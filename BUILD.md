@@ -27,13 +27,13 @@ Phase 6 — Enclosure, Test & Docs  [░░░░░░░░░░░░░░�
 > These must be resolved before the clock starts on Week 1.  
 > A blocked procurement = a blocked schedule.
 
-- [ ] **Buy 32GB microSD card (Class 10 / UHS-I)** — Pi 5 has no OS without this. Nothing runs until this is done.
-- [ ] **Flash Raspberry Pi OS Lite** onto the card using Raspberry Pi Imager.
-- [ ] **Boot and configure the Pi 5** — enable SSH, SPI interface, Camera interface, set hostname.
+- [x] **Buy 64GB microSD card (Class 10 / UHS-I)** — Pi 5 has no OS without this. Nothing runs until this is done.
+- [x] **Flash Raspberry Pi OS Lite** onto the card using Raspberry Pi Imager.
+- [x] **Boot and configure the Pi 5** — enable SSH, SPI interface, Camera interface, set hostname.
 - [ ] **Confirm Pi Camera Module compatibility** — Pi 5 uses a different CSI connector; may need an adapter cable.
 - [ ] **Install base Python packages** — `opencv-python`, `pytesseract`, `kivy`, `bcrypt`, `flask`, `requests`, `africastalking`.
 - [ ] **Order remaining hardware** — STM32 Nucleo, NEMA 17 motors, drivers, servos, IR sensors, solenoid, acrylic sheet.
-- [ ] **Set up project Git repository** — version control from day one.
+- [x] **Set up project Git repository** — version control from day one.
 
 ---
 
