@@ -139,12 +139,12 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 
 > _The local database is the kiosk's source of truth. Every card, student record, authentication state, and audit event lives here. Get the schema right before writing any application logic._
 
-- [ ] **2.1.1** Design the `students` table — registration number (PK), full name, programme, phone number, registration status. _(0.5 hr)_
-- [ ] **2.1.2** Design the `cards` table — card ID, registration number (FK), assigned slot index, card status (`pending`/`ready`/`collected`), batch ID, timestamps. _(0.5 hr)_
-- [ ] **2.1.3** Design the `authentication` table — registration number (FK), hashed OTP, OTP expiry timestamp, hashed PIN, failed OTP attempts, failed PIN attempts, lockout expiry. _(1 hr)_
-- [ ] **2.1.4** Design the `audit_log` table — log ID, timestamp, registration number, event type, failure type, session ID. _(0.5 hr)_
-- [ ] **2.1.5** Design the `batches` table — batch ID, staff ID, scan timestamp, total cards, stored count, rejected count, SMS sent count. _(0.5 hr)_
-- [ ] **2.1.6** Write Python schema initialisation script using `sqlite3` that creates all tables with correct constraints and indices. _(1 hr)_
+- [x] **2.1.1** Design the `students` table — registration number (PK), full name, programme, phone number, registration status. _(0.5 hr)_
+- [x] **2.1.2** Design the `cards` table — card ID, registration number (FK), assigned slot index, card status (`pending`/`ready`/`collected`), batch ID, timestamps. _(0.5 hr)_
+- [x] **2.1.3** Design the `authentication` table — registration number (FK), hashed OTP, OTP expiry timestamp, hashed PIN, `is_temp_pin` flag (FALSE for permanent, TRUE for temporary), failed OTP attempts, failed PIN attempts, lockout expiry. _(1 hr)_
+- [x] **2.1.4** Design the `audit_log` table — log ID, timestamp, registration number, event type, failure type, session ID. _(0.5 hr)_
+- [x] **2.1.5** Design the `batches` table — batch ID, staff ID, scan timestamp, total cards, stored count, rejected count, SMS sent count. _(0.5 hr)_
+- [x] **2.1.6** Write Python schema initialisation script using `sqlite3` that creates all tables with correct constraints and indices. _(1 hr)_
 
 **Subtotal: ~4 hrs**
 
@@ -260,12 +260,12 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 
 ### Task 3.4 — First-Year Temporary PIN Flow
 
-> _First-year students have no prior PIN. They receive a system-generated temporary PIN in their SMS alongside the OTP, and must immediately set a permanent PIN on first collection._
+> _First-year students have no prior PIN. They receive a system-generated temporary PIN in their SMS alongside the OTP, and must immediately set a permanent PIN on first collection. The database tracks whether the PIN is temporary via the `is_temp_pin` column in the `authentication` table._
 
 - [ ] **3.4.1** Write `generate_temp_pin()` using `secrets` — a random 4-digit numeric string. _(0.5 hr)_
-- [ ] **3.4.2** Store hashed temp PIN in `authentication` table with a `is_temp_pin = TRUE` flag. _(0.5 hr)_
-- [ ] **3.4.3** On successful PIN verification, check `is_temp_pin` flag — if true, force the new PIN entry screen before proceeding. _(0.5 hr)_
-- [ ] **3.4.4** On permanent PIN set, clear the `is_temp_pin` flag and overwrite the hash. _(0.5 hr)_
+- [ ] **3.4.2** Store hashed temp PIN in `authentication` table with the `is_temp_pin` column set to TRUE. Set `is_temp_pin = FALSE` for returning students with permanent PINs. _(0.5 hr)_
+- [ ] **3.4.3** On successful PIN verification, check the `is_temp_pin` flag in the `authentication` table — if TRUE, force the new PIN entry screen before proceeding to collection confirmation. _(0.5 hr)_
+- [ ] **3.4.4** On permanent PIN set, update the `authentication` table: set `is_temp_pin = FALSE` and overwrite the `pin_hash` with the new permanent PIN hash. _(0.5 hr)_
 
 **Subtotal: ~2 hrs**
 
