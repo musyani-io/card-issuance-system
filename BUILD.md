@@ -2,7 +2,7 @@
 
 > **Project:** Smart ID Card Distribution Kiosk  
 > **Duration:** 8 Weeks | **Developer:** Solo  
-> **Stack:** Raspberry Pi 5 · STM32 Nucleo-F446RE · Python 3.11 · C (STM32 HAL) · Kivy · SQLite · Flask
+> **Stack:** Raspberry Pi 5 (4GB) · STM32 Nucleo-F401RE · Python 3.11 · C (STM32 HAL) · Kivy · SQLite · Flask
 
 ---
 
@@ -422,7 +422,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 
 > _Before cutting a single piece of acrylic, get the STM32 firmware scaffolded and the SPI slave interpreter running. Hardware you can trust makes mechanical debugging much faster._
 
-- [ ] **5.1.1** Set up STM32CubeIDE project for Nucleo-F446RE. Enable SPI1 in slave mode, TIM2 and TIM3 for stepper pulse generation, TIM4 for servo PWM, and required GPIO pins. _(2 hrs)_
+- [ ] **5.1.1** Set up STM32CubeIDE project for Nucleo-F401RE. Enable SPI1 in slave mode, TIM2 and TIM3 for stepper pulse generation, TIM4 for servo PWM, and required GPIO pins. _(2 hrs)_
 - [ ] **5.1.2** Write SPI receive interrupt handler — parse incoming command frame, validate checksum, dispatch to command handler function. _(1.5 hrs)_
 - [ ] **5.1.3** Write `send_response(status, data)` function — builds response frame with checksum and queues it for SPI transmit. _(0.5 hr)_
 - [ ] **5.1.4** Test SPI communication with the Pi using loopback test from Task 4.5.4 — confirm all command bytes round-trip correctly. _(1 hr)_
