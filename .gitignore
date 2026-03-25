@@ -43,3 +43,20 @@ fp-info-cache
 *venv
 *venv
 *env
+kiosk-brain/venv/
+mock-db-api/.venv/
+
+# Runtime data
+kiosk-brain/data/kiosk.db
+kiosk-brain/data/logs/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# IDE / OS stuff
+.DS_Store
+.vscode/
+*.swp
+STM32CubeIDE_Project/Debug/
+STM32CubeIDE_Project/Release/
