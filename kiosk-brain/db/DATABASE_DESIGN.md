@@ -6,7 +6,52 @@ The SQLite database is the kiosk's source of truth. It stores student records, c
 
 ---
 
-## Key Design Decision: `is_temp_pin` Column
+## Key Design Decision 1: Email + SMS Credential Delivery
+
+### Purpose
+
+The `email` field in the `students` table enables **dual-channel credential delivery**. OTP and temporary PINs are sent to both the student's registered email and phone number for reliability and accessibility.
+
+**Advantages:**
+
+- **Redundancy** — If SMS fails (network, provider issues), email delivery succeeds
+- **Accessibility** — Some students may not have active SMS receive (international numbers, spotty coverage)
+- **Industry Standard** — Multi-channel 2FA is the modern security best practice
+
+### Implementation
+
+Each student record has:
+
+- `email` — University email (TEXT, can be NULL for edge cases)
+- `phone_number` — Mobile phone for SMS (TEXT, can be NULL)
+
+When credentials are generated:
+
+```
+send_credentials(email, phone_number, otp, temp_pin=None):
+  - Send SMS via Africa's Talking if phone_number exists
+  - Send email via SMTP (Gmail/University SMTP) if email exists
+  - Log failures separately for each channel
+  - Do NOT fail the entire batch if one channel fails
+```
+
+**Message Examples:**
+
+For **Returning Students** (no temp PIN):
+
+- **SMS:** `"Your ID card is ready. OTP: 847291. Collect 24/7."`
+- **Email:** `Subject: Your ID Card Claim OTP`  
+  `Your OTP is: 847291 (valid 24 hours)`
+
+For **First-Year Students** (with temp PIN):
+
+- **SMS:** `"OTP: 847291 | Temp PIN: 3829. Change PIN on first visit."`
+- **Email:** `Subject: Your ID Card Claim - OTP and Temporary PIN`  
+  `OTP: 847291 | Temporary PIN: 3829 (Change on first collection)`
+
+---
+
+## Key Design Decision 2: `is_temp_pin` Column
 
 ### Purpose
 
@@ -131,13 +176,13 @@ def cleanup_old_records():
 
 ## Table Summary
 
-| Table            | Purpose                        | Key Columns                                                                                                                                                         |
-| ---------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `students`       | Student records                | `registration_number` (PK), `full_name`, `programme`, `phone_number`, `registration_status`                                                                         |
-| `cards`          | Track individual ID cards      | `card_id` (PK), `registration_number` (FK), `slot_index`, `card_status`, `batch_id`, `created_at`, `updated_at`                                                     |
-| `authentication` | PIN/OTP credentials & security | `auth_id` (PK), `registration_number` (FK), `otp_hash`, `otp_expiry`, `pin_hash`, **`is_temp_pin`**, `failed_otp_attempts`, `failed_pin_attempts`, `lockout_expiry` |
-| `audit_log`      | Immutable audit trail          | `log_id` (PK), `timestamp`, `registration_number`, `event_type`, `failure_type`, `session_id`                                                                       |
-| `batches`        | Staff loading sessions         | `batch_id` (PK), `staff_id`, `scan_timestamp`, `total_cards`, `stored_count`, `rejected_count`, `sms_sent_count`                                                    |
+| Table            | Purpose                        | Key Columns                                                                                                                                                                         |
+| ---------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `students`       | Student records                | `registration_number` (PK), `first_name`, `surname`, `email`, `phone_number`, `programme`, `year_of_study`, `date_of_birth`, `national_id_number`, `faculty`, `registration_status` |
+| `cards`          | Track individual ID cards      | `card_id` (PK), `registration_number` (FK), `slot_index`, `card_status`, `batch_id`, `created_at`, `updated_at`                                                                     |
+| `authentication` | PIN/OTP credentials & security | `auth_id` (PK), `registration_number` (FK), `otp_hash`, `otp_expiry`, `pin_hash`, **`is_temp_pin`**, `failed_otp_attempts`, `failed_pin_attempts`, `lockout_expiry`                 |
+| `audit_log`      | Immutable audit trail          | `log_id` (PK), `timestamp`, `registration_number`, `event_type`, `failure_type`, `session_id`                                                                                       |
+| `batches`        | Staff loading sessions         | `batch_id` (PK), `staff_id`, `scan_timestamp`, `total_cards`, `stored_count`, `rejected_count`, `sms_sent_count`                                                                    |
 
 ---
 

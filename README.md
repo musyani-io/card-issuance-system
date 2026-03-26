@@ -148,7 +148,8 @@ SQLite file stored on 64GB microSD at runtime. Three critical tables:
 ```sql
 CREATE TABLE students (
   reg_number TEXT PRIMARY KEY,
-  full_name TEXT NOT NULL,
+  first_name TEXT NOT NULL,
+  surname TEXT NOT NULL,
   programme TEXT,
   phone TEXT,
   status TEXT CHECK(status IN ('active', 'inactive', 'suspended')),

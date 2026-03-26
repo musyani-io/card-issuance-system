@@ -139,7 +139,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 
 > _The local database is the kiosk's source of truth. Every card, student record, authentication state, and audit event lives here. Get the schema right before writing any application logic._
 
-- [x] **2.1.1** Design the `students` table — registration number (PK), full name, programme, phone number, registration status. _(0.5 hr)_
+- [x] **2.1.1** Design the `students` table — registration number (PK), first name, surname, email, phone number, programme, year of study, date of birth, national ID, faculty, registration status. _(0.5 hr)_
 - [x] **2.1.2** Design the `cards` table — card ID, registration number (FK), assigned slot index, card status (`pending`/`ready`/`collected`), batch ID, timestamps. _(0.5 hr)_
 - [x] **2.1.3** Design the `authentication` table — registration number (FK), hashed OTP, OTP expiry timestamp, hashed PIN, `is_temp_pin` flag (FALSE for permanent, TRUE for temporary), failed OTP attempts, failed PIN attempts, lockout expiry. _(1 hr)_
 - [x] **2.1.4** Design the `audit_log` table — log ID, timestamp, registration number, event type, failure type, session ID. _(0.5 hr)_
@@ -154,8 +154,8 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 
 > _The real university database won't be available during development. This Flask API on your laptop stands in for it, serving realistic student records so the Pi can do a real API lookup during batch loading._
 
-- [ ] **2.2.1** Set up a Flask project on the development laptop with a virtual environment. _(0.5 hr)_
-- [ ] **2.2.2** Populate a mock dataset of at least 30 student records (name, programme, phone, registration status). _(0.5 hr)_
+- [x] **2.2.1** Set up a Flask project on the development laptop with a virtual environment. _(0.5 hr)_
+- [x] **2.2.2** Populate a mock dataset of at least 30 student records (registration number, first name, surname, email, phone, programme, year of study, date of birth, national ID, faculty, registration status). _(0.5 hr)_
 - [ ] **2.2.3** Implement `GET /students/{reg_number}` endpoint — returns student record or 404 if not found. _(0.5 hr)_
 - [ ] **2.2.4** Implement `GET /students/{reg_number}/status` endpoint — returns only registration status (active/inactive). _(0.5 hr)_
 - [ ] **2.2.5** Add basic API key header authentication to the endpoint — the Pi will include this in every request. _(0.5 hr)_
@@ -231,18 +231,18 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 
 ---
 
-### Task 3.2 — Africa's Talking SMS Integration
+### Task 3.2 — Credential Delivery (SMS + Email)
 
-> _The OTP reaches the student only via SMS. Africa's Talking is the chosen provider — their Python SDK is straightforward and has good coverage across East Africa._
+> _OTP and temporary PINs are sent to both the student's phone (via SMS) and email (via SMTP) for redundancy and reliability. Africa's Talking handles SMS, and the kiosk-brain uses Python's `smtplib` for email delivery._
 
 - [ ] **3.2.1** Sign up for Africa's Talking sandbox account if not already done. Retrieve API key and sender name. _(0.5 hr)_
 - [ ] **3.2.2** Install SDK: `pip install africastalking`. Initialise with credentials in a config file (not hardcoded). _(0.5 hr)_
-- [ ] **3.2.3** Write `send_otp_sms(phone_number, otp, temp_pin=None)` function — formats message differently for returning vs first-year students. _(1 hr)_
-- [ ] **3.2.4** Handle SMS send failures (network error, invalid number) — log failure to `batches` table, do not crash the batch. _(0.5 hr)_
-- [ ] **3.2.5** Test SMS delivery to a real phone number using sandbox credentials. Confirm message arrives correctly. _(0.5 hr)_
-- [ ] **3.2.6** Implement OTP resend function with rate limiting: allow resend only if last OTP was sent >10 minutes ago. _(1 hr)_
+- [ ] **3.2.3** Write `send_credentials(email, phone_number, otp, temp_pin=None)` function — sends to both SMS (via Africa's Talking) and email (via SMTP). Formats message differently for returning vs first-year students. _(1.5 hrs)_
+- [ ] **3.2.4** Handle send failures (SMS network error, invalid email, SMTP failure) — log failure to `batches` table, do not crash the batch. _(0.5 hr)_
+- [ ] **3.2.5** Test credential delivery to both real phone and email address using sandbox credentials. Confirm both arrive correctly. _(0.5 hr)_
+- [ ] **3.2.6** Implement OTP resend function with rate limiting: allow resend only if last OTP was sent >10 minutes ago. Resend to both SMS and email. _(1 hr)_
 
-**Subtotal: ~4 hrs**
+**Subtotal: ~4.5 hrs**
 
 ---
 

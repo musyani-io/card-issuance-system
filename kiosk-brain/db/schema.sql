@@ -1,6 +1,8 @@
 CREATE TABLE students (
     registration_number TEXT PRIMARY KEY,
-    full_name TEXT NOT NULL,
+    first_name TEXT NOT NULL,
+    surname TEXT NOT NULL,
+    email TEXT NULL,
     programme TEXT NOT NULL,
     phone_number TEXT NULL,
     registration_status TEXT NOT NULL DEFAULT 'inactive'

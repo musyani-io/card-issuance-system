@@ -26,7 +26,7 @@ Workflow Examples:
 
 FIRST-YEAR STUDENT (First Collection):
   1. Card loaded → OCR reads reg number
-  2. SMS sent with OTP + temp PIN (hashed in DB, is_temp_pin=TRUE)
+  2. Credentials sent via SMS + EMAIL with OTP + temp PIN (hashed in DB, is_temp_pin=TRUE)
   3. Student enters OTP → Success
   4. Student enters temp PIN → Success
   5. Check is_temp_pin=TRUE → Force PIN setup screen
@@ -36,11 +36,20 @@ FIRST-YEAR STUDENT (First Collection):
 
 RETURNING STUDENT (Has Prior Year PIN):
   1. Old card scanned → OCR reads reg number
-  2. SMS sent with only OTP (existing PIN in DB unchanged, is_temp_pin=FALSE)
+  2. OTP sent via SMS + EMAIL (existing PIN in DB unchanged, is_temp_pin=FALSE)
   3. Student enters OTP → Success
   4. Student enters their existing PIN → Success
   5. Check is_temp_pin=FALSE → Skip PIN setup, proceed to confirm
   6. Confirm screen → Card dispensed
+
+CREDENTIAL DELIVERY STRATEGY:
+=============================
+Credentials (OTP + optional temp PIN) are sent via TWO channels:
+- SMS via Africa's Talking API (phone_number)
+- Email via SMTP (email)
+
+If one channel fails, the kiosk continues (does not crash batch).
+Both channels are attempted independently.
 
 Function Stubs (Implement in Phase 3):
 =====================================
