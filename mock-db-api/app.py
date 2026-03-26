@@ -55,3 +55,13 @@ STUDENTS = {
         'year_of_study': 4,
     },
 }
+
+@app.route('/students/<reg_number>', methods=['GET'])
+def get_student(reg_number):
+    """Retrieve student info by registration number"""
+    student = STUDENTS.get(reg_number)
+
+    if student is None:
+        return jsonify({'error': 'Student not found'}), 404
+    else:
+        return jsonify(student), 200
