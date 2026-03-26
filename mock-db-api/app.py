@@ -1,4 +1,5 @@
 from flask import Flask, jsonify, request
+from functools import wraps
 from datetime import datetime
 import os
 
@@ -11,6 +12,19 @@ def generate_student_email(first_name, surname, registration_number):
     first_name_l = first_name.lower()
     surname_l = surname.lower()
     return f"{first_name_l}.{surname_l}_{year_suffix}@student.udsm.ac.tz"
+
+def require_api_key(f):
+    """Decorate to enforce API key authentication on endpoints"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        api_key = request.headers.get('X-API-Key')
+
+        if not api_key or api_key != API_KEY:
+            return jsonify({'error': 'Invalid key'}), 401
+        
+        return f(*args, **kwargs)
+    
+    return decorated_function
 
 STUDENTS = {
     '2022-04-09050': {
@@ -57,6 +71,7 @@ STUDENTS = {
 }
 
 @app.route('/students/<reg_number>', methods=['GET'])
+@require_api_key
 def get_student(reg_number):
     """Retrieve student info by registration number"""
     student = STUDENTS.get(reg_number)
@@ -65,3 +80,4 @@ def get_student(reg_number):
         return jsonify({'error': 'Student not found'}), 404
     else:
         return jsonify(student), 200
+    

@@ -157,7 +157,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [x] **2.2.1** Set up a Flask project on the development laptop with a virtual environment. _(0.5 hr)_
 - [x] **2.2.2** Populate a mock dataset of at least 30 student records (registration number, first name, surname, email, phone, programme, year of study, date of birth, national ID, faculty, registration status). _(0.5 hr)_
 - [x] **2.2.3** Implement `GET /students/{reg_number}` endpoint — returns student record (including `registration_status`) or 404 if not found. Extract status from the response as needed. _(0.5 hr)_
-- [ ] **2.2.4** Add basic API key header authentication to the endpoint — the Pi will include this in every request. _(0.5 hr)_
+- [x] **2.2.4** Add basic API key header authentication to the endpoint — the Pi will include this in every request. _(0.5 hr)_
 - [ ] **2.2.5** Configure mDNS hostname so the Pi can resolve `university-db.local` — install `avahi-daemon` on the laptop if Linux, or use Bonjour on Windows/macOS. _(1 hr)_
 
 **Subtotal: ~3 hrs**
