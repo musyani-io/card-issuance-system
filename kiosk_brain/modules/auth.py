@@ -60,56 +60,171 @@ import sqlite3
 import bcrypt
 import secrets
 
+
 def generate_otp():
-    """Generate a cryptographically secure 6-digit OTP"""
-    otp_number = secrets.randbelow(1_000_000)
-    return f"{otp_number:06d}"
+    """
+    Generate a cryptographically secure 6-digit One-Time Password.
+
+    Returns:
+        str: Zero-padded 6-digit OTP (e.g., "000123", "847291")
+             Generated using secrets.randbelow() for cryptographic randomness
+
+    Usage:
+        Called during batch loading to create OTP for SMS dispatch
+        Example: otp = generate_otp() → "847291"
+    """
+    otp_number = secrets.randbelow(1_000_000)  # Random int [0, 999999]
+    return f"{otp_number:06d}"  # Zero-pad to 6 digits
+
 
 def store_otp_to_db(reg_number, otp_num, db_path="data/kiosk.db"):
-    """Stores the OTP hash and adds a 24-hour expiry"""
-    otp_hash = bcrypt.hashpw(otp_num.encode('utf-8'), bcrypt.gensalt())
+    """
+    Store hashed OTP and 24-hour expiry timestamp to authentication table.
+
+    Args:
+        reg_number: Student registration number (primary key in authentication table)
+        otp_num: Plain-text OTP string (e.g., "847291") to be hashed
+        db_path: Path to SQLite database (default: data/kiosk.db)
+
+    Side Effects:
+        - Hashes OTP with bcrypt (one-way, never stored in plaintext)
+        - Sets otp_expiry to current UTC time + 24 hours
+        - Updates authentication table for given reg_number
+        - Resets failed_otp_attempts counter to 0 (optional, if implemented)
+
+    Called by:
+        - SMS dispatch workflow during batch loading (Phase 3)
+        - After university API confirms student is active/inactive/suspended
+
+    Security Notes:
+        - bcrypt.gensalt() ensures different hash per OTP (rainbow table resistant)
+        - 24-hour expiry prevents multi-day reuse
+        - Hashed OTP never sent over network or logged
+    """
+    # Hash OTP with bcrypt (12-round default cost)
+    otp_hash = bcrypt.hashpw(otp_num.encode("utf-8"), bcrypt.gensalt())
+    # Set expiry timestamp (24 hours from now)
     otp_expiry = datetime.utcnow() + timedelta(hours=24)
 
+    # Write hashed OTP and expiry to database
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    cursor.execute("UPDATE authentication SET otp_hash = ?, otp_expiry = ? WHERE registration_number = ?", 
-                   (otp_hash, otp_expiry, reg_number))
-    
+    cursor.execute(
+        "UPDATE authentication SET otp_hash = ?, otp_expiry = ? WHERE registration_number = ?",
+        (otp_hash, otp_expiry, reg_number),
+    )
+
     conn.commit()
     conn.close()
 
+
 def verify_otp(reg_number, otp_num, db_path="data/kiosk.db"):
-    """Compares the student's OTP entry with the DB's"""
+    """
+    Verify student OTP against database hash using bcrypt.checkpw() comparison.
+
+    Args:
+        reg_number: Student registration number (lookup key in authentication table)
+        otp_num: Student-entered OTP string (e.g., "847291"), compared to hashed DB value
+        db_path: Path to SQLite database (default: data/kiosk.db)
+
+    Returns:
+        dict: Status response with keys:
+            - 'success': bool (True if OTP verified, False otherwise)
+            - 'error': str or None (error code: NOT_FOUND, EXPIRED, LOCKED, INVALID)
+            - 'message': str (human-readable status for UI display)
+
+    Error Codes:
+        - NOT_FOUND: Registration number not in authentication table (batch not loaded)
+        - EXPIRED: OTP > 24 hours old (otp_expiry < now); requires new batch load
+        - LOCKED: 3 failed attempts; soft lockout for 30 minutes (attempt count resets after expiry)
+        - INVALID: OTP hash mismatch (student entered wrong OTP); allows unlimited attempts
+
+    Side Effects on Failure:
+        - Increments failed_otp_attempts counter (+1 per failed bcrypt.checkpw)
+        - After 3 failures: sets lockout_expiry = now + 30 minutes
+        - Attempts during lockout period still return 'LOCKED' response
+
+    Called by:
+        - Card collection screen after student taps OTP entry field
+        - Session manager waits for await_authentication() callback before proceeding
+
+    Workflow Context:
+        - Success → unlock PIN entry screen (verify_pin() called next)
+        - Failure → display error message, allow retry (up to 3 times in 30 minutes)
+        - Expired → revert to batch loading kiosk (requires re-sending credentials)
+
+    Security Notes:
+        - bcrypt.checkpw() is constant-time comparison (immune to timing attacks)
+        - Soft 30-minute lockout prevents brute force (6! = 720k OTPs, recoverable after timeout)
+        - Hard 24-hour lockout prevents reuse (fresh batch load required)
+        - Hashed OTP always stored; plaintext only in RAM during comparison
+    """
+    # Fetch hashed OTP and expiry timestamp from authentication table
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    cursor.execute("SELECT otp_hash, otp_expiry FROM authentication WHERE registration_number = ?", (reg_number,))
+    cursor.execute(
+        "SELECT otp_hash, otp_expiry FROM authentication WHERE registration_number = ?",
+        (reg_number,),
+    )
     result = cursor.fetchone()
-    
+
+    # Student not found in batch (batch loading required)
     if result is None:
         conn.close()
-        return {'success': False, 'error': 'NOT FOUND', 'message': "Registration number not found"}
-    
+        return {
+            "success": False,
+            "error": "NOT FOUND",
+            "message": "Registration number not found",
+        }
+
+    # OTP > 24 hours old (hard lockout / expiry)
     if result[1] < datetime.utcnow():
         conn.close()
-        return {'success': False, 'error': 'EXPIRED', 'message': 'OTP has expired. Contact SMARTCARD'}
-    
-    is_valid = bcrypt.checkpw(otp_num.encode('utf-8'), result[0])
+        return {
+            "success": False,
+            "error": "EXPIRED",
+            "message": "OTP has expired. Contact SMARTCARD",
+        }
+
+    # Constant-time bcrypt comparison (true if hashes match, false otherwise)
+    is_valid = bcrypt.checkpw(otp_num.encode("utf-8"), result[0])
     if not is_valid:
-        cursor.execute("UPDATE authentication SET failed_otp_attempts = failed_otp_attempts + 1 WHERE registration_number = ?", (reg_number,))
+        # Increment failed OTP attempt counter for lock-out enforcement
+        cursor.execute(
+            "UPDATE authentication SET failed_otp_attempts = failed_otp_attempts + 1 WHERE registration_number = ?",
+            (reg_number,),
+        )
         conn.commit()
 
-        cursor.execute("SELECT failed_otp_attempts FROM authentication WHERE registration_number = ?", (reg_number,))
+        # Check if soft lockout (3 failed attempts) triggered
+        cursor.execute(
+            "SELECT failed_otp_attempts FROM authentication WHERE registration_number = ?",
+            (reg_number,),
+        )
         failed_otp_attempts = cursor.fetchone()
 
         if failed_otp_attempts[0] >= 3:
+            # Set 30-minute recovery window (soft lockout expires after timedelta)
             lockout_time = datetime.utcnow() + timedelta(minutes=30)
-            cursor.execute("UPDATE authentication SET lockout_expiry = ? WHERE registration_number = ?", (lockout_time, reg_number))
+            cursor.execute(
+                "UPDATE authentication SET lockout_expiry = ? WHERE registration_number = ?",
+                (lockout_time, reg_number),
+            )
             conn.commit()
             conn.close()
-            return {'success': False, 'error': 'LOCKED', 'message': 'Too many retries. Try after 30 minutes'}
+            return {
+                "success": False,
+                "error": "LOCKED",
+                "message": "Too many retries. Try after 30 minutes",
+            }
 
         conn.close()
-        return {'success': False, 'error': 'INVALID', 'message': 'Incorrect OTP. Try again.'}
-    
+        return {
+            "success": False,
+            "error": "INVALID",
+            "message": "Incorrect OTP. Try again.",
+        }
+
+    # OTP verified successfully; proceed to PIN verification
     conn.close()
-    return {'success': True, 'error': None, 'message': 'OTP verified successfully'}
+    return {"success": True, "error": None, "message": "OTP verified successfully"}

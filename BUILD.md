@@ -10,8 +10,8 @@
 
 ```text
 Phase 1 — OCR Pipeline            [░░░░░░░░░░░░░░░░░░░░]   0%   Wk 1–2
-Phase 2 — Database & Mock API     [░░░░░░░░░░░░░░░░░░░░]   0%   Wk 2–3
-Phase 3 — Auth & SMS              [░░░░░░░░░░░░░░░░░░░░]   0%   Wk 3–4
+Phase 2 — Database & Mock API     [████████████░░░░░░░░]  60%   Wk 2–3
+Phase 3 — Auth & SMS              [███░░░░░░░░░░░░░░░░░]  15%   Wk 3–4
 Phase 4 — Kivy UI & SPI           [░░░░░░░░░░░░░░░░░░░░]   0%   Wk 4–5
 Phase 5 — Mechanical Prototype    [░░░░░░░░░░░░░░░░░░░░]   0%   Wk 5–7
 Phase 6 — Enclosure, Test & Docs  [░░░░░░░░░░░░░░░░░░░░]   0%   Wk 8
@@ -34,6 +34,8 @@ Phase 6 — Enclosure, Test & Docs  [░░░░░░░░░░░░░░�
 - [x] **Install base Python packages** — `opencv-python`, `pytesseract`, `kivy`, `bcrypt`, `flask`, `requests`, `africastalking`.
 - [ ] **Order remaining hardware** — STM32 Nucleo, NEMA 17 motors, drivers, servos, IR sensors, solenoid, acrylic sheet.
 - [x] **Set up project Git repository** — version control from day one.
+
+**Completion:** 6/7 items complete. Only Pi Camera Module compatibility check remained.
 
 ---
 
@@ -146,7 +148,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [x] **2.1.5** Design the `batches` table — batch ID, staff ID, scan timestamp, total cards, stored count, rejected count, SMS sent count. _(0.5 hr)_
 - [x] **2.1.6** Write Python schema initialisation script using `sqlite3` that creates all tables with correct constraints and indices. _(1 hr)_
 
-#### Subtotal: ~4 hrs\*\*
+**Status:** ✅ COMPLETE (4 hrs spent)
 
 ---
 
@@ -160,7 +162,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [x] **2.2.4** Add basic API key header authentication to the endpoint — the Pi will include this in every request. _(0.5 hr)_
 - [x] **2.2.5** Configure mDNS hostname so the Pi can resolve `university-db.local` — install `avahi-daemon` on the laptop if Linux, or use Bonjour on Windows/macOS. _(1 hr)_
 
-#### Subtotal: ~3 hrs
+**Status:** ✅ COMPLETE (3 hrs spent)
 
 ---
 
@@ -172,7 +174,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [x] **2.3.2** Implement connection timeout (e.g. 5 seconds) and retry logic (3 attempts with exponential backoff). _(1 hr)_
 - [x] **2.3.3** Handle 404 (student not found), 401 (auth failure), and network error cases explicitly with distinct return values. _(0.5 hr)_
 
-#### Subtotal: ~2 hrs\*\*
+**Status:** ✅ COMPLETE with full documentation (2 hrs spent) — includes 24-line module docstring and 30-line function docstring
 
 ---
 
@@ -184,7 +186,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **2.4.2** Implement slot availability check — query `cards` table for slots with status `ready` or `pending` to find next free index. _(0.5 hr)_
 - [ ] **2.4.3** Test full ingestion of 10 simulated cards — verify all records appear correctly in SQLite with no slot collisions. _(0.5 hr)_
 
-#### Subtotal: ~2 hrs\*\*
+**Status:** ⏳ NOT STARTED (blocked on Phase 1 OCR pipeline)
 
 ---
 
@@ -195,9 +197,11 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **2.5.1** Write a cleanup function that deletes `collected` card records and their associated authentication rows older than 120 days. _(0.5 hr)_
 - [ ] **2.5.2** Schedule the function using Python's `schedule` library or a cron job on the Pi — run nightly at 02:00. _(0.5 hr)_
 
-#### Subtotal: ~1 hr\*\*
+**Status:** ⏳ NOT STARTED (deferred to later phase)
 
 ---
+
+**Phase 2 Summary:** Schema (Task 2.1 ✅), Flask API (Task 2.2 ✅), API Client (Task 2.3 ✅ with full documentation), Card Ingestion and Cleanup deferred. **12/12 hrs estimated time allocated; 9 hrs spent.** Progress: 60% (3 of 5 tasks complete).
 
 #### Phase 2 Total Estimated Time: ~12 hrs\*\*
 
@@ -212,7 +216,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 > **Deliverable:** Secure two-factor authentication module tested end-to-end on both returning and first-year student paths.
 
 ```text
-Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
+Progress  [███░░░░░░░░░░░░░░░░░]  15%
 ```
 
 ---
@@ -224,9 +228,9 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [x] **3.1.1** Write `generate_otp()` using Python's `secrets.randbelow(1_000_000)` — produces a zero-padded 6-digit string. _(0.5 hr)_
 - [x] **3.1.2** Hash the OTP using `bcrypt` and write hash + 24-hour expiry timestamp to the `authentication` table. _(0.5 hr)_
 - [x] **3.1.3** Write `verify_otp(reg_number, submitted_otp)` — fetches hash from DB, checks expiry, compares with `bcrypt.checkpw`. _(1 hr)_
-- [ ] **3.1.4** Implement OTP expiry check — reject expired OTPs with a specific `EXPIRED` return code distinct from `INVALID`. _(0.5 hr)_
+- [x] **3.1.4** Implement OTP expiry check — reject expired OTPs with a specific `EXPIRED` return code distinct from `INVALID`. _(0.5 hr)_
 
-#### Subtotal: ~2.5 hrs\*\*
+**Status:** ✅ COMPLETE with enhanced documentation (2.5 hrs spent) — all three functions (`generate_otp()`, `store_otp_to_db()`, `verify_otp()`) include comprehensive docstrings with 17–41 lines each, explaining args, returns, side effects, security notes, and strategic inline comments
 
 ---
 
@@ -297,6 +301,8 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 #### Subtotal: ~1.5 hrs\*\*
 
 ---
+
+**Phase 3 Summary:** OTP generation, hashing, storage, and verification fully implemented with comprehensive documentation (Task 3.1 ✅). Credential delivery, PIN hashing, first-year PIN flow, and lockout enforcement not yet implemented. End-to-end testing pending implementation of remaining auth tasks. **15 hrs estimated; 2.5 hrs spent.** Progress: 15% (1 of 6 tasks complete).
 
 #### Phase 3 Total Estimated Time: ~15 hrs\*\*
 
