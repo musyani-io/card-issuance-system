@@ -60,7 +60,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **1.1.3** Test lighting conditions — add a fixed diffuse light source above the scan station if natural light is inconsistent. _(0.5 hr)_
 - [ ] **1.1.4** Confirm captured frames are sharp and the card fills a consistent region of the frame. _(0.5 hr)_
 
-**Subtotal: ~2.5 hrs**
+#### Subtotal: ~2.5 hrs\*\*
 
 ---
 
@@ -74,7 +74,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **1.2.4** Define and crop a fixed Region of Interest (ROI) around where the registration number is printed on the card layout. _(1 hr)_
 - [ ] **1.2.5** Apply mild Gaussian blur followed by sharpening kernel to reduce noise while preserving character edges. _(0.5 hr)_
 
-**Subtotal: ~5 hrs**
+#### Subtotal: ~5 hrs\*\*
 
 ---
 
@@ -87,7 +87,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **1.3.3** Whitelist only alphanumeric characters relevant to your registration number format to reduce false characters. _(0.5 hr)_
 - [ ] **1.3.4** Retrieve the confidence score from Tesseract output data — this is the threshold gate for reject vs. accept. _(0.5 hr)_
 
-**Subtotal: ~2 hrs**
+#### Subtotal: ~2 hrs\*\*
 
 ---
 
@@ -99,7 +99,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **1.4.2** Implement decision logic: if confidence ≥ threshold AND regex matches → accept. Otherwise → reject. _(0.5 hr)_
 - [ ] **1.4.3** Implement the physical reject path signal — send a command to the STM32 (stub for now) to actuate the servo flap into the reject bin. _(0.5 hr)_
 
-**Subtotal: ~1.5 hrs**
+#### Subtotal: ~1.5 hrs\*\*
 
 ---
 
@@ -112,11 +112,11 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **1.5.3** Adjust the confidence threshold to maximise true accepts while keeping false accepts at zero. _(0.5 hr)_
 - [ ] **1.5.4** Document final threshold value and accuracy result. Target: >90% accuracy. _(0.5 hr)_
 
-**Subtotal: ~2.5 hrs**
+#### Subtotal: ~2.5 hrs\*\*
 
 ---
 
-**Phase 1 Total Estimated Time: ~13.5 hrs**
+#### Phase 1 Total Estimated Time: ~13.5 hrs\*\*
 
 ---
 
@@ -146,7 +146,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [x] **2.1.5** Design the `batches` table — batch ID, staff ID, scan timestamp, total cards, stored count, rejected count, SMS sent count. _(0.5 hr)_
 - [x] **2.1.6** Write Python schema initialisation script using `sqlite3` that creates all tables with correct constraints and indices. _(1 hr)_
 
-**Subtotal: ~4 hrs**
+#### Subtotal: ~4 hrs\*\*
 
 ---
 
@@ -158,9 +158,9 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [x] **2.2.2** Populate a mock dataset of at least 30 student records (registration number, first name, surname, email, phone, programme, year of study, date of birth, national ID, faculty, registration status). _(0.5 hr)_
 - [x] **2.2.3** Implement `GET /students/{reg_number}` endpoint — returns student record (including `registration_status`) or 404 if not found. Extract status from the response as needed. _(0.5 hr)_
 - [x] **2.2.4** Add basic API key header authentication to the endpoint — the Pi will include this in every request. _(0.5 hr)_
-- [ ] **2.2.5** Configure mDNS hostname so the Pi can resolve `university-db.local` — install `avahi-daemon` on the laptop if Linux, or use Bonjour on Windows/macOS. _(1 hr)_
+- [x] **2.2.5** Configure mDNS hostname so the Pi can resolve `university-db.local` — install `avahi-daemon` on the laptop if Linux, or use Bonjour on Windows/macOS. _(1 hr)_
 
-**Subtotal: ~3 hrs**
+#### Subtotal: ~3 hrs
 
 ---
 
@@ -172,7 +172,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **2.3.2** Implement connection timeout (e.g. 5 seconds) and retry logic (3 attempts with exponential backoff). _(1 hr)_
 - [ ] **2.3.3** Handle 404 (student not found), 401 (auth failure), and network error cases explicitly with distinct return values. _(0.5 hr)_
 
-**Subtotal: ~2 hrs**
+#### Subtotal: ~2 hrs\*\*
 
 ---
 
@@ -184,7 +184,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **2.4.2** Implement slot availability check — query `cards` table for slots with status `ready` or `pending` to find next free index. _(0.5 hr)_
 - [ ] **2.4.3** Test full ingestion of 10 simulated cards — verify all records appear correctly in SQLite with no slot collisions. _(0.5 hr)_
 
-**Subtotal: ~2 hrs**
+#### Subtotal: ~2 hrs\*\*
 
 ---
 
@@ -195,11 +195,11 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **2.5.1** Write a cleanup function that deletes `collected` card records and their associated authentication rows older than 120 days. _(0.5 hr)_
 - [ ] **2.5.2** Schedule the function using Python's `schedule` library or a cron job on the Pi — run nightly at 02:00. _(0.5 hr)_
 
-**Subtotal: ~1 hr**
+#### Subtotal: ~1 hr\*\*
 
 ---
 
-**Phase 2 Total Estimated Time: ~12 hrs**
+#### Phase 2 Total Estimated Time: ~12 hrs\*\*
 
 ---
 
@@ -226,7 +226,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **3.1.3** Write `verify_otp(reg_number, submitted_otp)` — fetches hash from DB, checks expiry, compares with `bcrypt.checkpw`. _(1 hr)_
 - [ ] **3.1.4** Implement OTP expiry check — reject expired OTPs with a specific `EXPIRED` return code distinct from `INVALID`. _(0.5 hr)_
 
-**Subtotal: ~2.5 hrs**
+#### Subtotal: ~2.5 hrs\*\*
 
 ---
 
@@ -241,7 +241,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **3.2.5** Test credential delivery to both real phone and email address using sandbox credentials. Confirm both arrive correctly. _(0.5 hr)_
 - [ ] **3.2.6** Implement OTP resend function with rate limiting: allow resend only if last OTP was sent >10 minutes ago. Resend to both SMS and email. _(1 hr)_
 
-**Subtotal: ~4.5 hrs**
+#### Subtotal: ~4.5 hrs\*\*
 
 ---
 
@@ -253,7 +253,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **3.3.2** Write `verify_pin(reg_number, submitted_pin)` — fetches hash from `authentication` table, calls `bcrypt.checkpw`. _(0.5 hr)_
 - [ ] **3.3.3** Write `set_pin(reg_number, new_pin)` — validates 4–6 digit length, hashes, and writes to `authentication` table. _(0.5 hr)_
 
-**Subtotal: ~1.5 hrs**
+#### Subtotal: ~1.5 hrs\*\*
 
 ---
 
@@ -266,7 +266,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **3.4.3** On successful PIN verification, check the `is_temp_pin` flag in the `authentication` table — if TRUE, force the new PIN entry screen before proceeding to collection confirmation. _(0.5 hr)_
 - [ ] **3.4.4** On permanent PIN set, update the `authentication` table: set `is_temp_pin = FALSE` and overwrite the `pin_hash` with the new permanent PIN hash. _(0.5 hr)_
 
-**Subtotal: ~2 hrs**
+#### Subtotal: ~2 hrs\*\*
 
 ---
 
@@ -282,7 +282,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **3.5.6** Write `log_audit_event(reg_number, event_type, failure_type, session_id)` function — inserts a row into `audit_log`. _(0.5 hr)_
 - [ ] **3.5.7** Call audit logger on: every OTP failure, every PIN failure, every lockout trigger, every successful collection. _(0.5 hr)_
 
-**Subtotal: ~3.5 hrs**
+#### Subtotal: ~3.5 hrs\*\*
 
 ---
 
@@ -294,11 +294,11 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **3.6.2** Simulate first-year student path: OTP receive → correct OTP → temp PIN → set permanent PIN → success. _(0.5 hr)_
 - [ ] **3.6.3** Simulate lockout scenarios: 3× wrong OTP, then 3× wrong PIN on a fresh session. Confirm lockout records in `audit_log`. _(0.5 hr)_
 
-**Subtotal: ~1.5 hrs**
+#### Subtotal: ~1.5 hrs\*\*
 
 ---
 
-**Phase 3 Total Estimated Time: ~15 hrs**
+#### Phase 3 Total Estimated Time: ~15 hrs\*\*
 
 ---
 
@@ -325,7 +325,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **4.1.3** Implement `SessionManager` class — holds current session state (reg number, session ID, auth step) and provides a `teardown()` method that resets all state and returns to `IDLE`. _(1 hr)_
 - [ ] **4.1.4** Implement a session timeout timer — if no touch input for 90 seconds mid-session, call `teardown()` automatically. _(1 hr)_
 
-**Subtotal: ~3.5 hrs**
+#### Subtotal: ~3.5 hrs\*\*
 
 ---
 
@@ -338,7 +338,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **4.2.3** Build **Batch Progress** screen — live feed showing card number being processed, current OCR result, accept/reject decision, running counts for stored/rejected/failed. _(1.5 hrs)_
 - [ ] **4.2.4** Build **Batch Summary** screen — final counts table (scanned, stored, inactive-held, rejected, SMS sent/failed). Logout button. _(1 hr)_
 
-**Subtotal: ~5 hrs**
+#### Subtotal: ~5 hrs\*\*
 
 ---
 
@@ -356,7 +356,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **4.3.8** Build **Success** screen — "Your card has been dispensed" message, optional 1-tap satisfaction rating, auto-return to Idle after 8 seconds. _(0.5 hr)_
 - [ ] **4.3.9** Build **Locked** screen — explains lockout type (OTP or PIN), displays time remaining until unlock, auto-return to Idle when timer expires. _(0.5 hr)_
 
-**Subtotal: ~6 hrs**
+#### Subtotal: ~6 hrs\*\*
 
 ---
 
@@ -369,7 +369,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **4.4.3** Define frame structure: `[CMD_BYTE] [PARAM_BYTE] [CHECKSUM]` for commands, `[STATUS_BYTE] [DATA_BYTE] [CHECKSUM]` for responses. _(0.5 hr)_
 - [ ] **4.4.4** Document the full protocol in `SPI_PROTOCOL.md` — this is the contract between Pi software and STM32 firmware. _(0.5 hr)_
 
-**Subtotal: ~2.5 hrs**
+#### Subtotal: ~2.5 hrs\*\*
 
 ---
 
@@ -382,7 +382,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **4.5.3** Write named wrapper functions: `rotate_to_slot(index)`, `eject_card()`, `unlock_door()`, `get_sensor_state()`, etc. _(0.5 hr)_
 - [ ] **4.5.4** Write a loopback test — with the STM32 in echo mode (firmware stub), verify every command byte comes back correctly. _(0.5 hr)_
 
-**Subtotal: ~2.5 hrs**
+#### Subtotal: ~2.5 hrs\*\*
 
 ---
 
@@ -395,11 +395,11 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **4.6.3** Wire batch loading pipeline to the Batch Progress UI screen — OCR results feed the live progress display. _(0.5 hr)_
 - [ ] **4.6.4** Confirm `SessionManager.teardown()` is called on every exit path: cancel, timeout, lockout, success, error. _(0.5 hr)_
 
-**Subtotal: ~2.5 hrs**
+#### Subtotal: ~2.5 hrs\*\*
 
 ---
 
-**Phase 4 Total Estimated Time: ~20 hrs**
+#### Phase 4 Total Estimated Time: ~20 hrs\*\*
 
 ---
 
@@ -426,7 +426,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **5.1.3** Write `send_response(status, data)` function — builds response frame with checksum and queues it for SPI transmit. _(0.5 hr)_
 - [ ] **5.1.4** Test SPI communication with the Pi using loopback test from Task 4.5.4 — confirm all command bytes round-trip correctly. _(1 hr)_
 
-**Subtotal: ~5 hrs**
+#### Subtotal: ~5 hrs\*\*
 
 ---
 
@@ -440,7 +440,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **5.2.4** Implement A4988 microstepping configuration via GPIO — set MS1/MS2/MS3 pins for 1/8 step mode for smoother motion. _(0.5 hr)_
 - [ ] **5.2.5** Validate all 10 slot positions physically — rotate to slot 0 through 9 and confirm alignment with rear gate position. _(1 hr)_
 
-**Subtotal: ~5.5 hrs**
+#### Subtotal: ~5.5 hrs\*\*
 
 ---
 
@@ -453,7 +453,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **5.3.3** Configure MOSFET driver GPIO for solenoid — write `lock_door()` and `unlock_door()` functions. _(0.5 hr)_
 - [ ] **5.3.4** Test servo sweep on bench — confirm latch servo holds and releases cleanly, ejector servo pushes a card cleanly. _(1 hr)_
 
-**Subtotal: ~3 hrs**
+#### Subtotal: ~3 hrs\*\*
 
 ---
 
@@ -465,7 +465,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **5.4.2** Implement `GET_SENSOR_STATE` command handler — pack all 5 sensor states into the data byte of the response frame. _(0.5 hr)_
 - [ ] **5.4.3** Test each sensor individually — confirm the Pi correctly reads door open, card seated at rear gate, card at front gate, card in expired slot. _(1 hr)_
 
-**Subtotal: ~2.5 hrs**
+#### Subtotal: ~2.5 hrs\*\*
 
 ---
 
@@ -480,7 +480,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **5.5.5** Mount all 4 IR break-beam sensor pairs at their positions — door frame, rear gate, front gate, expired card slot. _(1 hr)_
 - [ ] **5.5.6** Install neodymium retention magnets in each of the 10 carousel slots. _(0.5 hr)_
 
-**Subtotal: ~7 hrs**
+#### Subtotal: ~7 hrs\*\*
 
 ---
 
@@ -494,11 +494,11 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **5.6.4** Fabricate expired card scan slot assembly — slot guide channel, latch servo mount, USB camera mount. _(1 hr)_
 - [ ] **5.6.5** Test latch servo — confirm card is held securely during authentication and released cleanly into the internal collection bin on command. _(0.5 hr)_
 
-**Subtotal: ~4 hrs**
+#### Subtotal: ~4 hrs\*\*
 
 ---
 
-**Phase 5 Total Estimated Time: ~27 hrs**
+#### Phase 5 Total Estimated Time: ~27 hrs\*\*
 
 ---
 
@@ -528,7 +528,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **6.1.6** Route and dress all internal cabling — power, SPI bus, motor driver wires, sensor wires, camera ribbon. _(1 hr)_
 - [ ] **6.1.7** Bond panels and complete final assembly. _(0.5 hr)_
 
-**Subtotal: ~7.5 hrs**
+#### Subtotal: ~7.5 hrs\*\*
 
 ---
 
@@ -543,7 +543,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **6.2.5** **Lockout and Security Test** — trigger OTP lockout and PIN lockout scenarios, confirm correct lockout duration, confirm audit log entries. _(0.5 hr)_
 - [ ] **6.2.6** **Power Interruption Test** — cut mains power mid-session, confirm UPS sustains operation and system reaches graceful shutdown without database corruption. _(0.5 hr)_
 
-**Subtotal: ~4.5 hrs**
+#### Subtotal: ~4.5 hrs\*\*
 
 ---
 
@@ -554,7 +554,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **6.3.1** Log all defects found during Task 6.2 with severity (critical / major / minor). _(0.5 hr)_
 - [ ] **6.3.2** Fix all critical and major defects. Retest each fix. _(2 hrs)_
 
-**Subtotal: ~2.5 hrs**
+#### Subtotal: ~2.5 hrs\*\*
 
 ---
 
@@ -567,10 +567,10 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [ ] **6.4.3** Write **Project Report** — problem statement, design decisions, implementation challenges, test results, conclusion, and future work. _(2 hrs)_
 - [ ] **6.4.4** Prepare **Final Presentation** — slides covering concept, architecture, demo flow, test results, and reflection. _(1 hr)_
 
-**Subtotal: ~5.5 hrs** _(assuming incremental writing throughout the project)_
+#### Subtotal: ~5.5 hrs\*\* _(assuming incremental writing throughout the project)_
 
 ---
 
-**Phase 6 Total Estimated Time: ~20 hrs**
+#### Phase 6 Total Estimated Time: ~20 hrs\*\*
 
 ---

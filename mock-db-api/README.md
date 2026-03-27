@@ -22,26 +22,26 @@ The mock API serves three critical functions during development:
 
 ### Single Endpoint
 
-```
+```bash
 GET /students/{reg_number}
 ```
 
 **Headers**:
 
-```
+```bash
 Authorization: Bearer your-api-key-here
 Content-Type: application/json
 ```
 
 **Path Parameters**:
 
-- `reg_number`: University registration number (e.g., `T/UDSM/0001/2021`)
+- `reg_number`: University registration number (e.g., `2001-02-99999`)
 
 **Response (200 OK)**:
 
 ```json
 {
-	"reg_number": "T/UDSM/0001/2021",
+	"reg_number": "2001-02-99999",
 	"name": "John Doe",
 	"programme": "Computer Science",
 	"phone": "+255123456789",
@@ -141,7 +141,7 @@ python app.py
 
 Output:
 
-```
+```bash
  * Running on http://0.0.0.0:5000 (Press CTRL+C to quit)
 ```
 
@@ -447,7 +447,7 @@ def metrics():
 
 ## Architecture Diagram
 
-```
+```bash
 ┌─────────────────────────┐
 │   Development Laptop    │
 │ (Mock University API)   │
@@ -491,7 +491,7 @@ def metrics():
 
 ## References
 
-- **Flask Documentation**: https://flask.palletsprojects.com/
-- **mDNS (Avahi)**: https://en.wikipedia.org/wiki/Multicast_DNS
-- **Bearer Tokens (RFC 6750)**: https://tools.ietf.org/html/rfc6750
-- **HTTP Status Codes**: https://httpwg.org/specs/rfc7231.html#status.codes
+- **Flask Documentation**: <https://flask.palletsprojects.com/>
+- **mDNS (Avahi)**: <https://en.wikipedia.org/wiki/Multicast_DNS>
+- **Bearer Tokens (RFC 6750)**: <https://tools.ietf.org/html/rfc6750>
+- **HTTP Status Codes**: <https://httpwg.org/specs/rfc7231.html#status.codes>
