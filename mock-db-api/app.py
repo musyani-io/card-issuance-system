@@ -1,3 +1,14 @@
+"""
+Smart ID Card Distribution Kiosk - Mock University Database API
+
+Server Access:
+  - From Pi: http://university-db.local:5000/
+  - Local testing: http://localhost:5000/
+  
+Authentication: All endpoints require X-API-Key header
+  - Example: curl -H "X-API-Key: dev-api-key-12345" http://university-db.local:5000/students/<reg_number>
+"""
+
 from flask import Flask, jsonify, request
 from functools import wraps
 from datetime import datetime
