@@ -238,9 +238,9 @@ Progress  [███░░░░░░░░░░░░░░░░░]  15%
 
 > _OTP and temporary PINs are sent to both the student's phone (via SMS) and email (via SMTP) for redundancy and reliability. Africa's Talking handles SMS, and the kiosk-brain uses Python's `smtplib` for email delivery._
 
-- [ ] **3.2.1** Sign up for Africa's Talking sandbox account if not already done. Retrieve API key and sender name. _(0.5 hr)_
-- [ ] **3.2.2** Install SDK: `pip install africastalking`. Initialise with credentials in a config file (not hardcoded). _(0.5 hr)_
-- [ ] **3.2.3** Write `send_credentials(email, phone_number, otp, temp_pin=None)` function — sends to both SMS (via Africa's Talking) and email (via SMTP). Formats message differently for returning vs first-year students. _(1.5 hrs)_
+- [x] **3.2.1** Sign up for Africa's Talking sandbox account if not already done. Retrieve API key and sender name. _(0.5 hr)_
+- [x] **3.2.2** Install SDK: `pip install africastalking`. Initialise with credentials in a config file (not hardcoded). _(0.5 hr)_
+- [x] **3.2.3** Write `send_credentials(email, phone_number, otp, temp_pin=None)` function — sends to both SMS (via Africa's Talking) and email (via SMTP). Formats message differently for returning vs first-year students. _(1.5 hrs)_
 - [ ] **3.2.4** Handle send failures (SMS network error, invalid email, SMTP failure) — log failure to `batches` table, do not crash the batch. _(0.5 hr)_
 - [ ] **3.2.5** Test credential delivery to both real phone and email address using sandbox credentials. Confirm both arrive correctly. _(0.5 hr)_
 - [ ] **3.2.6** Implement OTP resend function with rate limiting: allow resend only if last OTP was sent >10 minutes ago. Resend to both SMS and email. _(1 hr)_
