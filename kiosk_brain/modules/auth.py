@@ -54,3 +54,26 @@ Both channels are attempted independently.
 Function Stubs (Implement in Phase 3):
 =====================================
 """
+
+from datetime import datetime, timedelta
+import sqlite3
+import bcrypt
+import secrets
+
+def generate_otp():
+    """Generate a cryptographically secure 6-digit OTP"""
+    otp_number = secrets.randbelow(1_000_000)
+    return f"{otp_number:06d}"
+
+def store_otp_to_db(reg_number, otp_num, db_path="data/kiosk.db"):
+    """Stores the OTP hash and adds a 24-hour expiry"""
+    otp_hash = bcrypt.hashpw(otp_num.encode('utf-8'), bcrypt.gensalt())
+    otp_expiry = datetime.utcnow() + timedelta(hours=24)
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE authentication SET otp_hash = ?, otp_expiry = ? WHERE registration_number = ?", 
+                   (otp_hash, otp_expiry, reg_number))
+    
+    conn.commit()
+    conn.close()
