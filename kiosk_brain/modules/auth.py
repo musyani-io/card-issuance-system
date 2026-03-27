@@ -77,3 +77,39 @@ def store_otp_to_db(reg_number, otp_num, db_path="data/kiosk.db"):
     
     conn.commit()
     conn.close()
+
+def verify_otp(reg_number, otp_num, db_path="data/kiosk.db"):
+    """Compares the student's OTP entry with the DB's"""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT otp_hash, otp_expiry FROM authentication WHERE registration_number = ?", (reg_number,))
+    result = cursor.fetchone()
+    
+    if result is None:
+        conn.close()
+        return {'success': False, 'error': 'NOT FOUND', 'message': "Registration number not found"}
+    
+    if result[1] < datetime.utcnow():
+        conn.close()
+        return {'success': False, 'error': 'EXPIRED', 'message': 'OTP has expired. Contact SMARTCARD'}
+    
+    is_valid = bcrypt.checkpw(otp_num.encode('utf-8'), result[0])
+    if not is_valid:
+        cursor.execute("UPDATE authentication SET failed_otp_attempts = failed_otp_attempts + 1 WHERE registration_number = ?", (reg_number,))
+        conn.commit()
+
+        cursor.execute("SELECT failed_otp_attempts FROM authentication WHERE registration_number = ?", (reg_number,))
+        failed_otp_attempts = cursor.fetchone()
+
+        if failed_otp_attempts[0] >= 3:
+            lockout_time = datetime.utcnow() + timedelta(minutes=30)
+            cursor.execute("UPDATE authentication SET lockout_expiry = ? WHERE registration_number = ?", (lockout_time, reg_number))
+            conn.commit()
+            conn.close()
+            return {'success': False, 'error': 'LOCKED', 'message': 'Too many retries. Try after 30 minutes'}
+
+        conn.close()
+        return {'success': False, 'error': 'INVALID', 'message': 'Incorrect OTP. Try again.'}
+    
+    conn.close()
+    return {'success': True, 'error': None, 'message': 'OTP verified successfully'}

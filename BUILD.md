@@ -223,7 +223,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 
 - [x] **3.1.1** Write `generate_otp()` using Python's `secrets.randbelow(1_000_000)` — produces a zero-padded 6-digit string. _(0.5 hr)_
 - [x] **3.1.2** Hash the OTP using `bcrypt` and write hash + 24-hour expiry timestamp to the `authentication` table. _(0.5 hr)_
-- [ ] **3.1.3** Write `verify_otp(reg_number, submitted_otp)` — fetches hash from DB, checks expiry, compares with `bcrypt.checkpw`. _(1 hr)_
+- [x] **3.1.3** Write `verify_otp(reg_number, submitted_otp)` — fetches hash from DB, checks expiry, compares with `bcrypt.checkpw`. _(1 hr)_
 - [ ] **3.1.4** Implement OTP expiry check — reject expired OTPs with a specific `EXPIRED` return code distinct from `INVALID`. _(0.5 hr)_
 
 #### Subtotal: ~2.5 hrs\*\*
