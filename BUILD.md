@@ -168,9 +168,9 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 
 > _The Pi needs a clean, resilient function to call the mock API — one that handles network hiccups gracefully and never blocks the UI indefinitely on a timeout._
 
-- [ ] **2.3.1** Write `api_client.py` module with a `get_student(reg_number)` function using the `requests` library. _(0.5 hr)_
-- [ ] **2.3.2** Implement connection timeout (e.g. 5 seconds) and retry logic (3 attempts with exponential backoff). _(1 hr)_
-- [ ] **2.3.3** Handle 404 (student not found), 401 (auth failure), and network error cases explicitly with distinct return values. _(0.5 hr)_
+- [x] **2.3.1** Write `api_client.py` module with a `get_student(reg_number)` function using the `requests` library. _(0.5 hr)_
+- [x] **2.3.2** Implement connection timeout (e.g. 5 seconds) and retry logic (3 attempts with exponential backoff). _(1 hr)_
+- [x] **2.3.3** Handle 404 (student not found), 401 (auth failure), and network error cases explicitly with distinct return values. _(0.5 hr)_
 
 #### Subtotal: ~2 hrs\*\*
 

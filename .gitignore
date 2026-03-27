@@ -43,12 +43,12 @@ fp-info-cache
 *venv
 *venv
 *env
-kiosk-brain/venv/
-mock-db-api/.venv/
+kiosk_brain/venv/
+mock_db_api/.venv/
 
 # Runtime data
-kiosk-brain/data/kiosk.db
-kiosk-brain/data/logs/
+kiosk_brain/data/kiosk.db
+kiosk_brain/data/logs/
 
 # Python cache
 __pycache__/
