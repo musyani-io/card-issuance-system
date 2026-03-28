@@ -216,7 +216,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 > **Deliverable:** Secure two-factor authentication module tested end-to-end on both returning and first-year student paths.
 
 ```text
-Progress  [███░░░░░░░░░░░░░░░░░]  15%
+Progress  [██████░░░░░░░░░░░░░░]  35%
 ```
 
 ---
@@ -241,9 +241,9 @@ Progress  [███░░░░░░░░░░░░░░░░░]  15%
 - [x] **3.2.1** Sign up for Africa's Talking sandbox account if not already done. Retrieve API key and sender name. _(0.5 hr)_
 - [x] **3.2.2** Install SDK: `pip install africastalking`. Initialise with credentials in a config file (not hardcoded). _(0.5 hr)_
 - [x] **3.2.3** Write `send_credentials(email, phone_number, otp, temp_pin=None)` function — sends to both SMS (via Africa's Talking) and email (via SMTP). Formats message differently for returning vs first-year students. _(1.5 hrs)_
-- [ ] **3.2.4** Handle send failures (SMS network error, invalid email, SMTP failure) — log failure to `batches` table, do not crash the batch. _(0.5 hr)_
+- [x] **3.2.4** Handle send failures (SMS network error, invalid email, SMTP failure) — log failure to `batches` table, do not crash the batch. _(0.5 hr)_
 - [ ] **3.2.5** Test credential delivery to both real phone and email address using sandbox credentials. Confirm both arrive correctly. _(0.5 hr)_
-- [ ] **3.2.6** Implement OTP resend function with rate limiting: allow resend only if last OTP was sent >10 minutes ago. Resend to both SMS and email. _(1 hr)_
+- [x] **3.2.6** Implement automatic OTP credential retry with rate limiting: if `send_credentials()` returns `success=False` (both SMS and email failed), check if ≥10 minutes have passed since the last send attempt. If yes, automatically resend to both channels. If not enough time has passed, skip resend. Never expose manual resend to students at this stage. _(1 hr)_
 
 #### Subtotal: ~4.5 hrs\*\*
 
@@ -302,7 +302,7 @@ Progress  [███░░░░░░░░░░░░░░░░░]  15%
 
 ---
 
-**Phase 3 Summary:** OTP generation, hashing, storage, and verification fully implemented with comprehensive documentation (Task 3.1 ✅). Credential delivery, PIN hashing, first-year PIN flow, and lockout enforcement not yet implemented. End-to-end testing pending implementation of remaining auth tasks. **15 hrs estimated; 2.5 hrs spent.** Progress: 15% (1 of 6 tasks complete).
+**Phase 3 Summary:** OTP generation, hashing, storage, and verification fully implemented (Task 3.1 ✅). Credential delivery with automatic retry/rate limiting mostly complete (Tasks 3.2.1-3.2.4, 3.2.6 ✅; 3.2.5 testing pending). PIN hashing, first-year PIN flow, lockout enforcement, and end-to-end testing not yet implemented. **15 hrs estimated; ~5.5 hrs spent.** Progress: 35% (Task 3.1 + most of 3.2 complete; Tasks 3.3-3.6 pending).
 
 #### Phase 3 Total Estimated Time: ~15 hrs\*\*
 

@@ -55,6 +55,7 @@ Function Stubs (Implement in Phase 3):
 =====================================
 """
 
+from sms_client import send_credentials
 from datetime import datetime, timedelta
 import sqlite3
 import bcrypt
@@ -228,3 +229,52 @@ def verify_otp(reg_number, otp_num, db_path="data/kiosk.db"):
     # OTP verified successfully; proceed to PIN verification
     conn.close()
     return {"success": True, "error": None, "message": "OTP verified successfully"}
+
+
+def dispatch_credentials_with_logging(
+    reg_number, otp, temp_pin, batch_id=None, db_path="data/kiosk.db"
+):
+    result = send_credentials(reg_number, otp, temp_pin, db_path)
+
+    if not result["success"]:
+        result = retry_send_credentials(reg_number, otp, temp_pin, db_path)
+
+    if batch_id:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        sms_sent = result.get("sms_sent", False)
+        email_sent = result.get("email_sent", False)
+        cursor.execute(
+            "UPDATE batches SET sms_sent = ? WHERE batch_id = ?",
+            (int(sms_sent or email_sent), batch_id),
+        )
+        conn.commit()
+        conn.close()
+
+    return result
+
+
+def retry_send_credentials(reg_number, otp, temp_pin, db_path="data/kiosk.db"):
+    """Attempt to re-send credentials if both SMS / Email fail, after 10 min"""
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT otp_expiry FROM authentication WHERE registration_number = ?",
+        (reg_number,),
+    )
+    otp_expiry = cursor.fetchone()
+    conn.close()
+
+    if not otp_expiry:
+        return {"success": False, "error": "NOT FOUND", "message": "Student not found"}
+
+    time_elapsed = datetime.utcnow() - (otp_expiry[0] - timedelta(hours=24))
+    if time_elapsed < timedelta(minutes=10):
+        return {
+            "success": False,
+            "error": "RATE LIMITED",
+            "message": "Please wait for another request",
+        }
+
+    return send_credentials(reg_number, otp, temp_pin, db_path)

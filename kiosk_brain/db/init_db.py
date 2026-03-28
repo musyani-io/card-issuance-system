@@ -3,12 +3,13 @@ import os
 from pathlib import Path
 import logging
 
+
 def initialize_database(db_path="kiosk.db"):
     """Initialize the SQLite Database with schema"""
     current_dir = Path(__file__).parent
-    schema_path = current_dir / 'schema.sql'
+    schema_path = current_dir / "schema.sql"
 
-    with open(schema_path, 'r') as f:
+    with open(schema_path, "r") as f:
         schema_sql = f.read()
 
     conn = sqlite3.connect(db_path)
@@ -18,6 +19,7 @@ def initialize_database(db_path="kiosk.db"):
     conn.close()
 
     logging.info(f"Database initialized successfully at {db_path}")
+
 
 if __name__ == "__main__":
     try:
