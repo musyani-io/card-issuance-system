@@ -78,6 +78,39 @@ def generate_otp():
     return f"{otp_number:06d}"  # Zero-pad to 6 digits
 
 
+def generate_temp_pin():
+    """Generate a cryptogrophically secure 4-digit temporary pin for first-time users."""
+    temp_pin_num = secrets.randbelow(10_000)
+    return f"{temp_pin_num:04d}"
+
+
+def hash_credential(data):
+    """Generate bcrypt hashing for OTP, PIN or any data"""
+    return bcrypt.hashpw(data.encode("utf-8"), bcrypt.gensalt())
+
+
+def set_pin(reg_number, pin, db_path="data/kiosk.db"):
+    """Verify PIN length (4 digits), hash, and store it in database"""
+    if not (4 <= len(pin) <= 6) or not pin.isdigit():
+        return {
+            "success": False,
+            "error": "INVALID",
+            "message": "PIN must be 4-6 digits",
+        }
+
+    pin_hash = hash_credential(pin)
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE authentication SET pin_hash = ?, is_temp_pin = FALSE WHERE registration_number = ?",
+        (pin_hash, reg_number),
+    )
+    conn.commit()
+    conn.close()
+
+    return {"success": True, "error": None, "message": "PIN set successfully"}
+
+
 def store_otp_to_db(reg_number, otp_num, db_path="data/kiosk.db"):
     """
     Store hashed OTP and 24-hour expiry timestamp to authentication table.
@@ -103,7 +136,7 @@ def store_otp_to_db(reg_number, otp_num, db_path="data/kiosk.db"):
         - Hashed OTP never sent over network or logged
     """
     # Hash OTP with bcrypt (12-round default cost)
-    otp_hash = bcrypt.hashpw(otp_num.encode("utf-8"), bcrypt.gensalt())
+    otp_hash = hash_credential(otp_num)
     # Set expiry timestamp (24 hours from now)
     otp_expiry = datetime.utcnow() + timedelta(hours=24)
 
@@ -115,6 +148,20 @@ def store_otp_to_db(reg_number, otp_num, db_path="data/kiosk.db"):
         (otp_hash, otp_expiry, reg_number),
     )
 
+    conn.commit()
+    conn.close()
+
+
+def store_temp_pin_to_db(reg_number, temp_pin, db_path="data/kiosk.db"):
+    """Store the hashed temp pin with is_temp_pin=TRUE"""
+    pin_hash = hash_credential(temp_pin)
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE authentication SET pin_hash = ?, is_temp_pin = TRUE WHERE registration_number = ?",
+        (pin_hash, reg_number),
+    )
     conn.commit()
     conn.close()
 
@@ -229,6 +276,40 @@ def verify_otp(reg_number, otp_num, db_path="data/kiosk.db"):
     # OTP verified successfully; proceed to PIN verification
     conn.close()
     return {"success": True, "error": None, "message": "OTP verified successfully"}
+
+
+def verify_pin(reg_number, pin, db_path="data/kiosk.db"):
+    """Verify the PIN against the database hash"""
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT pin_hash FROM authentication WHERE registration_number = ?",
+        (reg_number,),
+    )
+    result = cursor.fetchone()
+
+    if result is None:
+        conn.close()
+        return {"success": False, "error": "NOT FOUND", "message": "Student not found"}
+
+    is_valid = bcrypt.checkpw(pin.encode("utf-8"), result[0])
+
+    if not is_valid:
+        cursor.execute(
+            "UPDATE authentication SET failed_pin_attempts = failed_pin_attempts + 1 WHERE registration_number = ?",
+            (reg_number,),
+        )
+        conn.commit()
+        conn.close()
+        return {
+            "success": False,
+            "error": "INVALID",
+            "message": "Incorrect PIN. Try again.",
+        }
+
+    conn.close()
+    return {"success": True, "error": None, "message": "PIN verified successfully."}
 
 
 def dispatch_credentials_with_logging(
