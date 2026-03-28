@@ -216,7 +216,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 > **Deliverable:** Secure two-factor authentication module tested end-to-end on both returning and first-year student paths.
 
 ```text
-Progress  [████████████░░░░░░░░]  57%
+Progress  [██████████████████░░]  70%
 ```
 
 ---
@@ -253,7 +253,7 @@ Progress  [████████████░░░░░░░░]  57%
 
 > _The PIN is the second factor. bcrypt is used so that even if the SQLite database file is stolen, the PINs cannot be reversed._
 
-- [x] **3.3.1** Write `hash_pin(pin)` using `bcrypt.hashpw(pin.encode(), bcrypt.gensalt())`. _(0.5 hr)_
+- [x] **3.3.1** Write `hash_pin(pin)` using `bcrypt.hashpw(pin.encode(), bcrypt.gensalt())`. _(0.5 hr)_ — Implemented as generic `hash_credential()` wrapper, used directly by `verify_pin()` and `set_pin()`.
 - [x] **3.3.2** Write `verify_pin(reg_number, submitted_pin)` — fetches hash from `authentication` table, calls `bcrypt.checkpw`, returns success/INVALID error. _(0.5 hr)_
 - [x] **3.3.3** Write `set_pin(reg_number, new_pin)` — validates 4–6 digit length, hashes, and writes to `authentication` table. _(0.5 hr)_
 
@@ -267,8 +267,8 @@ Progress  [████████████░░░░░░░░]  57%
 
 - [x] **3.4.1** Write `generate_temp_pin()` using `secrets` — a random 4-digit numeric string. _(0.5 hr)_
 - [x] **3.4.2** Store hashed temp PIN in `authentication` table with the `is_temp_pin` column set to TRUE. Set `is_temp_pin = FALSE` for returning students with permanent PINs. _(0.5 hr)_
-- [ ] **3.4.3** On successful PIN verification, check the `is_temp_pin` flag in the `authentication` table — if TRUE, force the new PIN entry screen before proceeding to collection confirmation. _(0.5 hr)_
-- [ ] **3.4.4** On permanent PIN set, update the `authentication` table: set `is_temp_pin = FALSE` and overwrite the `pin_hash` with the new permanent PIN hash. _(0.5 hr)_
+- [x] **3.4.3** On successful PIN verification, check the `is_temp_pin` flag in the `authentication` table — if TRUE, force the new PIN entry screen before proceeding to collection confirmation. _(0.5 hr)_
+- [x] **3.4.4** On permanent PIN set, update the `authentication` table: set `is_temp_pin = FALSE` and overwrite the `pin_hash` with the new permanent PIN hash. _(0.5 hr)_ — Completed in `set_pin()` function.
 
 #### Subtotal: ~2 hrs\*\*
 
@@ -302,7 +302,7 @@ Progress  [████████████░░░░░░░░]  57%
 
 ---
 
-**Phase 3 Summary:** OTP generation, hashing, storage, and verification fully implemented (Task 3.1 ✅). Credential delivery with automatic retry/rate limiting complete (Tasks 3.2.1-3.2.4, 3.2.6 ✅; 3.2.5 testing pending). Temporary PIN generation and storage complete (Tasks 3.4.1-3.4.2 ✅). PIN verification complete (Task 3.3.2 ✅). PIN hashing wrapper, PIN setup function, PIN enforcement flow, lockout enforcement, and end-to-end testing not yet implemented. **15 hrs estimated; ~8.5 hrs spent.** Progress: 57% (Tasks 3.1, 3.2.1-3.2.4, 3.2.6, 3.3.2, 3.4.1-3.4.2 complete; Tasks 3.3.1, 3.3.3, 3.4.3-3.4.4, 3.5-3.6 pending).
+**Phase 3 Summary:** OTP generation, hashing, storage, and verification fully implemented (Task 3.1 ✅ = 2 hrs). Credential delivery with automatic retry/rate limiting complete (Tasks 3.2.1-3.2.4, 3.2.6 ✅ = 4 hrs; 3.2.5 testing pending = 0.5 hrs). PIN verification, hashing, and setup fully complete (Tasks 3.3.1-3.3.3 ✅ = 1.5 hrs). Temporary PIN generation, storage, enforcement, and permanent PIN setting fully complete (Tasks 3.4.1-3.4.4 ✅ = 2 hrs). Lockout enforcement (Tasks 3.5.1-3.5.7) and end-to-end testing (Tasks 3.6.1-3.6.3) not yet implemented. **15 hrs estimated; ~10 hrs spent.** Progress: 70% (All Phase 3.1-3.4 tasks complete; Tasks 3.2.5, 3.5, 3.6 pending).
 
 #### Phase 3 Total Estimated Time: ~15 hrs\*\*
 

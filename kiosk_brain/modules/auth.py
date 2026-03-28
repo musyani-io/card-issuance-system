@@ -110,6 +110,19 @@ def set_pin(reg_number, pin, db_path="data/kiosk.db"):
 
     return {"success": True, "error": None, "message": "PIN set successfully"}
 
+def enfore_pin_setup(reg_number, db_path="data/kiosk.db"):
+    """Checks if the PIN is temporary and enforces permanent PIN setup before collection"""
+    
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT is_temp_pin FROM authentication WHERE registration_number = ?", (reg_number,))
+    is_temp_pin = cursor.fetchone()
+    conn.close()
+
+    if is_temp_pin is None:
+        return {'success': False, 'error': 'NOT FOUND', 'message': 'Student not found'}
+    
+    return {'success': True, 'requires_pin_setup': is_temp_pin[0], 'message': "PIN Check complete"}
 
 def store_otp_to_db(reg_number, otp_num, db_path="data/kiosk.db"):
     """
