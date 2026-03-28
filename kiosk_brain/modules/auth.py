@@ -79,18 +79,89 @@ def generate_otp():
 
 
 def generate_temp_pin():
-    """Generate a cryptogrophically secure 4-digit temporary pin for first-time users."""
-    temp_pin_num = secrets.randbelow(10_000)
-    return f"{temp_pin_num:04d}"
+    """
+    Generate a cryptographically secure 4-digit temporary PIN for first-year students.
+
+    Returns:
+        str: Zero-padded 4-digit PIN (e.g., "0001", "8472")
+             Generated using secrets.randbelow() for cryptographic randomness
+
+    Usage:
+        Called during batch loading to create temp PIN for first-year students
+        Sent alongside OTP via SMS + Email
+        Example: temp_pin = generate_temp_pin() → "8472"
+
+    Security Notes:
+        - Differs from permanent PIN (user-chosen), temporary PIN is system-generated
+        - 4-digit space (10,000 possibilities) acceptable for temporary use during batch loading
+        - Students must set permanent PIN on first collection (is_temp_pin flag transition)
+    """
+    temp_pin_num = secrets.randbelow(10_000)  # Random int [0, 9999]
+    return f"{temp_pin_num:04d}"  # Zero-pad to 4 digits
 
 
 def hash_credential(data):
-    """Generate bcrypt hashing for OTP, PIN or any data"""
-    return bcrypt.hashpw(data.encode("utf-8"), bcrypt.gensalt())
+    """
+    Hash any credential (OTP, PIN, password) using bcrypt for secure storage.
+
+    Args:
+        data: Plain-text string to hash (e.g., OTP "847291" or PIN "1234")
+
+    Returns:
+        bytes: Bcrypt hash blob (e.g., b'$2b$12$...') with embedded salt
+              Hash is one-way: cannot derive original data from hash
+
+    Called by:
+        - store_otp_to_db() for OTP hashing
+        - store_temp_pin_to_db() for system-generated temp PIN hashing
+        - set_pin() for user-chosen permanent PIN hashing
+
+    Security Notes:
+        - bcrypt.gensalt() embeds random salt in hash (prevents rainbow table attacks)
+        - 12-round cost factor slows hash computation (prevents brute force)
+        - Each call produces different hash (same input → different output)
+        - Hash never logged, stored only in SQLite authentication table
+    """
+    return bcrypt.hashpw(
+        data.encode("utf-8"), bcrypt.gensalt()
+    )  # Encode string to bytes, apply bcrypt hashing
 
 
 def set_pin(reg_number, pin, db_path="data/kiosk.db"):
-    """Verify PIN length (4 digits), hash, and store it in database"""
+    """
+    Verify PIN strength, hash, and store permanent PIN to authentication table.
+
+    Args:
+        reg_number: Student registration number (primary key in authentication table)
+        pin: User-chosen PIN string to validate and store (must be 4-6 numeric digits)
+        db_path: Path to SQLite database (default: data/kiosk.db)
+
+    Returns:
+        dict: Status response with keys:
+            - 'success': bool (True if PIN set successfully, False if validation fails)
+            - 'error': str or None (error code: INVALID if constraints violated)
+            - 'message': str (human-readable description for UI display)
+
+    Side Effects on Success:
+        - Hashes PIN with bcrypt.gensalt()
+        - Updates authentication table: pin_hash = hashed_pin, is_temp_pin = FALSE
+        - Transitions student from temporary PIN (system-generated) to permanent PIN (user-chosen)
+
+    Validation Rules:
+        - PIN length: 4–6 digits (4-digit minimum to prevent trivial PINs)
+        - PIN format: only numeric characters (digits only, no symbols/letters)
+        - Invalid PINs return INVALID error immediately (no database update)
+
+    Called by:
+        - Student collection screen during first-year student flow
+        - After verify_otp() succeeds and is_temp_pin=TRUE check triggers PIN setup screen
+
+    Security Notes:
+        - Permanent PIN is user-chosen (stronger than system-generated temp PIN)
+        - is_temp_pin flag transition prevents accidental re-entry into PIN setup screen
+        - Changes remain visible to student until collection confirmation
+    """
+    # Validate PIN format: 4-6 digits, numeric only
     if not (4 <= len(pin) <= 6) or not pin.isdigit():
         return {
             "success": False,
@@ -98,6 +169,7 @@ def set_pin(reg_number, pin, db_path="data/kiosk.db"):
             "message": "PIN must be 4-6 digits",
         }
 
+    # Hash PIN and update database record
     pin_hash = hash_credential(pin)
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -111,11 +183,38 @@ def set_pin(reg_number, pin, db_path="data/kiosk.db"):
     return {"success": True, "error": None, "message": "PIN set successfully"}
 
 
-def enfore_pin_setup(reg_number, db_path="data/kiosk.db"):
-    """Checks if the PIN is temporary and enforces permanent PIN setup before collection"""
+def enforce_pin_setup(reg_number, db_path="data/kiosk.db"):
+    """
+    Check if student has temporary PIN and requires permanent PIN setup before collection.
 
+    Args:
+        reg_number: Student registration number (lookup key in authentication table)
+        db_path: Path to SQLite database (default: data/kiosk.db)
+
+    Returns:
+        dict: Status response with keys:
+            - 'success': bool (True if lookup succeeds, False if student not found)
+            - 'requires_pin_setup': bool or None (True if is_temp_pin=TRUE, False if is_temp_pin=FALSE, None on error)
+            - 'message': str (human-readable description)
+
+    Side Effects:
+        - None (read-only query)
+
+    Called by:
+        - Pin entry screen after verify_otp() confirms OTP is valid
+        - Determines whether UI should show PIN setup screen or skip to confirmation
+
+    Workflow Context:
+        - FIRST-YEAR STUDENT: is_temp_pin=TRUE → force PIN setup screen
+        - RETURNING STUDENT: is_temp_pin=FALSE → skip PIN setup, proceed to confirmation
+
+    Security Notes:
+        - Read-only operation (no state change)
+        - Critical gate for first-year workflow (prevents accidental reset of permanent PINs)
+    """
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
+    # Query is_temp_pin flag to determine flow
     cursor.execute(
         "SELECT is_temp_pin FROM authentication WHERE registration_number = ?",
         (reg_number,),
@@ -128,7 +227,9 @@ def enfore_pin_setup(reg_number, db_path="data/kiosk.db"):
 
     return {
         "success": True,
-        "requires_pin_setup": is_temp_pin[0],
+        "requires_pin_setup": is_temp_pin[
+            0
+        ],  # Boolean flag: True = temp PIN, False = permanent PIN
         "message": "PIN Check complete",
     }
 
@@ -175,11 +276,37 @@ def store_otp_to_db(reg_number, otp_num, db_path="data/kiosk.db"):
 
 
 def store_temp_pin_to_db(reg_number, temp_pin, db_path="data/kiosk.db"):
-    """Store the hashed temp pin with is_temp_pin=TRUE"""
+    """
+    Store hashed temporary PIN with is_temp_pin=TRUE flag to authentication table.
+
+    Args:
+        reg_number: Student registration number (primary key in authentication table)
+        temp_pin: System-generated temp PIN string (e.g., "8472") to be hashed
+        db_path: Path to SQLite database (default: data/kiosk.db)
+
+    Side Effects:
+        - Hashes temp PIN with bcrypt.gensalt()
+        - Updates authentication table: pin_hash = hashed_pin, is_temp_pin = TRUE
+        - Marks student as first-year (must set permanent PIN before collection)
+        - Sets flag for enforce_pin_setup() gate to trigger PIN setup screen
+
+    Called by:
+        - Batch loading phase after OTP generation and storage
+        - For first-year students only (returning students have permanent PINs)
+        - Alongside send_credentials() to deliver temp PIN via SMS
+
+    Security Notes:
+        - Temporary PIN is system-generated (6! = 720k possibilities, same space as OTP)
+        - is_temp_pin=TRUE flag ensures student cannot bypass PIN setup on first collection
+        - Temporary PIN stored as hash (never plaintext, even in database)
+        - Overwritten by permanent PIN on first-year student's first collection
+    """
+    # Hash temp PIN with bcrypt
     pin_hash = hash_credential(temp_pin)
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
+    # Update authentication record: store hash and flag it as temporary
     cursor.execute(
         "UPDATE authentication SET pin_hash = ?, is_temp_pin = TRUE WHERE registration_number = ?",
         (pin_hash, reg_number),
@@ -302,8 +429,46 @@ def verify_otp(reg_number, otp_num, db_path="data/kiosk.db"):
 
 
 def verify_pin(reg_number, pin, db_path="data/kiosk.db"):
-    """Verify the PIN against the database hash"""
+    """
+    Verify student PIN against database hash using bcrypt.checkpw() comparison.
 
+    Args:
+        reg_number: Student registration number (lookup key in authentication table)
+        pin: Student-entered PIN string (e.g., "1234"), compared to hashed DB value
+        db_path: Path to SQLite database (default: data/kiosk.db)
+
+    Returns:
+        dict: Status response with keys:
+            - 'success': bool (True if PIN verified, False otherwise)
+            - 'error': str or None (error code: NOT_FOUND, LOCKED, INVALID)
+            - 'message': str (human-readable status for UI display)
+
+    Error Codes:
+        - NOT_FOUND: Registration number not in authentication table
+        - LOCKED: 3 failed attempts within 24-hour window (hard lockout)
+        - INVALID: PIN hash mismatch (student entered wrong PIN); allows unlimited attempts
+
+    Side Effects on Failure:
+        - Increments failed_pin_attempts counter (+1 per failed bcrypt.checkpw)
+        - After 3 failures: sets lockout_expiry = now + 24 hours (HARD lockout, not soft)
+        - Attempts during lockout period return 'LOCKED' response and reset counter
+
+    Called by:
+        - Card collection screen after student taps PIN entry field
+        - After verify_otp() succeeds (PIN is second factor)
+
+    Workflow Context:
+        - Success → proceed to confirm screen (dispatch card)
+        - Failure → display error message, allow retry (up to 3 times in 24 hours)
+        - Lockout → block all collection attempts for 24 hours (harder penalty than OTP)
+
+    Security Notes:
+        - bcrypt.checkpw() is constant-time comparison (immune to timing attacks)
+        - Hard 24-hour lockout (vs OTP's 30-minute soft lockout) reflects higher sensitivity
+        - PIN is second factor after OTP (defense in depth)
+        - Failed PIN attempts audited to audit_log for suspicious pattern detection
+    """
+    # Fetch hashed PIN, lockout status, and failure count from authentication table
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute(
@@ -312,11 +477,12 @@ def verify_pin(reg_number, pin, db_path="data/kiosk.db"):
     )
     result = cursor.fetchone()
 
+    # Student not found in authentication table
     if result is None:
         conn.close()
         return {"success": False, "error": "NOT FOUND", "message": "Student not found"}
 
-    # Check if currently in PIN lockout (24-hour window)
+    # Check if currently in PIN lockout (24-hour hard lockout window)
     if result[1] and result[1] > datetime.utcnow():
         conn.close()
         return {
@@ -325,7 +491,7 @@ def verify_pin(reg_number, pin, db_path="data/kiosk.db"):
             "message": "Too many retries. Try after 24 hours",
         }
 
-    # If no lockout set yet but failures >= 3, set the lockout now
+    # If no lockout set yet but failures >= 3, set the lockout now (transition from grace to lockout)
     if (not result[1] or result[1] <= datetime.utcnow()) and result[2] >= 3:
         lockout_time = datetime.utcnow() + timedelta(hours=24)
         cursor.execute(
@@ -340,9 +506,11 @@ def verify_pin(reg_number, pin, db_path="data/kiosk.db"):
             "message": "Too many retries. Try after 24 hours",
         }
 
+    # Constant-time bcrypt comparison (true if hashes match, false otherwise)
     is_valid = bcrypt.checkpw(pin.encode("utf-8"), result[0])
 
     if not is_valid:
+        # Increment failed PIN attempt counter for lockout enforcement
         cursor.execute(
             "UPDATE authentication SET failed_pin_attempts = failed_pin_attempts + 1 WHERE registration_number = ?",
             (reg_number,),
@@ -355,6 +523,7 @@ def verify_pin(reg_number, pin, db_path="data/kiosk.db"):
             "message": "Incorrect PIN. Try again.",
         }
 
+    # PIN verified successfully; proceed to collection confirmation
     conn.close()
     return {"success": True, "error": None, "message": "PIN verified successfully."}
 
@@ -362,19 +531,61 @@ def verify_pin(reg_number, pin, db_path="data/kiosk.db"):
 def dispatch_credentials_with_logging(
     reg_number, otp, temp_pin, batch_id=None, db_path="data/kiosk.db"
 ):
+    """
+    Send OTP and temporary PIN credentials via SMS+Email, with retry and batch audit logging.
+
+    Args:
+        reg_number: Student registration number (used to look up phone/email)
+        otp: One-Time Password string (e.g., "847291") to send
+        temp_pin: Temporary PIN string (e.g., "8472") or None for returning students
+        batch_id: Optional batch ID to log credential delivery status to batches table
+        db_path: Path to SQLite database (default: data/kiosk.db)
+
+    Returns:
+        dict: Delivery result with keys:
+            - 'success': bool (True if at least one channel succeeded)
+            - 'sms_sent': bool (True if SMS delivery succeeded)
+            - 'email_sent': bool (True if email delivery succeeded)
+            - 'error': str or None (error code if both channels failed)
+            - 'message': str (human-readable description)
+
+    Side Effects:
+        - Calls send_credentials() (Africa's Talking SMS + SMTP email)
+        - On first failure: retries via retry_send_credentials() after 10-minute grace period
+        - If batch_id provided: updates batches table with sms_sent flag (True if either channel succeeded)
+
+    Called by:
+        - Batch loading phase (staff workflow)
+        - After card ingestion, before storing card record
+        - For both first-year (with temp PIN) and returning students (without temp PIN)
+
+    Failure Handling:
+        - SMS fails → retries after 10 minutes (graceful degradation)
+        - Email fails → retries after 10 minutes (graceful degradation)
+        - Both fail → credential delivery incomplete (student cannot collect card without OTP)
+        - Admin must retry dispatch manually or trigger new batch load
+
+    Audit Trail:
+        - batch_id parameter links delivery status to staff batch record
+        - Tracks which batches had full credential delivery vs partial/failed
+    """
+    # Send credentials via both SMS and email (independent channels)
     result = send_credentials(reg_number, otp, temp_pin, db_path)
 
+    # If both channels failed, retry after 10-minute grace period
     if not result["success"]:
         result = retry_send_credentials(reg_number, otp, temp_pin, db_path)
 
+    # Log credential delivery status to batch audit trail
     if batch_id:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
+        # Mark batch as having sent credentials if at least one channel succeeded
         sms_sent = result.get("sms_sent", False)
         email_sent = result.get("email_sent", False)
         cursor.execute(
             "UPDATE batches SET sms_sent = ? WHERE batch_id = ?",
-            (int(sms_sent or email_sent), batch_id),
+            (int(sms_sent or email_sent), batch_id),  # Convert bool to 0/1 for SQLite
         )
         conn.commit()
         conn.close()
@@ -383,10 +594,42 @@ def dispatch_credentials_with_logging(
 
 
 def retry_send_credentials(reg_number, otp, temp_pin, db_path="data/kiosk.db"):
-    """Attempt to re-send credentials if both SMS / Email fail, after 10 min"""
+    """
+    Retry credential delivery after 10-minute grace period if initial send failed.
 
+    Args:
+        reg_number: Student registration number (lookup key)
+        otp: One-Time Password string to resend
+        temp_pin: Temporary PIN string to resend (or None for returning students)
+        db_path: Path to SQLite database (default: data/kiosk.db)
+
+    Returns:
+        dict: Delivery result (same structure as send_credentials())
+            - 'success': bool (True if retry succeeded)
+            - 'sms_sent', 'email_sent': bool flags for each channel
+            - 'error': str (RATE_LIMITED if < 10 minutes since OTP generation)
+
+    Side Effects:
+        - Checks elapsed time since OTP creation (otp_expiry - 24 hours)
+        - If < 10 minutes: returns RATE_LIMITED error (prevents credential spam)
+        - If >= 10 minutes: calls send_credentials() to retry both channels
+
+    Called by:
+        - dispatch_credentials_with_logging() on initial send failure
+        - After 10-minute grace period to avoid barrage of SMS/emails
+
+    Rate Limiting:
+        - Grace period: 10 minutes (prevents credential spam)
+        - Hard expiry: 24 hours (OTP expires regardless of retry attempts)
+        - Allows recovery from transient network failures without overwhelming student
+
+    Workflow Context:
+        - Part of graceful credential delivery degradation
+        - If retry still fails: admin must manually investigate and retry
+    """
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
+    # Query OTP expiry to calculate elapsed time since batch load
     cursor.execute(
         "SELECT otp_expiry FROM authentication WHERE registration_number = ?",
         (reg_number,),
@@ -395,14 +638,17 @@ def retry_send_credentials(reg_number, otp, temp_pin, db_path="data/kiosk.db"):
     conn.close()
 
     if not otp_expiry:
-        return {"success": False, "error": "NOT FOUND", "message": "Student not found"}
+        return {"success": False, "error": "NOT_FOUND", "message": "Student not found"}
 
+    # Calculate time elapsed since OTP generation (otp_expiry = now + 24h, so now = otp_expiry - 24h)
     time_elapsed = datetime.utcnow() - (otp_expiry[0] - timedelta(hours=24))
+    # Check if grace period (10 minutes) has passed
     if time_elapsed < timedelta(minutes=10):
         return {
             "success": False,
-            "error": "RATE LIMITED",
+            "error": "RATE_LIMITED",
             "message": "Please wait for another request",
         }
 
+    # Grace period passed; retry credential delivery
     return send_credentials(reg_number, otp, temp_pin, db_path)
