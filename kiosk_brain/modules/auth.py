@@ -110,19 +110,28 @@ def set_pin(reg_number, pin, db_path="data/kiosk.db"):
 
     return {"success": True, "error": None, "message": "PIN set successfully"}
 
+
 def enfore_pin_setup(reg_number, db_path="data/kiosk.db"):
     """Checks if the PIN is temporary and enforces permanent PIN setup before collection"""
-    
+
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    cursor.execute("SELECT is_temp_pin FROM authentication WHERE registration_number = ?", (reg_number,))
+    cursor.execute(
+        "SELECT is_temp_pin FROM authentication WHERE registration_number = ?",
+        (reg_number,),
+    )
     is_temp_pin = cursor.fetchone()
     conn.close()
 
     if is_temp_pin is None:
-        return {'success': False, 'error': 'NOT FOUND', 'message': 'Student not found'}
-    
-    return {'success': True, 'requires_pin_setup': is_temp_pin[0], 'message': "PIN Check complete"}
+        return {"success": False, "error": "NOT FOUND", "message": "Student not found"}
+
+    return {
+        "success": True,
+        "requires_pin_setup": is_temp_pin[0],
+        "message": "PIN Check complete",
+    }
+
 
 def store_otp_to_db(reg_number, otp_num, db_path="data/kiosk.db"):
     """
@@ -220,11 +229,11 @@ def verify_otp(reg_number, otp_num, db_path="data/kiosk.db"):
         - Hard 24-hour lockout prevents reuse (fresh batch load required)
         - Hashed OTP always stored; plaintext only in RAM during comparison
     """
-    # Fetch hashed OTP and expiry timestamp from authentication table
+    # Fetch hashed OTP, expiry timestamp, lockout status, and failure count from authentication table
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT otp_hash, otp_expiry FROM authentication WHERE registration_number = ?",
+        "SELECT otp_hash, otp_expiry, lockout_expiry, failed_otp_attempts FROM authentication WHERE registration_number = ?",
         (reg_number,),
     )
     result = cursor.fetchone()
@@ -236,6 +245,30 @@ def verify_otp(reg_number, otp_num, db_path="data/kiosk.db"):
             "success": False,
             "error": "NOT FOUND",
             "message": "Registration number not found",
+        }
+
+    # Check if currently in OTP lockout (30-minute window)
+    if result[2] and result[2] > datetime.utcnow():
+        conn.close()
+        return {
+            "success": False,
+            "error": "LOCKED",
+            "message": "Too many retries. Try after 30 minutes",
+        }
+
+    # If no lockout set yet but failures >= 3, set the lockout now
+    if (not result[2] or result[2] <= datetime.utcnow()) and result[3] >= 3:
+        lockout_time = datetime.utcnow() + timedelta(minutes=30)
+        cursor.execute(
+            "UPDATE authentication SET lockout_expiry = ? WHERE registration_number = ?",
+            (lockout_time, reg_number),
+        )
+        conn.commit()
+        conn.close()
+        return {
+            "success": False,
+            "error": "LOCKED",
+            "message": "Too many retries. Try after 30 minutes",
         }
 
     # OTP > 24 hours old (hard lockout / expiry)
@@ -250,35 +283,12 @@ def verify_otp(reg_number, otp_num, db_path="data/kiosk.db"):
     # Constant-time bcrypt comparison (true if hashes match, false otherwise)
     is_valid = bcrypt.checkpw(otp_num.encode("utf-8"), result[0])
     if not is_valid:
-        # Increment failed OTP attempt counter for lock-out enforcement
+        # Increment failed OTP attempt counter for audit logging
         cursor.execute(
             "UPDATE authentication SET failed_otp_attempts = failed_otp_attempts + 1 WHERE registration_number = ?",
             (reg_number,),
         )
         conn.commit()
-
-        # Check if soft lockout (3 failed attempts) triggered
-        cursor.execute(
-            "SELECT failed_otp_attempts FROM authentication WHERE registration_number = ?",
-            (reg_number,),
-        )
-        failed_otp_attempts = cursor.fetchone()
-
-        if failed_otp_attempts[0] >= 3:
-            # Set 30-minute recovery window (soft lockout expires after timedelta)
-            lockout_time = datetime.utcnow() + timedelta(minutes=30)
-            cursor.execute(
-                "UPDATE authentication SET lockout_expiry = ? WHERE registration_number = ?",
-                (lockout_time, reg_number),
-            )
-            conn.commit()
-            conn.close()
-            return {
-                "success": False,
-                "error": "LOCKED",
-                "message": "Too many retries. Try after 30 minutes",
-            }
-
         conn.close()
         return {
             "success": False,
@@ -297,7 +307,7 @@ def verify_pin(reg_number, pin, db_path="data/kiosk.db"):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT pin_hash FROM authentication WHERE registration_number = ?",
+        "SELECT pin_hash, lockout_expiry, failed_pin_attempts FROM authentication WHERE registration_number = ?",
         (reg_number,),
     )
     result = cursor.fetchone()
@@ -305,6 +315,30 @@ def verify_pin(reg_number, pin, db_path="data/kiosk.db"):
     if result is None:
         conn.close()
         return {"success": False, "error": "NOT FOUND", "message": "Student not found"}
+
+    # Check if currently in PIN lockout (24-hour window)
+    if result[1] and result[1] > datetime.utcnow():
+        conn.close()
+        return {
+            "success": False,
+            "error": "LOCKED",
+            "message": "Too many retries. Try after 24 hours",
+        }
+
+    # If no lockout set yet but failures >= 3, set the lockout now
+    if (not result[1] or result[1] <= datetime.utcnow()) and result[2] >= 3:
+        lockout_time = datetime.utcnow() + timedelta(hours=24)
+        cursor.execute(
+            "UPDATE authentication SET lockout_expiry = ? WHERE registration_number = ?",
+            (lockout_time, reg_number),
+        )
+        conn.commit()
+        conn.close()
+        return {
+            "success": False,
+            "error": "LOCKED",
+            "message": "Too many retries. Try after 24 hours",
+        }
 
     is_valid = bcrypt.checkpw(pin.encode("utf-8"), result[0])
 
