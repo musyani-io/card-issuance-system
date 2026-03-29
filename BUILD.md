@@ -216,7 +216,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 > **Deliverable:** Secure two-factor authentication module tested end-to-end on both returning and first-year student paths.
 
 ```text
-Progress  [██████████████████░░]  90%
+Progress  [███████████████████░]  95%
 ```
 
 ---
@@ -242,7 +242,7 @@ Progress  [██████████████████░░]  90%
 - [x] **3.2.2** Install SDK: `pip install africastalking`. Initialise with credentials in a config file (not hardcoded). _(0.5 hr)_
 - [x] **3.2.3** Write `send_credentials(email, phone_number, otp, temp_pin=None)` function — sends to both SMS (via Africa's Talking) and email (via SMTP). Formats message differently for returning vs first-year students. _(1.5 hrs)_
 - [x] **3.2.4** Handle send failures (SMS network error, invalid email, SMTP failure) — log failure to `batches` table, do not crash the batch. _(0.5 hr)_
-- [ ] **3.2.5** Test credential delivery to both real phone and email address using sandbox credentials. Confirm both arrive correctly. _(0.5 hr)_
+- [x] **3.2.5** Test credential delivery to both real phone and email address using production credentials. ✅ **Email verified working**. ⚠️ **SMS blocked: Messages charged but not delivered — investigating carrier/account issue.** _(0.5 hr)_
 - [x] **3.2.6** Implement automatic OTP credential retry with rate limiting: if `send_credentials()` returns `success=False` (both SMS and email failed), check if ≥10 minutes have passed since the last send attempt. If yes, automatically resend to both channels. If not enough time has passed, skip resend. Never expose manual resend to students at this stage. _(1 hr)_
 
 #### Subtotal: ~4.5 hrs\*\*
@@ -296,15 +296,15 @@ Progress  [██████████████████░░]  90%
 
 > _Before the UI exists, confirm the entire auth flow works correctly by running it as a script test._
 
-- [ ] **3.6.1** Simulate returning student path: OTP receive → correct OTP → correct PIN → success. _(0.5 hr)_
-- [ ] **3.6.2** Simulate first-year student path: OTP receive → correct OTP → temp PIN → set permanent PIN → success. _(0.5 hr)_
-- [ ] **3.6.3** Simulate lockout scenarios: 3× wrong OTP, then 3× wrong PIN on a fresh session. Confirm lockout records in `audit_log`. _(0.5 hr)_
+- [x] **3.6.1** Simulate returning student path: OTP receive → correct OTP → correct PIN → success. _(0.5 hr)_
+- [x] **3.6.2** Simulate first-year student path: OTP receive → correct OTP → temp PIN → set permanent PIN → success. _(0.5 hr)_
+- [x] **3.6.3** Simulate lockout scenarios: 3× wrong OTP, then 3× wrong PIN on a fresh session. Confirm lockout records in `audit_log`. _(0.5 hr)_
 
 #### Subtotal: ~1.5 hrs\*\*
 
 ---
 
-**Phase 3 Summary:** OTP generation, hashing, storage, and verification fully implemented (Task 3.1 ✅ = 2.5 hrs). Credential delivery with automatic retry/rate limiting complete (Tasks 3.2.1-3.2.4, 3.2.6 ✅ = 4 hrs; 3.2.5 testing pending = 0.5 hrs). PIN verification, hashing, and setup fully complete (Tasks 3.3.1-3.3.3 ✅ = 1.5 hrs). Temporary PIN generation, storage, enforcement, and permanent PIN setting fully complete (Tasks 3.4.1-3.4.4 ✅ = 2 hrs). Lockout enforcement with BEFORE checks and automatic lockout setting fully complete (Tasks 3.5.1-3.5.5 ✅ = 2 hrs). Audit logging function and all audit calls fully complete (Tasks 3.5.6-3.5.7 ✅ = 1 hr). End-to-end authentication testing pending (Tasks 3.6.1-3.6.3). **15 hrs estimated; ~13.5 hrs spent.** Progress: 90% (All Phase 3.1-3.5 tasks complete; only Tasks 3.2.5 and 3.6 pending). NOTE: Task 3.6 (end-to-end auth testing) can proceed independently now — does NOT require Phase 1 OCR completion, only Python test scripts.
+**Phase 3 Summary:** OTP generation, hashing, storage, and verification fully implemented (Task 3.1 ✅ = 2.5 hrs). Credential delivery with automatic retry/rate limiting complete (Tasks 3.2.1-3.2.4, 3.2.6 ✅ = 4 hrs). **Email delivery verified working (Task 3.2.5 ✅)** — Gmail SMTP with app password active and messages arriving. **⚠️ SMS DELIVERY BLOCKED** — Africa's Talking account charging for SMS but messages not arriving to students; requires investigation of carrier configuration or account settings. PIN verification, hashing, and setup fully complete (Tasks 3.3.1-3.3.3 ✅ = 1.5 hrs). Temporary PIN generation, storage, enforcement, and permanent PIN setting fully complete (Tasks 3.4.1-3.4.4 ✅ = 2 hrs). Lockout enforcement with BEFORE checks and automatic lockout setting fully complete (Tasks 3.5.1-3.5.5 ✅ = 2 hrs). Audit logging function and all audit calls fully complete (Tasks 3.5.6-3.5.7 ✅ = 1 hr). End-to-end authentication testing complete (Tasks 3.6.1-3.6.3 ✅ = 1.5 hrs) — all tests passing with database audit logging verified. **15 hrs estimated; ~14 hrs spent.** Progress: 95% (All Phase 3.1-3.6 tasks complete; **only SMS delivery issue remaining**).
 
 #### Phase 3 Total Estimated Time: ~15 hrs\*\*
 

@@ -55,11 +55,35 @@ Function Stubs (Implement in Phase 3):
 =====================================
 """
 
-from sms_client import send_credentials
+from modules.sms_client import send_credentials
 from datetime import datetime, timedelta
 import sqlite3
 import bcrypt
 import secrets
+
+
+def parse_db_datetime(value):
+    """
+    Parse SQLite datetime string back to datetime object.
+    SQLite stores datetimes as ISO format strings (YYYY-MM-DD HH:MM:SS.SSS).
+
+    Args:
+        value: DateTime string from SQLite, or None
+
+    Returns:
+        datetime object, or None if input is None or empty
+    """
+    if value is None or value == "":
+        return None
+    try:
+        # Try parsing ISO format with microseconds
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        try:
+            # Fallback: parse without timezone
+            return datetime.strptime(value.split(".")[0], "%Y-%m-%d %H:%M:%S")
+        except (ValueError, AttributeError):
+            return None
 
 
 def generate_otp():
@@ -374,8 +398,13 @@ def verify_otp(reg_number, otp_num, db_path="data/kiosk.db"):
             "message": "Registration number not found",
         }
 
+    # Parse datetime strings from SQLite
+    otp_hash, otp_expiry_str, lockout_expiry_str, failed_attempts = result
+    otp_expiry = parse_db_datetime(otp_expiry_str)
+    lockout_expiry = parse_db_datetime(lockout_expiry_str)
+
     # Check if currently in OTP lockout (30-minute window)
-    if result[2] and result[2] > datetime.utcnow():
+    if lockout_expiry and lockout_expiry > datetime.utcnow():
         conn.close()
         return {
             "success": False,
@@ -384,7 +413,9 @@ def verify_otp(reg_number, otp_num, db_path="data/kiosk.db"):
         }
 
     # If no lockout set yet but failures >= 3, set the lockout now
-    if (not result[2] or result[2] <= datetime.utcnow()) and result[3] >= 3:
+    if (
+        not lockout_expiry or lockout_expiry <= datetime.utcnow()
+    ) and failed_attempts >= 3:
         lockout_time = datetime.utcnow() + timedelta(minutes=30)
         cursor.execute(
             "UPDATE authentication SET lockout_expiry = ? WHERE registration_number = ?",
@@ -400,7 +431,7 @@ def verify_otp(reg_number, otp_num, db_path="data/kiosk.db"):
         }
 
     # OTP > 24 hours old (hard lockout / expiry)
-    if result[1] < datetime.utcnow():
+    if otp_expiry and otp_expiry < datetime.utcnow():
         conn.close()
         return {
             "success": False,
@@ -409,7 +440,7 @@ def verify_otp(reg_number, otp_num, db_path="data/kiosk.db"):
         }
 
     # Constant-time bcrypt comparison (true if hashes match, false otherwise)
-    is_valid = bcrypt.checkpw(otp_num.encode("utf-8"), result[0])
+    is_valid = bcrypt.checkpw(otp_num.encode("utf-8"), otp_hash)
     if not is_valid:
         # Increment failed OTP attempt counter for audit logging
         cursor.execute(
@@ -485,8 +516,12 @@ def verify_pin(reg_number, pin, db_path="data/kiosk.db"):
         conn.close()
         return {"success": False, "error": "NOT FOUND", "message": "Student not found"}
 
+    # Parse datetime strings from SQLite
+    pin_hash, lockout_expiry_str, failed_attempts = result
+    lockout_expiry = parse_db_datetime(lockout_expiry_str)
+
     # Check if currently in PIN lockout (24-hour hard lockout window)
-    if result[1] and result[1] > datetime.utcnow():
+    if lockout_expiry and lockout_expiry > datetime.utcnow():
         conn.close()
         return {
             "success": False,
@@ -495,7 +530,9 @@ def verify_pin(reg_number, pin, db_path="data/kiosk.db"):
         }
 
     # If no lockout set yet but failures >= 3, set the lockout now (transition from grace to lockout)
-    if (not result[1] or result[1] <= datetime.utcnow()) and result[2] >= 3:
+    if (
+        not lockout_expiry or lockout_expiry <= datetime.utcnow()
+    ) and failed_attempts >= 3:
         lockout_time = datetime.utcnow() + timedelta(hours=24)
         cursor.execute(
             "UPDATE authentication SET lockout_expiry = ? WHERE registration_number = ?",
@@ -511,7 +548,7 @@ def verify_pin(reg_number, pin, db_path="data/kiosk.db"):
         }
 
     # Constant-time bcrypt comparison (true if hashes match, false otherwise)
-    is_valid = bcrypt.checkpw(pin.encode("utf-8"), result[0])
+    is_valid = bcrypt.checkpw(pin.encode("utf-8"), pin_hash)
 
     if not is_valid:
         # Increment failed PIN attempt counter for lockout enforcement
@@ -663,12 +700,12 @@ def retry_send_credentials(reg_number, otp, temp_pin, db_path="data/kiosk.db"):
 def log_audit_event(
     reg_number, event_type, failure_type=None, session_id=None, db_path="data/kiosk.db"
 ):
-    "Log various events into the log table"
+    "Log various events into the audit_log table"
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO audit_log (timestamp, registration_number, event_type, failure_type, session_id) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO audit_log (event_time, registration_number, event_type, failure_type, session_id) VALUES (?, ?, ?, ?, ?)",
         (datetime.utcnow(), reg_number, event_type, failure_type, session_id),
     )
     conn.commit()

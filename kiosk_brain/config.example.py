@@ -38,7 +38,7 @@ SMTP_PASSWORD = "xxxx xxxx xxxx xxxx"
 
 APP_PASSWORD = "xxxx xxxx xxxx xxxx"
 # Gmail App-Specific Password (16 characters with spaces)
-# 
+#
 # IMPORTANT: This is NOT your Gmail password!
 # Generation steps:
 # 1. Enable 2-Step Verification on your Google Account
