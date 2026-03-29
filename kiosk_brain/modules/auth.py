@@ -392,6 +392,7 @@ def verify_otp(reg_number, otp_num, db_path="data/kiosk.db"):
         )
         conn.commit()
         conn.close()
+        log_audit_event(reg_number, "OTP LOCKOUT", "THRESHOLD EXCEEDED", None, db_path)
         return {
             "success": False,
             "error": "LOCKED",
@@ -417,6 +418,7 @@ def verify_otp(reg_number, otp_num, db_path="data/kiosk.db"):
         )
         conn.commit()
         conn.close()
+        log_audit_event(reg_number, "OTP FAILED", "INVALID", None, db_path)
         return {
             "success": False,
             "error": "INVALID",
@@ -425,6 +427,7 @@ def verify_otp(reg_number, otp_num, db_path="data/kiosk.db"):
 
     # OTP verified successfully; proceed to PIN verification
     conn.close()
+    log_audit_event(reg_number, "OTP VERIFIED", None, None, db_path)
     return {"success": True, "error": None, "message": "OTP verified successfully"}
 
 
@@ -500,6 +503,7 @@ def verify_pin(reg_number, pin, db_path="data/kiosk.db"):
         )
         conn.commit()
         conn.close()
+        log_audit_event(reg_number, "PIN LOCKOUT", "THRESHOLD EXCEEDED", None, db_path)
         return {
             "success": False,
             "error": "LOCKED",
@@ -517,6 +521,7 @@ def verify_pin(reg_number, pin, db_path="data/kiosk.db"):
         )
         conn.commit()
         conn.close()
+        log_audit_event(reg_number, "PIN FAILED", "INVALID", None, db_path)
         return {
             "success": False,
             "error": "INVALID",
@@ -525,6 +530,7 @@ def verify_pin(reg_number, pin, db_path="data/kiosk.db"):
 
     # PIN verified successfully; proceed to collection confirmation
     conn.close()
+    log_audit_event(reg_number, "PIN VERIFIED", None, None, db_path)
     return {"success": True, "error": None, "message": "PIN verified successfully."}
 
 
@@ -652,3 +658,18 @@ def retry_send_credentials(reg_number, otp, temp_pin, db_path="data/kiosk.db"):
 
     # Grace period passed; retry credential delivery
     return send_credentials(reg_number, otp, temp_pin, db_path)
+
+
+def log_audit_event(
+    reg_number, event_type, failure_type=None, session_id=None, db_path="data/kiosk.db"
+):
+    "Log various events into the log table"
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO audit_log (timestamp, registration_number, event_type, failure_type, session_id) VALUES (?, ?, ?, ?, ?)",
+        (datetime.utcnow(), reg_number, event_type, failure_type, session_id),
+    )
+    conn.commit()
+    conn.close()

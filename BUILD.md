@@ -216,7 +216,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 > **Deliverable:** Secure two-factor authentication module tested end-to-end on both returning and first-year student paths.
 
 ```text
-Progress  [████████████████████]  80%
+Progress  [██████████████████░░]  90%
 ```
 
 ---
@@ -283,10 +283,10 @@ Progress  [████████████████████]  80%
 - [x] **3.5.3** After 3 consecutive OTP failures: set `lockout_expiry` = now + 30 minutes. Return `LOCKED` status code. _(0.5 hr)_
 - [x] **3.5.4** After 3 consecutive PIN failures: set `lockout_expiry` = now + 24 hours. Return `LOCKED` status code. _(0.5 hr)_
 - [x] **3.5.5** Check `lockout_expiry` at the start of every OTP and PIN verification call — reject immediately if still within lockout window. _(0.5 hr)_
-- [ ] **3.5.6** Write `log_audit_event(reg_number, event_type, failure_type, session_id)` function — inserts a row into `audit_log`. _(0.5 hr)_
-- [ ] **3.5.7** Call audit logger on: every OTP failure, every PIN failure, every lockout trigger, every successful collection. _(0.5 hr)_
+- [x] **3.5.6** Write `log_audit_event(reg_number, event_type, failure_type, session_id)` function — inserts a row into `audit_log`. _(0.5 hr)_
+- [x] **3.5.7** Call audit logger on: every OTP failure, every PIN failure, every lockout trigger, every successful collection. _(0.5 hr)_
 
-**Status:** ✅ TASKS 3.5.1–3.5.5 COMPLETE (2 hrs spent). Lockout enforcement now working with BEFORE checks in both `verify_otp()` and `verify_pin()`. When failures >= 3, lockout is automatically set on next verification attempt (30 min for OTP, 24 hrs for PIN). Tasks 3.5.6–3.5.7 remain pending (audit logging not yet implemented).
+**Status:** ✅ COMPLETE (3 hrs spent). Full lockout enforcement with BEFORE checks, automatic lockout setting at 3 failures, and audit logging on all events (failures, lockouts, successes).
 
 #### Subtotal: ~3.5 hrs\*\*
 
@@ -304,7 +304,7 @@ Progress  [████████████████████]  80%
 
 ---
 
-**Phase 3 Summary:** OTP generation, hashing, storage, and verification fully implemented (Task 3.1 ✅ = 2.5 hrs). Credential delivery with automatic retry/rate limiting complete (Tasks 3.2.1-3.2.4, 3.2.6 ✅ = 4 hrs; 3.2.5 testing pending = 0.5 hrs). PIN verification, hashing, and setup fully complete (Tasks 3.3.1-3.3.3 ✅ = 1.5 hrs). Temporary PIN generation, storage, enforcement, and permanent PIN setting fully complete (Tasks 3.4.1-3.4.4 ✅ = 2 hrs). Lockout enforcement fully complete with BEFORE checks and automatic lockout setting (Tasks 3.5.1-3.5.5 ✅ = 2 hrs). Audit logging functions and calls pending (Tasks 3.5.6-3.5.7, Tasks 3.6.1-3.6.3). **15 hrs estimated; ~12 hrs spent.** Progress: 80% (All Phase 3.1-3.5.5 tasks complete; Tasks 3.2.5, 3.5.6-3.5.7, 3.6 pending).
+**Phase 3 Summary:** OTP generation, hashing, storage, and verification fully implemented (Task 3.1 ✅ = 2.5 hrs). Credential delivery with automatic retry/rate limiting complete (Tasks 3.2.1-3.2.4, 3.2.6 ✅ = 4 hrs; 3.2.5 testing pending = 0.5 hrs). PIN verification, hashing, and setup fully complete (Tasks 3.3.1-3.3.3 ✅ = 1.5 hrs). Temporary PIN generation, storage, enforcement, and permanent PIN setting fully complete (Tasks 3.4.1-3.4.4 ✅ = 2 hrs). Lockout enforcement with BEFORE checks and automatic lockout setting fully complete (Tasks 3.5.1-3.5.5 ✅ = 2 hrs). Audit logging function and all audit calls fully complete (Tasks 3.5.6-3.5.7 ✅ = 1 hr). End-to-end authentication testing pending (Tasks 3.6.1-3.6.3). **15 hrs estimated; ~13.5 hrs spent.** Progress: 90% (All Phase 3.1-3.5 tasks complete; only Tasks 3.2.5 and 3.6 pending). NOTE: Task 3.6 (end-to-end auth testing) can proceed independently now — does NOT require Phase 1 OCR completion, only Python test scripts.
 
 #### Phase 3 Total Estimated Time: ~15 hrs\*\*
 
