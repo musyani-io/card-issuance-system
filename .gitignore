@@ -39,13 +39,103 @@ fp-info-cache
 # Local project settings
 *.kicad_prl
 
-# Virtual Environments
+# Virtual Environments & Configuration files
 *venv
 *venv
 *env
 kiosk_brain/venv/
 mock_db_api/.venv/
+kiosk_brain/config.py
+mock_db_api/config.py
 
+# =============================================================================
+# SENSITIVE: API Keys, Passwords, Credentials
+# =============================================================================
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+.secrets
+
+# =============================================================================
+# Python Cache & Compiled Files
+# =============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# =============================================================================
+# Testing & Coverage
+# =============================================================================
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+.pytest/
+
+# =============================================================================
+# Database Files (Local Test Databases)
+# =============================================================================
+*.db
+*.sqlite
+*.sqlite3
+kiosk_brain/data/kiosk.db
+kiosk_brain/data/test*.db
+kiosk_brain/data/*.db
+
+# =============================================================================
+# Logs & Temporary Files
+# =============================================================================
+*.log
+logs/
+*.tmp
+tmp/
+*.bak
+*.swp
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# =============================================================================
+# IDE & Editor Configurations
+# =============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# =============================================================================
+# OS Files
+# =============================================================================
+Thumbs.db
+.AppleDouble
+.LSOverride
 # Runtime data
 kiosk_brain/data/kiosk.db
 kiosk_brain/data/logs/
