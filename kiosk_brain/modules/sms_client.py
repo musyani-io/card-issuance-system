@@ -87,7 +87,9 @@ def send_credentials(reg_num, otp, temp_pin=None, db_path="data/kiosk.db"):
     if temp_pin:
         email_body += f"<p>Your temporary PIN is: <b>{temp_pin}</b>. You will set a permanent PIN on collection.</p>"
 
-    email_body += f"<p>Please go fetch your ID Card within 24 hours.</b></p></body></html>"
+    email_body += (
+        f"<p>Please go fetch your ID Card within 24 hours.</b></p></body></html>"
+    )
     msg = MIMEText(email_body, "html")
     msg["Subject"] = email_subject
     msg["From"] = "smartcard.kiosk@gmail.com"
