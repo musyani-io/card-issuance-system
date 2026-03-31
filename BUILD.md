@@ -319,7 +319,7 @@ Progress  [██████████████████░░]  85%
 > **Deliverable:** Fully integrated end-to-end system running on the combined Pi + STM32 hardware.
 
 ```text
-Progress  [██████░░░░░░░░░░░░░░]  30%
+Progress  [███████░░░░░░░░░░░░░]  35%
 ```
 
 ---
@@ -332,8 +332,8 @@ Progress  [██████░░░░░░░░░░░░░░]  30%
 - [x] **4.1.1 (Screens)** Build initial screen classes: WelcomeScreen, OTPEntryScreen, PINEntryScreen, ConfirmationScreen, ErrorScreen. _(1.5 hrs)_ ✅ **COMPLETE** — all five screens built, layouts and widgets in place.
 - [x] **4.1.1 (Keypads)** Integrate reusable number keypads (1-9, DEL, 0, ENTER) into OTPEntryScreen and PINEntryScreen via `create_number_keypad()` helper. Implement all key handlers: DEL (backspace), digits (append), ENTER (submit). _(1 hr)_ ✅ **COMPLETE** — keypads fully functional with button callbacks and bindings; all key interactions working.
 - [x] **4.1.1 (Navigation)** Implement button callbacks for screen transitions — Welcome→OTP, OTP→PIN, PIN→Confirmation, Confirmation→Welcome. _(0.75 hrs)_ ✅ **MOSTLY COMPLETE** — 4 of 5 bindings active; Error→Previous deferred pending session state tracking (Task 4.1.3).
-- [ ] **4.1.2** Define all screen names as constants: `IDLE`, `STAFF_PIN`, `STAFF_CHECKLIST`, `BATCH_PROGRESS`, `BATCH_SUMMARY`, `STUDENT_HOME`, `STUDENT_REG_ENTRY`, `OTP_ENTRY`, `PIN_ENTRY`, `PIN_SETUP`, `CONFIRM`, `SUCCESS`, `LOCKED`. _(0.5 hr)_ ⏳ **NEXT** — Creates `ui/constants.py` to centralize screen identifiers.
-- [ ] **4.1.3** Implement `SessionManager` class — holds current session state (reg number, session ID, auth step) and provides a `teardown()` method that resets all state and returns to `IDLE`. _(1 hr)_
+- [x] **4.1.2** Define all screen names as constants: `IDLE`, `WELCOME`, `REG_ENTRY`, `OTP_ENTRY`, `PIN_ENTRY`, `PIN_SETUP`, `CONFIRMATION`, `SUCCESS`, `ERROR`, `LOCKED`, `STAFF_PIN`, `STAFF_CHECKLIST`, `BATCH_PROGRESS`, `BATCH_SUMMARY`. _(0.5 hr)_ ✅ **COMPLETE** — `ui/constants.py` created with all 14 screen identifiers; RegEntryScreen added for first-year registration entry; navigation fully wired (returning → OTP, first-year → Reg Entry → OTP).
+- [ ] **4.1.3** Implement `SessionManager` class — holds current session state (reg number, session ID, auth step) and provides a `teardown()` method that resets all state and returns to `IDLE`. _(1 hr)_ ⏳ **NEXT** — Required for session tracking and Error → Previous navigation.
 - [ ] **4.1.4** Implement a session timeout timer — if no touch input for 90 seconds mid-session, call `teardown()` automatically. _(1 hr)_
 
 #### Subtotal: ~3.5 hrs\*\*
