@@ -6,6 +6,7 @@ from kivy.uix.textinput import TextInput
 from kivy.uix.gridlayout import GridLayout
 from ui.constants import *
 
+
 def create_number_keypad(cols=3, callback=None):
     keypad = GridLayout(cols=cols, spacing=5, size_hint_y=0.4)
 
@@ -39,6 +40,7 @@ class WelcomeScreen(Screen):
         choice.add_widget(self.ret_button)
         choice.add_widget(self.first_button)
         layout.add_widget(choice)
+
 
 class OTPEntryScreen(Screen):
     def __init__(self, **kw):
@@ -145,6 +147,7 @@ class ErrorScreen(Screen):
         layout.add_widget(info_label)
         layout.add_widget(self.retry_button)
 
+
 class RegEntryScreen(Screen):
     def __init__(self, **kw):
         super().__init__(**kw)
@@ -154,7 +157,7 @@ class RegEntryScreen(Screen):
 
         reg_label = Label(text="Enter your registration number", size_hint_y=0.3)
         self.reg_input = TextInput(text="", multiline=False, size_hint_y=0.2)
-        self.submit_button = Button(text='Submit', size_hint_y=0.2)
+        self.submit_button = Button(text="Submit", size_hint_y=0.2)
 
         layout.add_widget(reg_label)
         layout.add_widget(self.reg_input)

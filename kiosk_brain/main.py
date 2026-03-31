@@ -5,15 +5,18 @@ from ui.screens import (
     PINEntryScreen,
     ErrorScreen,
     ConfirmationScreen,
-    RegEntryScreen
+    RegEntryScreen,
 )
 from ui.constants import *
+from modules.session_manager import SessionManager
 
 Config.set("graphics", "width", "800")
 Config.set("graphics", "height", "400")
 
 from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager
+
+session_manager = SessionManager()
 
 
 class KioskApp(App):
@@ -37,16 +40,22 @@ class KioskApp(App):
             on_press=lambda x: setattr(sm, "current", SCREEN_OTP_ENTRY)
         )
         welcome_screen.first_button.bind(
-            on_press=lambda x: setattr(sm, 'current', SCREEN_REG_ENTRY)
+            on_press=lambda x: setattr(sm, "current", SCREEN_REG_ENTRY)
         )
         reg_entry_screen.submit_button.bind(
-            on_press=lambda x: setattr(sm, 'current', SCREEN_OTP_ENTRY)
+            on_press=lambda x: setattr(sm, "current", SCREEN_OTP_ENTRY)
         )
         otp_entry_screen.submit_button.bind(
-            on_press=lambda x: setattr(sm, "current", SCREEN_PIN_ENTRY)
+            on_press=lambda x: (
+                session_manager.update_activity(),
+                setattr(sm, "current", SCREEN_PIN_ENTRY),
+            )
         )
         pin_entry_screen.submit_button.bind(
-            on_press=lambda x: setattr(sm, "current", SCREEN_CONFIRMATION)
+            on_press=lambda x: (
+                session_manager.update_activity(),
+                setattr(sm, "current", SCREEN_CONFIRMATION),
+            )
         )
         confirmation_screen.ok_button.bind(
             on_press=lambda x: setattr(sm, "current", SCREEN_WELCOME)
