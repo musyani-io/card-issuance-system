@@ -319,7 +319,7 @@ Progress  [██████████████████░░]  85%
 > **Deliverable:** Fully integrated end-to-end system running on the combined Pi + STM32 hardware.
 
 ```text
-Progress  [████████░░░░░░░░░░░░]  40%
+Progress  [█████████░░░░░░░░░░░]  45%
 ```
 
 ---
@@ -334,9 +334,9 @@ Progress  [████████░░░░░░░░░░░░]  40%
 - [x] **4.1.1 (Navigation)** Implement button callbacks for screen transitions — Welcome→OTP, OTP→PIN, PIN→Confirmation, Confirmation→Welcome. _(0.75 hrs)_ ✅ **MOSTLY COMPLETE** — 4 of 5 bindings active; Error→Previous deferred pending session state tracking (Task 4.1.3).
 - [x] **4.1.2** Define all screen names as constants: `IDLE`, `WELCOME`, `REG_ENTRY`, `OTP_ENTRY`, `PIN_ENTRY`, `PIN_SETUP`, `CONFIRMATION`, `SUCCESS`, `ERROR`, `LOCKED`, `STAFF_PIN`, `STAFF_CHECKLIST`, `BATCH_PROGRESS`, `BATCH_SUMMARY`. _(0.5 hr)_ ✅ **COMPLETE** — `ui/constants.py` created with all 14 screen identifiers; RegEntryScreen added for first-year registration entry; navigation fully wired (returning → OTP, first-year → Reg Entry → OTP).
 - [x] **4.1.3** Implement `SessionManager` class — holds current session state (reg number, session ID, auth step) and provides methods: `teardown()` (reset all state), `update_activity()` (track user interactions), `is_timed_out(timeout_seconds=60)` (detect 60-sec idle timeout). _(1 hr)_ ✅ **COMPLETE** — SessionManager fully functional, detects timeout automatically.
-- [ ] **4.1.4** Implement a session timeout timer — if no touch input for 90 seconds mid-session, call `teardown()` automatically. _(1 hr)_
+- [x] **4.1.4** Implement a session timeout timer — if no touch input for 60 seconds mid-session, call `teardown()` automatically and return to WELCOME. _(1 hr)_ ✅ **COMPLETE** — Clock.schedule_interval runs check every 1 second; session activity bound to all button presses; timeout triggers teardown and screen reset.
 
-#### Subtotal: ~3.5 hrs\*\*
+#### Subtotal: ~4.5 hrs\*\* **[TASK 4.1 ✅ COMPLETE]**
 
 ---
 

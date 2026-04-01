@@ -54,17 +54,17 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 
 **Changes:**
 
-- [ ] **1.1.1** Remove `AFRICA_TALKING_API_KEY` constant _(5 min)_
-- [ ] **1.1.2** Remove `AFRICA_TALKING_USERNAME` constant _(5 min)_
-- [ ] **1.1.3** Add `BRIQ_API_KEY = "your-briq-api-key"` _(2 min)_
-- [ ] **1.1.4** Add `BRIQ_API_ENDPOINT = "https://api.briq.io/api/send-sms"` (confirm actual endpoint) _(3 min)_
-- [ ] **1.1.5** Add `BRIQ_SENDER_ID = "CARD-KIOSK"` (or appropriate sender name) _(2 min)_
-- [ ] **1.1.6** Verify all SMTP settings remain unchanged: `SMTP_EMAIL`, `APP_PASSWORD` _(3 min)_
+- [x] **1.1.1** Remove `AFRICA_TALKING_API_KEY` constant _(5 min)_
+- [x] **1.1.2** Remove `AFRICA_TALKING_USERNAME` constant _(5 min)_
+- [x] **1.1.3** Add `BRIQ_API_KEY = "your-briq-api-key"` _(2 min)_
+- [x] **1.1.4** Add `BRIQ_API_ENDPOINT = "https://api.briq.io/api/send-sms"` (confirm actual endpoint) _(3 min)_
+- [x] **1.1.5** Add `BRIQ_SENDER_ID = "CARD-KIOSK"` (or appropriate sender name) _(2 min)_
+- [x] **1.1.6** Verify all SMTP settings remain unchanged: `SMTP_EMAIL`, `APP_PASSWORD` _(3 min)_
 
 **Verification:**
 
-- [ ] Python can import config without syntax errors: `python3 -c "from config import BRIQ_API_KEY, BRIQ_API_ENDPOINT, BRIQ_SENDER_ID; print('OK')"`
-- [ ] Confirm old Africa's Talking constants are gone: `python3 -c "from config import AFRICA_TALKING_API_KEY"` should raise `ImportError`
+- [x] Python can import config without syntax errors: `python3 -c "from config import BRIQ_API_KEY, BRIQ_API_ENDPOINT, BRIQ_SENDER_ID; print('OK')"`
+- [x] Confirm old Africa's Talking constants are gone: `python3 -c "from config import AFRICA_TALKING_API_KEY"` should raise `ImportError`
 
 #### Subtotal: ~0.25 hrs
 
@@ -74,8 +74,8 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 
 **Changes:**
 
-- [ ] **1.2.1** Remove Africa's Talking section and setup instructions _(5 min)_
-- [ ] **1.2.2** Add BRIQ setup instructions section:
+- [x] **1.2.1** Remove Africa's Talking section and setup instructions _(5 min)_
+- [x] **1.2.2** Add BRIQ setup instructions section:
 
   ```python
   # BRIQ Solutions SMS Gateway Configuration
@@ -87,12 +87,12 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
   _(5 min)_
 
 - [ ] **1.2.3** Add example BRIQ constants (with placeholder values) _(5 min)_
-- [ ] **1.2.4** Keep all SMTP configuration as-is with no changes _(2 min)_
+- [x] **1.2.4** Keep all SMTP configuration as-is with no changes _(2 min)_
 
 **Verification:**
 
-- [ ] File is syntactically valid Python: `python3 -m py_compile config.example.py`
-- [ ] Docstring/comments are clear for new developers
+- [x] File is syntactically valid Python: `python3 -m py_compile config.example.py`
+- [x] Docstring/comments are clear for new developers
 
 #### Subtotal: ~0.25 hrs
 
@@ -133,17 +133,17 @@ import sqlite3
 
 **Changes:**
 
-- [ ] **2.1.1** Remove `AFRICA_TALKING_API_KEY` from config import _(2 min)_
-- [ ] **2.1.2** Remove `AFRICA_TALKING_USERNAME` from config import _(2 min)_
-- [ ] **2.1.3** Add `BRIQ_API_KEY`, `BRIQ_API_ENDPOINT`, `BRIQ_SENDER_ID` to config import _(3 min)_
-- [ ] **2.1.4** Delete `import africastalking` line _(1 min)_
-- [ ] **2.1.5** Add `import requests` (already in requirements.txt) _(1 min)_
-- [ ] **2.1.6** Verify email imports remain: `from email.mime.text import MIMEText`, `import smtplib`, `import sqlite3` _(1 min)_
+- [x] **2.1.1** Remove `AFRICA_TALKING_API_KEY` from config import _(2 min)_
+- [x] **2.1.2** Remove `AFRICA_TALKING_USERNAME` from config import _(2 min)_
+- [x] **2.1.3** Add `BRIQ_API_KEY`, `BRIQ_API_ENDPOINT`, `BRIQ_SENDER_ID` to config import _(3 min)_
+- [x] **2.1.4** Delete `import africastalking` line _(1 min)_
+- [x] **2.1.5** Add `import requests` (already in requirements.txt) _(1 min)_
+- [x] **2.1.6** Verify email imports remain: `from email.mime.text import MIMEText`, `import smtplib`, `import sqlite3` _(1 min)_
 
 **Verification:**
 
-- [ ] No syntax errors: `python3 -m py_compile modules/sms_client.py`
-- [ ] Imports resolve: `python3 -c "from modules.sms_client import *; print('OK')"`
+- [x] No syntax errors: `python3 -m py_compile modules/sms_client.py`
+- [x] Imports resolve: `python3 -c "from modules.sms_client import *; print('OK')"`
 
 #### Subtotal: ~0.25 hrs
 

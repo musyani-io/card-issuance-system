@@ -125,45 +125,7 @@ def send_credentials(reg_num, otp, temp_pin=None, db_path="data/kiosk.db"):
 
     sms_message += " Valid for 24 hours"  # OTP expiry message
 
-    # Initialize Africa's Talking SMS client
-    africastalking.initialize(AFRICA_TALKING_USERNAME, AFRICA_TALKING_API_KEY)
-    sms = africastalking.SMS
-    response = sms.send(sms_message, [phone_number])  # Send to single phone number
-
-    # Parse Africa's Talking response (varies by API version)
-    sms_sent = False
-    sms_error = None
-    try:
-        if "SMSMessageData" in response:
-            sms_data = response["SMSMessageData"]
-            # Handler 1: Dictionary with Recipients array
-            if isinstance(sms_data, dict) and "Recipients" in sms_data:
-                recipients = sms_data["Recipients"]
-                if isinstance(recipients, list) and len(recipients) > 0:
-                    # Check first recipient status (status="Success" or statusCode=101)
-                    first_recipient = recipients[0]
-                    sms_sent = (
-                        first_recipient.get("status") == "Success"
-                        or first_recipient.get("statusCode") == 101
-                    )
-                    if not sms_sent:
-                        sms_error = (
-                            f"SMS failed: {first_recipient.get('status', 'Unknown')}"
-                        )
-                else:
-                    sms_error = f"SMS failed: No recipients in response"
-            # Handler 2: Fallback for direct list format
-            elif isinstance(sms_data, list) and len(sms_data) > 0:
-                sms_sent = sms_data[0].get("Status") == "Success"
-                if not sms_sent:
-                    sms_error = f"SMS failed: {sms_data[0].get('ErrorMessage', 'Unknown error')}"
-            else:
-                sms_error = f"SMS failed: Unexpected response format"
-        else:
-            sms_error = f"SMS failed: No SMSMessageData in response"
-    except Exception as e:
-        sms_sent = False
-        sms_error = f"SMS error: {str(e)}"
+    # WRITE BRIQ'S CODE HERE
 
     # Construct HTML email message
     email_subject = "SMARTCARD OTP KIOSK"
