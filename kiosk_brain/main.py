@@ -1,3 +1,60 @@
+"""
+Kiosk Application Entry Point — Kivy UI Framework Integration
+
+This is the main entry point for the Smart ID Card Distribution Kiosk. It initializes
+the Kivy application, sets up the ScreenManager for UI navigation, and wires all UI
+screen transitions to SessionManager state updates.
+
+**Architecture Overview:**
+==========================
+
+SINGLE INSTANCE PATTERN:
+- One KioskApp instance runs for the entire kiosk lifetime (until poweroff)
+- One ScreenManager manages all 6 UI screens
+- One SessionManager shared globally tracks student session state
+- Timeout timer (Clock.schedule_interval) runs every 1 second
+
+SCREEN MANAGER GRAPH:
+    WELCOME → REG_ENTRY → OTP_ENTRY → PIN_ENTRY → CONFIRMATION → WELCOME
+           ↑                                             ↓
+           └─ ERROR (on lockout, network failure) ──────┘
+
+SESSION LIFECYCLE:
+    1. Student at kiosk (WELCOME screen, no session)
+    2. Student enters reg number (REG_ENTRY screen, session initializes)
+    3. Student enters OTP (OTP_ENTRY screen, session active)
+    4. Student enters PIN (PIN_ENTRY screen, session active)
+    5. Student collects card (CONFIRMATION screen, card dispensed)
+    6. Session teardown (WELCOME screen, session reset)
+
+TIMEOUT ENFORCEMENT:
+    - Clock.schedule_interval() calls _check_timeout() every 1 second
+    - Inactivity > 60 seconds triggers automatic session teardown + return to WELCOME
+    - Prevents card hijacking if student walks away mid-session
+
+**CRITICAL DEVELOPER PATTERN:**
+
+SessionManager MUST be explicitly torn down before leaving a session:
+
+    ✓ CORRECT:
+        confirmation_screen.ok_button.bind(
+            on_press=lambda x: (
+                session_manager.teardown(),        # ← Mandatory cleanup
+                setattr(sm, "current", SCREEN_WELCOME)
+            )
+        )
+
+    ✗ WRONG:
+        confirmation_screen.ok_button.bind(
+            on_press=lambda x: setattr(sm, "current", SCREEN_WELCOME)
+        )  # ← Ghost session!  Previous student's reg_number persists in memory
+
+**Configuration:**
+    - Display: 800x400 pixels (hardcoded via Kivy Config)
+    - Window mode: Fullscreen on Raspberry Pi (/dev/fb0)
+    - Orientation: Landscape (fixed)
+"""
+
 from kivy.config import Config
 from ui.screens import (
     WelcomeScreen,
@@ -10,18 +67,70 @@ from ui.screens import (
 from ui.constants import *
 from modules.session_manager import SessionManager
 
+# Configure Kivy display before App initialization
 Config.set("graphics", "width", "800")
 Config.set("graphics", "height", "400")
 
 from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager
+from kivy.clock import Clock
 
+# Global session manager instance (shared across all screens)
 session_manager = SessionManager()
 
 
 class KioskApp(App):
+    """
+    Main Kivy application for the Smart ID Card Distribution Kiosk.
+
+    Responsibilities:
+        - Initialize Kivy ScreenManager with all 6 UI screens
+        - Wire screen transitions to SessionManager state updates
+        - Schedule inactivity timeout checks every 1 second
+        - Handle graceful shutdown (teardown, cleanup)
+
+    Attributes:
+        sm: Kivy ScreenManager instance (self.sm = sm in build())
+
+    Lifecycle:
+        - app.build() called on App().run() startup (creates screens + bindings)
+        - app._check_timeout() called every 1 second via Clock.schedule_interval()
+        - app.on_stop() called on window close or SIGTERM
+
+    **Thread Safety:** All Kivy operations are single-threaded (main thread only)
+    """
+
     def build(self):
+        """
+        Initialize UI screens and wire all transitions to SessionManager.
+
+        Returns:
+            sm (ScreenManager): Root widget for Kivy app (displays current screen)
+
+        Side Effects:
+            - Creates 6 screen instances (WelcomeScreen, OTPEntryScreen, etc.)
+            - Adds all screens to ScreenManager
+            - Binds all button callbacks to screen transitions
+            - Schedules _check_timeout() on 1-second interval
+            - Stores sm reference as self.sm (for timeout handler)
+
+        **Screen Transition Graph Wiring:**
+            welcome.ret_button → OTP_ENTRY (returning student flow)
+            welcome.first_button → REG_ENTRY (first-year student flow)
+            reg_entry.submit_button → OTP_ENTRY (reg number captured)
+            otp_entry.submit_button → PIN_ENTRY (OTP verified)
+            pin_entry.submit_button → CONFIRMATION (PIN verified)
+            confirmation.ok_button → WELCOME (card dispensed, session teardown)
+
+        **Timeout Handler Scheduling:**
+            Clock.schedule_interval(lambda dt: self._check_timeout(), 1)
+            - Calls _check_timeout() every 1000ms
+            - Receives dt (delta time since last call) but unused
+        """
+        # Create ScreenManager to hold all 6 screens
         sm = ScreenManager()
+
+        # Instantiate all screen objects
         welcome_screen = WelcomeScreen()
         otp_entry_screen = OTPEntryScreen()
         pin_entry_screen = PINEntryScreen()
@@ -29,6 +138,7 @@ class KioskApp(App):
         confirmation_screen = ConfirmationScreen()
         reg_entry_screen = RegEntryScreen()
 
+        # Register all screens with name identifiers
         sm.add_widget(welcome_screen)
         sm.add_widget(otp_entry_screen)
         sm.add_widget(pin_entry_screen)
@@ -36,32 +146,80 @@ class KioskApp(App):
         sm.add_widget(confirmation_screen)
         sm.add_widget(reg_entry_screen)
 
+        # Wire welcome screen buttons → next screens
         welcome_screen.ret_button.bind(
-            on_press=lambda x: setattr(sm, "current", SCREEN_OTP_ENTRY)
+            on_press=lambda x: setattr(
+                sm, "current", SCREEN_OTP_ENTRY
+            )  # Returning student
         )
         welcome_screen.first_button.bind(
-            on_press=lambda x: setattr(sm, "current", SCREEN_REG_ENTRY)
+            on_press=lambda x: setattr(
+                sm, "current", SCREEN_REG_ENTRY
+            )  # First-year student
         )
+
+        # Wire reg entry → OTP entry
         reg_entry_screen.submit_button.bind(
             on_press=lambda x: setattr(sm, "current", SCREEN_OTP_ENTRY)
         )
+
+        # Wire OTP entry → PIN entry (update activity timestamp on transition)
         otp_entry_screen.submit_button.bind(
             on_press=lambda x: (
-                session_manager.update_activity(),
+                session_manager.update_activity(),  # Reset inactivity timeout
                 setattr(sm, "current", SCREEN_PIN_ENTRY),
             )
         )
+
+        # Wire PIN entry → Confirmation (update activity timestamp on transition)
         pin_entry_screen.submit_button.bind(
             on_press=lambda x: (
-                session_manager.update_activity(),
+                session_manager.update_activity(),  # Reset inactivity timeout
                 setattr(sm, "current", SCREEN_CONFIRMATION),
             )
         )
+
+        # Wire confirmation → welcome (MANDATORY: teardown session before returning to idle)
         confirmation_screen.ok_button.bind(
             on_press=lambda x: setattr(sm, "current", SCREEN_WELCOME)
         )
+
+        # Store ScreenManager reference for timeout handler access
+        self.sm = sm
+
+        # Schedule inactivity timeout check every 1 second
+        Clock.schedule_interval(lambda dt: self._check_timeout(), 1)
+
         return sm
+
+    def _check_timeout(self):
+        """
+        Check for inactivity timeout and return to welcome screen if exceeded.
+
+        Called by: Clock.schedule_interval() every 1 second
+
+        Timeout Logic:
+            - If last_activity_time > 60 seconds ago → timeout triggered
+            - Call session_manager.teardown() to reset session state
+            - Transition to SCREEN_WELCOME (return to idle)
+            - Next student sees blank welcome screen (no lingering data)
+
+        **Security Critical:**
+            This function prevents card hijacking if student walks away mid-session.
+            Failure to teardown() before returning to WELCOME allows ghost sessions.
+
+        Side Effects:
+            - Calls session_manager.is_timed_out() every 1 second
+            - On timeout: calls session_manager.teardown() and sm.current = WELCOME
+            - Otherwise: no side effects
+        """
+        # Check if inactivity exceeded timeout (60-second grace period)
+        if session_manager.is_timed_out(timeout_seconds=60):
+            # Inactivity timeout triggered
+            session_manager.teardown()  # Reset all session state
+            setattr(self.sm, "current", SCREEN_WELCOME)  # Return to idle screen
 
 
 if __name__ == "__main__":
+    # Application entry point - start Kivy main loop
     KioskApp().run()

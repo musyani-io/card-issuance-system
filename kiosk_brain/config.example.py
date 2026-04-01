@@ -10,19 +10,14 @@ NEVER commit config.py to git - it contains sensitive API keys and passwords.
 
 """
 
-# =============================================================================
-# Africa's Talking SMS Service
-# =============================================================================
-# Get credentials at: https://africastalking.com/
-# For development, use the sandbox credentials provided in your account
+# BRIQ Solutions SMS Gateway Configuration
+  # 1. Sign up for BRIQ account at https://briq.io
+  # 2. Retrieve API key from dashboard
+  # 3. Set BRIQ_API_KEY and BRIQ_API_ENDPOINT below
 
-AFRICA_TALKING_API_KEY = "atsk_YOUR_API_KEY_HERE"
-# This is your unique API key - never share it publicly
-
-AFRICA_TALKING_USERNAME = "sandbox"
-# Use "sandbox" for development/testing
-# Use your production username for production deployments
-
+BRIQ_API_KEY = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+BRIQ_SENDER_ID = "BRIQ"
+BRIQ_API_ENDPOINT = "https://api.briq.io/api/send-sms"
 
 # =============================================================================
 # Gmail SMTP for Email Delivery
