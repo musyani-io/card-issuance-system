@@ -335,7 +335,7 @@ class ConfirmationScreen(Screen):
         layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
         self.add_widget(layout)
 
-        success_label = Label(text="Card Dispensed Successfully", size_hint_y=0.4)
+        success_label = Label(text="Ready to dispense your card", size_hint_y=0.4)
         info_label = Label(
             text="Your ID Card will be dispensed shortly...", size_hint_y=0.3
         )
@@ -436,4 +436,80 @@ class RegEntryScreen(Screen):
 
         layout.add_widget(reg_label)
         layout.add_widget(self.reg_input)
+        layout.add_widget(self.submit_button)
+
+
+class IdleScreen(Screen):
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.name = SCREEN_IDLE
+        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
+        self.add_widget(layout)
+
+        message = Label(text="Collect My\nID Card", size_hint_y=0.5)
+        self.collect_button = Button(text="Collect My Card", size_hint_y=0.3)
+
+        layout.add_widget(message)
+        layout.add_widget(self.collect_button)
+
+
+class SuccessScreen(Screen):
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.name = SCREEN_SUCCESS
+        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
+        self.add_widget(layout)
+
+        success_message = Label(
+            text="Card dispensed Succesfully!\n\nPlease collect your card",
+            size_hint_y=0.5,
+        )
+        info_message = Label(text="Thank you for using the kiosk", size_hint_y=0.3)
+
+        layout.add_widget(success_message)
+        layout.add_widget(info_message)
+
+
+class LockedScreen(Screen):
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.name = SCREEN_LOCKED
+        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
+        self.add_widget(layout)
+
+        lockout_message = Label(
+            text="Registration number temporarily locked", size_hint_y=0.3
+        )
+        info_message = Label(
+            text="Too many failed attempts.\nPlease wait before trying again",
+            size_hint_y=0.3,
+        )
+        self.timer_label = Label(text="Time remaining: 30:00", size_hint_y=0.3)
+
+        layout.add_widget(lockout_message)
+        layout.add_widget(info_message)
+        layout.add_widget(self.timer_label)
+
+
+class PINSetupScreen(Screen):
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.name = SCREEN_PIN_SETUP
+        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
+        self.add_widget(layout)
+
+        pin_label = Label(text="Enter new 4-6 digit PIN", size_hint_y=0.3)
+        self.pin_input = TextInput(
+            text="", multiline=False, input_filter="int", size_hint_y=0.3
+        )
+        confirm_label = Label(text="Confirm your new PIN", size_hint_y=0.3)
+        self.confirm_input = TextInput(
+            text="", multiline=False, input_filter="int", size_hint_y=0.3
+        )
+        self.submit_button = Button(text="Set PIN", size_hint_y=0.2)
+
+        layout.add_widget(pin_label)
+        layout.add_widget(self.pin_input)
+        layout.add_widget(confirm_label)
+        layout.add_widget(self.confirm_input)
         layout.add_widget(self.submit_button)

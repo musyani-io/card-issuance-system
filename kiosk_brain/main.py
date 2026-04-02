@@ -56,14 +56,7 @@ SessionManager MUST be explicitly torn down before leaving a session:
 """
 
 from kivy.config import Config
-from ui.screens import (
-    WelcomeScreen,
-    OTPEntryScreen,
-    PINEntryScreen,
-    ErrorScreen,
-    ConfirmationScreen,
-    RegEntryScreen,
-)
+from ui.screens import *
 from ui.constants import *
 from modules.session_manager import SessionManager
 
@@ -84,7 +77,7 @@ class KioskApp(App):
     Main Kivy application for the Smart ID Card Distribution Kiosk.
 
     Responsibilities:
-        - Initialize Kivy ScreenManager with all 6 UI screens
+        - Initialize Kivy ScreenManager with all 10 UI screens
         - Wire screen transitions to SessionManager state updates
         - Schedule inactivity timeout checks every 1 second
         - Handle graceful shutdown (teardown, cleanup)
@@ -108,26 +101,30 @@ class KioskApp(App):
             sm (ScreenManager): Root widget for Kivy app (displays current screen)
 
         Side Effects:
-            - Creates 6 screen instances (WelcomeScreen, OTPEntryScreen, etc.)
+            - Creates 10 screen instances (IdleScreen, WelcomeScreen, RegEntryScreen, etc.)
             - Adds all screens to ScreenManager
             - Binds all button callbacks to screen transitions
             - Schedules _check_timeout() on 1-second interval
             - Stores sm reference as self.sm (for timeout handler)
 
         **Screen Transition Graph Wiring:**
+            idle.collect_button → WELCOME (start session)
             welcome.ret_button → OTP_ENTRY (returning student flow)
             welcome.first_button → REG_ENTRY (first-year student flow)
             reg_entry.submit_button → OTP_ENTRY (reg number captured)
             otp_entry.submit_button → PIN_ENTRY (OTP verified)
             pin_entry.submit_button → CONFIRMATION (PIN verified)
-            confirmation.ok_button → WELCOME (card dispensed, session teardown)
+            pin_setup.submit_button → CONFIRMATION (first-year PIN set)
+            confirmation.ok_button → SUCCESS (card dispensed)
+            success → IDLE (auto-return after 8 seconds)
+            locked → IDLE (auto-return when countdown reaches 0:00)
 
         **Timeout Handler Scheduling:**
             Clock.schedule_interval(lambda dt: self._check_timeout(), 1)
             - Calls _check_timeout() every 1000ms
             - Receives dt (delta time since last call) but unused
         """
-        # Create ScreenManager to hold all 6 screens
+        # Create ScreenManager to hold all 10 screens
         sm = ScreenManager()
 
         # Instantiate all screen objects
@@ -137,6 +134,10 @@ class KioskApp(App):
         error_screen = ErrorScreen()
         confirmation_screen = ConfirmationScreen()
         reg_entry_screen = RegEntryScreen()
+        pin_setup_screen = PINSetupScreen()
+        locked_screen = LockedScreen()
+        success_screen = SuccessScreen()
+        idle_screen = IdleScreen()
 
         # Register all screens with name identifiers
         sm.add_widget(welcome_screen)
@@ -145,17 +146,28 @@ class KioskApp(App):
         sm.add_widget(error_screen)
         sm.add_widget(confirmation_screen)
         sm.add_widget(reg_entry_screen)
+        sm.add_widget(pin_setup_screen)
+        sm.add_widget(locked_screen)
+        sm.add_widget(success_screen)
+        sm.add_widget(idle_screen)
+
+        # Wire idle screen button → welcome (start new session)
+        idle_screen.collect_button.bind(
+            on_press=lambda x: setattr(sm, "current", SCREEN_WELCOME)
+        )
 
         # Wire welcome screen buttons → next screens
         welcome_screen.ret_button.bind(
-            on_press=lambda x: setattr(
-                sm, "current", SCREEN_OTP_ENTRY
-            )  # Returning student
+            on_press=lambda x: (
+                session_manager.update_activity(),  # Initialize session on button press
+                setattr(sm, "current", SCREEN_OTP_ENTRY),  # Returning student
+            )
         )
         welcome_screen.first_button.bind(
-            on_press=lambda x: setattr(
-                sm, "current", SCREEN_REG_ENTRY
-            )  # First-year student
+            on_press=lambda x: (
+                session_manager.update_activity(),  # Initialize session on button press
+                setattr(sm, "current", SCREEN_REG_ENTRY),  # First-year student
+            )
         )
 
         # Wire reg entry → OTP entry
@@ -179,13 +191,38 @@ class KioskApp(App):
             )
         )
 
-        # Wire confirmation → welcome (MANDATORY: teardown session before returning to idle)
-        confirmation_screen.ok_button.bind(
-            on_press=lambda x: setattr(sm, "current", SCREEN_WELCOME)
+        # Wire PIN setup (first-year) → Confirmation (first-time PIN set)
+        pin_setup_screen.submit_button.bind(
+            on_press=lambda x: (
+                session_manager.update_activity(),  # Reset inactivity timeout
+                setattr(sm, "current", SCREEN_CONFIRMATION),
+            )
         )
+
+        # Wire confirmation → success (card dispensed, ready for collection)
+        confirmation_screen.ok_button.bind(
+            on_press=lambda x: setattr(sm, "current", SCREEN_SUCCESS)
+        )
+
+        # Wire success → idle (auto-return after 8 seconds)
+        # Schedule a callback 8000ms (8 seconds) after SuccessScreen appears
+        def schedule_success_return():
+            Clock.schedule_once(
+                lambda dt: (
+                    session_manager.teardown(),  # CRITICAL: cleanup before idle
+                    setattr(sm, "current", SCREEN_IDLE),
+                ),
+                8,  # 8-second delay
+            )
+
+        # Bind to success screen's on_enter event
+        success_screen.bind(on_enter=lambda screen: schedule_success_return())
 
         # Store ScreenManager reference for timeout handler access
         self.sm = sm
+
+        # Set initial screen to IDLE (kiosk ready for new session)
+        sm.current = SCREEN_IDLE
 
         # Schedule inactivity timeout check every 1 second
         Clock.schedule_interval(lambda dt: self._check_timeout(), 1)

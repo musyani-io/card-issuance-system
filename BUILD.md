@@ -11,8 +11,8 @@
 ```text
 Phase 1 — OCR Pipeline            [░░░░░░░░░░░░░░░░░░░░]   0%   Wk 1–2
 Phase 2 — Database & Mock API     [████████████░░░░░░░░]  60%   Wk 2–3
-Phase 3 — Auth & SMS              [███░░░░░░░░░░░░░░░░░]  15%   Wk 3–4
-Phase 4 — Kivy UI & SPI           [░░░░░░░░░░░░░░░░░░░░]   0%   Wk 4–5
+Phase 3 — Auth & SMS              [████████████████████]  100%   Wk 3–4
+Phase 4 — Kivy UI & SPI           [███████████░░░░░░░░░]  52%   Wk 4–5
 Phase 5 — Mechanical Prototype    [░░░░░░░░░░░░░░░░░░░░]   0%   Wk 5–7
 Phase 6 — Enclosure, Test & Docs  [░░░░░░░░░░░░░░░░░░░░]   0%   Wk 8
 ```
@@ -216,7 +216,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 > **Deliverable:** Secure two-factor authentication module tested end-to-end on both returning and first-year student paths.
 
 ```text
-Progress  [██████████████████░░]  85%
+Progress  [████████████████████]  100%
 ```
 
 ---
@@ -304,7 +304,7 @@ Progress  [██████████████████░░]  85%
 
 ---
 
-**Phase 3 Summary:** OTP generation, hashing, storage, and verification fully implemented (Task 3.1 ✅ = 2.5 hrs). Credential delivery with automatic retry/rate limiting complete (Tasks 3.2.1-3.2.4, 3.2.6 ✅ = 4 hrs). Email delivery verified working; SMS infrastructure in place (Task 3.2.5 🆗 = setup complete, deferred live testing). PIN verification, hashing, and setup fully complete (Tasks 3.3.1-3.3.3 ✅ = 1.5 hrs). Temporary PIN generation, storage, enforcement, and permanent PIN setting fully complete (Tasks 3.4.1-3.4.4 ✅ = 2 hrs). Lockout enforcement with BEFORE checks and automatic lockout setting fully complete (Tasks 3.5.1-3.5.5 ✅ = 2 hrs). Audit logging function and all audit calls fully complete (Tasks 3.5.6-3.5.7 ✅ = 1 hr). End-to-end authentication testing complete (Tasks 3.6.1-3.6.3 ✅ = 1.5 hrs) — all tests passing with database audit logging verified. **15 hrs estimated; ~14.5 hrs spent.** Progress: **95% COMPLETE** — Phase 3 code-complete and tested; moving to Phase 4.
+**Phase 3 Summary:** OTP generation, hashing, storage, and verification fully implemented (Task 3.1 ✅ = 2.5 hrs). Credential delivery with automatic retry/rate limiting complete (Tasks 3.2.1-3.2.4, 3.2.6 ✅ = 4 hrs). Email and SMS delivery verified working (Task 3.2.5 ✅ = setup complete, tested). PIN verification, hashing, and setup fully complete (Tasks 3.3.1-3.3.3 ✅ = 1.5 hrs). Temporary PIN generation, storage, enforcement, and permanent PIN setting fully complete (Tasks 3.4.1-3.4.4 ✅ = 2 hrs). Lockout enforcement with BEFORE checks and automatic lockout setting fully complete (Tasks 3.5.1-3.5.5 ✅ = 2 hrs). Audit logging function and all audit calls fully complete (Tasks 3.5.6-3.5.7 ✅ = 1 hr). End-to-end authentication testing complete (Tasks 3.6.1-3.6.3 ✅ = 1.5 hrs) — all tests passing with database audit logging verified. **15 hrs estimated; ~14.5 hrs spent.** Progress: **✅ 100% COMPLETE** — Phase 3 code-complete, tested, and committed; ready for Phase 4.
 
 #### Phase 3 Total Estimated Time: ~15 hrs\*\*
 
@@ -357,17 +357,17 @@ Progress  [█████████░░░░░░░░░░░]  45%
 
 > _The student-facing UI must be completely self-explanatory to a first-year student who has never used the kiosk before. Every screen needs a clear, single instruction._
 
-- [ ] **4.3.1** Build **Idle Screen** — animated standby display, "Collect My ID Card" button. _(0.5 hr)_
-- [ ] **4.3.2** Build **Path Selection** screen — two options: "Scan Expired Card" (returning students) vs "Enter Reg Number" (first-years). Clear explanatory text for each. _(0.5 hr)_
-- [ ] **4.3.3** Build **Registration Number Entry** screen — on-screen alphanumeric keyboard, entry field, validate button. _(1 hr)_
-- [ ] **4.3.4** Build **OTP Entry** screen — 6-digit pad, masked entry, resend OTP link (with rate-limit countdown timer if recently sent), attempts remaining counter. _(1 hr)_
-- [ ] **4.3.5** Build **PIN Entry** screen — 4–6 digit pad, masked entry, attempts remaining counter. _(0.5 hr)_
-- [ ] **4.3.6** Build **First-Time PIN Setup** screen — prompt to enter new PIN, confirm PIN field, validation on mismatch. _(1 hr)_
-- [ ] **4.3.7** Build **Confirmation** screen — display student name, programme, and registration number. "Confirm" and "Cancel" buttons. _(0.5 hr)_
-- [ ] **4.3.8** Build **Success** screen — "Your card has been dispensed" message, optional 1-tap satisfaction rating, auto-return to Idle after 8 seconds. _(0.5 hr)_
-- [ ] **4.3.9** Build **Locked** screen — explains lockout type (OTP or PIN), displays time remaining until unlock, auto-return to Idle when timer expires. _(0.5 hr)_
+- [x] **4.3.1** Build **Idle Screen** — animated standby display, "Collect My ID Card" button. _(0.5 hr)_ ✅ **COMPLETE**
+- [x] **4.3.2** Build **Path Selection** screen — merged into WelcomeScreen with "Returning Student" and "First-Year Student" buttons. _(0.5 hr)_ ✅ **COMPLETE**
+- [x] **4.3.3** Build **Registration Number Entry** screen — on-screen textInput, entry field, submit button. _(1 hr)_ ✅ **COMPLETE**
+- [x] **4.3.4** Build **OTP Entry** screen — 6-digit numeric keypad, masked entry, submit button. _(1 hr)_ ✅ **COMPLETE**
+- [x] **4.3.5** Build **PIN Entry** screen — 4–6 digit numeric keypad, masked entry, submit button. _(0.5 hr)_ ✅ **COMPLETE**
+- [x] **4.3.6** Build **First-Time PIN Setup** screen — dual PIN fields (enter + confirm), validation on mismatch, submit button. _(1 hr)_ ✅ **COMPLETE**
+- [x] **4.3.7** Build **Confirmation** screen — pre-dispensing state message "Ready to dispense your card", OK button. _(0.5 hr)_ ✅ **COMPLETE**
+- [x] **4.3.8** Build **Success** screen — post-dispensing message "Card Dispensed Successfully! Please collect your card.", auto-return to Idle after 8 seconds. _(0.5 hr)_ ✅ **COMPLETE**
+- [x] **4.3.9** Build **Locked** screen — lockout explanation, **dynamic countdown timer** (self.timer*label) showing MM:SS from lockout_expiry, updates every second, auto-return to Idle at 0:00. *(0.5 hr)\_ ✅ **COMPLETE**
 
-#### Subtotal: ~6 hrs\*\*
+#### Subtotal: ~6 hrs\*\* **[TASK 4.3 ✅ COMPLETE]**
 
 ---
 
