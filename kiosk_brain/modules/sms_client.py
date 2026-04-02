@@ -2,7 +2,7 @@
 SMS and Email Credential Delivery Client
 
 This module sends OTP and temporary PIN credentials to students via two independent channels:
-- Africa's Talking SMS gateway (primary, instant delivery)
+- BRIQ Solutions SMS gateway (primary, instant delivery)
 - SMTP email via Gmail app-specific passwords (fallback, reliable)
 
 Design Pattern: Graceful Degradation
@@ -19,8 +19,9 @@ Configuration:
 ==============
 
 Required environment variables in config.py:
-- AFRICA_TALKING_API_KEY: Africa's Talking sandbox/production API key
-- AFRICA_TALKING_USERNAME: Africa's Talking username
+- BRIQ_API_KEY: BRIQ Solutions API key
+- BRIQ_BASE_URL: BRIQ Solutions API base URL
+- BRIQ_SENDER_ID: BRIQ Solutions sender identifier
 - SMTP_EMAIL: Gmail address with app-specific password enabled
 - APP_PASSWORD: Gmail app-specific password (format: "xxxx xxxx xxxx xxxx")
 
@@ -28,13 +29,13 @@ Migration Path:
 ===============
 
 Development:  Mock credentials, no actual SMS/email sending
-Production:   Real Africa's Talking account, real Gmail credentials
+Production:   Real BRIQ Solutions account, real Gmail credentials
 
 No code changes needed—only config.py values change between environments.
 """
 
 from config import (
-    BRIQ_API_ENDPOINT,
+    BRIQ_BASE_URL,
     BRIQ_API_KEY,
     BRIQ_SENDER_ID,
     SMTP_EMAIL,
@@ -44,6 +45,24 @@ from email.mime.text import MIMEText
 import requests
 import smtplib
 import sqlite3
+
+
+def format_phone_number(phone_number):
+    """
+    Format phone number for BRIQ API.
+    
+    BRIQ expects format: 255XXXXXXXXX (no + prefix)
+    Handles both +255... and 255... formats.
+    
+    Args:
+        phone_number: str (e.g., "+255123456789" or "255123456789")
+    
+    Returns:
+        str: Formatted phone number (e.g., "255123456789")
+    """
+    if phone_number.startswith("+"):
+        return phone_number[1:]  # Remove + prefix
+    return phone_number
 
 
 def send_credentials(reg_num, otp, temp_pin=None, db_path="data/kiosk.db"):
@@ -60,7 +79,7 @@ def send_credentials(reg_num, otp, temp_pin=None, db_path="data/kiosk.db"):
     Returns:
         dict: Delivery result with keys:
             - 'success': bool (True if at least one channel succeeded)
-            - 'sms_sent': bool (True if Africa's Talking SMS delivered)
+            - 'sms_sent': bool (True if BRIQ Solutions SMS delivered)
             - 'email_sent': bool (True if SMTP email sent)
             - 'sms_error': str or None (error description if SMS failed)
             - 'email_error': str or None (error description if email failed)
@@ -90,7 +109,7 @@ def send_credentials(reg_num, otp, temp_pin=None, db_path="data/kiosk.db"):
         - OTP/PIN never logged to file or database (transient, memory-only)
         - Email body includes HTML formatting (visual clarity)
         - Phone number and email lookup from students table (batches must load students first)
-        - Africa's Talking API key and Gmail app password in config.py (not versioned)
+        - BRIQ Solutions API key and Gmail app password in config.py (not versioned)
     """
 
     # Query student contact info from database
@@ -115,7 +134,7 @@ def send_credentials(reg_num, otp, temp_pin=None, db_path="data/kiosk.db"):
     first_name = first_name.upper()  # Format name for greeting
     surname = surname.upper()
     # Construct SMS message with OTP (and optional temp PIN)
-    sms_message = f"""Dear {surname}, your card is available at the kiosk.
+    sms_message = f"""Dear {first_name} {surname}, your card is available at the kiosk.
     Your SMARTCARD One-Time Password (OTP) is {otp}."""
 
     if temp_pin:
@@ -123,9 +142,41 @@ def send_credentials(reg_num, otp, temp_pin=None, db_path="data/kiosk.db"):
             f" Temporary PIN: {temp_pin}."  # First-year students get temp PIN
         )
 
-    sms_message += " Valid for 24 hours"  # OTP expiry message
+    sms_message += " Fetch it within 24 hours."  # OTP expiry message
 
-    # WRITE BRIQ'S CODE HERE
+    # Send SMS via BRIQ API
+    sms_sent = False
+    sms_error = None
+    try:
+        # Format phone number: remove + prefix if present (BRIQ expects 255... format)
+        formatted_phone = format_phone_number(phone_number)
+        
+        url = BRIQ_BASE_URL + "/v1/message/send-instant"
+        payload = {
+            "content": sms_message,
+            "recipients": [formatted_phone],
+            "sender_id": BRIQ_SENDER_ID
+        }
+        headers = {
+            "X-API-Key": BRIQ_API_KEY,
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.post(url, json=payload, headers=headers, timeout=5)
+        response_data = response.json()
+        
+        # Check both HTTP status and response success field
+        if response.status_code == 200 and response_data.get("success"):
+            sms_sent = True
+            sms_error = None
+        else:
+            sms_sent = False
+            sms_error = response_data.get("message", f"HTTP {response.status_code}")
+    
+    except Exception as e:
+        sms_sent = False
+        sms_error = f"SMS failed: {str(e)}"
+
 
     # Construct HTML email message
     email_subject = "SMARTCARD OTP KIOSK"

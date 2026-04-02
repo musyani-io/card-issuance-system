@@ -56,7 +56,7 @@ Function Stubs (Implement in Phase 3):
 """
 
 from modules.sms_client import send_credentials
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import sqlite3
 import bcrypt
 import secrets
@@ -64,24 +64,30 @@ import secrets
 
 def parse_db_datetime(value):
     """
-    Parse SQLite datetime string back to datetime object.
+    Parse SQLite datetime string back to timezone-aware datetime object.
     SQLite stores datetimes as ISO format strings (YYYY-MM-DD HH:MM:SS.SSS).
+    Converts to UTC timezone-aware datetime to avoid deprecation warnings.
 
     Args:
         value: DateTime string from SQLite, or None
 
     Returns:
-        datetime object, or None if input is None or empty
+        datetime object (UTC timezone-aware), or None if input is None or empty
     """
     if value is None or value == "":
         return None
     try:
-        # Try parsing ISO format with microseconds
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        # Parse ISO format and ensure timezone-aware
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        # If naive, add UTC timezone
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
     except (ValueError, AttributeError):
         try:
-            # Fallback: parse without timezone
-            return datetime.strptime(value.split(".")[0], "%Y-%m-%d %H:%M:%S")
+            # Fallback: parse without timezone and add UTC
+            dt = datetime.strptime(value.split(".")[0], "%Y-%m-%d %H:%M:%S")
+            return dt.replace(tzinfo=timezone.utc)
         except (ValueError, AttributeError):
             return None
 
@@ -285,14 +291,14 @@ def store_otp_to_db(reg_number, otp_num, db_path="data/kiosk.db"):
     # Hash OTP with bcrypt (12-round default cost)
     otp_hash = hash_credential(otp_num)
     # Set expiry timestamp (24 hours from now)
-    otp_expiry = datetime.utcnow() + timedelta(hours=24)
+    otp_expiry = datetime.now(timezone.utc) + timedelta(hours=24)
 
     # Write hashed OTP and expiry to database
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute(
         "UPDATE authentication SET otp_hash = ?, otp_expiry = ? WHERE registration_number = ?",
-        (otp_hash, otp_expiry, reg_number),
+        (otp_hash, otp_expiry.isoformat(), reg_number),
     )
 
     conn.commit()
@@ -404,7 +410,7 @@ def verify_otp(reg_number, otp_num, db_path="data/kiosk.db"):
     lockout_expiry = parse_db_datetime(lockout_expiry_str)
 
     # Check if currently in OTP lockout (30-minute window)
-    if lockout_expiry and lockout_expiry > datetime.utcnow():
+    if lockout_expiry and lockout_expiry > datetime.now(timezone.utc):
         conn.close()
         return {
             "success": False,
@@ -414,12 +420,12 @@ def verify_otp(reg_number, otp_num, db_path="data/kiosk.db"):
 
     # If no lockout set yet but failures >= 3, set the lockout now
     if (
-        not lockout_expiry or lockout_expiry <= datetime.utcnow()
+        not lockout_expiry or lockout_expiry <= datetime.now(timezone.utc)
     ) and failed_attempts >= 3:
-        lockout_time = datetime.utcnow() + timedelta(minutes=30)
+        lockout_time = datetime.now(timezone.utc) + timedelta(minutes=30)
         cursor.execute(
             "UPDATE authentication SET lockout_expiry = ? WHERE registration_number = ?",
-            (lockout_time, reg_number),
+            (lockout_time.isoformat(), reg_number),
         )
         conn.commit()
         conn.close()
@@ -431,7 +437,7 @@ def verify_otp(reg_number, otp_num, db_path="data/kiosk.db"):
         }
 
     # OTP > 24 hours old (hard lockout / expiry)
-    if otp_expiry and otp_expiry < datetime.utcnow():
+    if otp_expiry and otp_expiry < datetime.now(timezone.utc):
         conn.close()
         return {
             "success": False,
@@ -521,7 +527,7 @@ def verify_pin(reg_number, pin, db_path="data/kiosk.db"):
     lockout_expiry = parse_db_datetime(lockout_expiry_str)
 
     # Check if currently in PIN lockout (24-hour hard lockout window)
-    if lockout_expiry and lockout_expiry > datetime.utcnow():
+    if lockout_expiry and lockout_expiry > datetime.now(timezone.utc):
         conn.close()
         return {
             "success": False,
@@ -531,12 +537,12 @@ def verify_pin(reg_number, pin, db_path="data/kiosk.db"):
 
     # If no lockout set yet but failures >= 3, set the lockout now (transition from grace to lockout)
     if (
-        not lockout_expiry or lockout_expiry <= datetime.utcnow()
+        not lockout_expiry or lockout_expiry <= datetime.now(timezone.utc)
     ) and failed_attempts >= 3:
-        lockout_time = datetime.utcnow() + timedelta(hours=24)
+        lockout_time = datetime.now(timezone.utc) + timedelta(hours=24)
         cursor.execute(
             "UPDATE authentication SET lockout_expiry = ? WHERE registration_number = ?",
-            (lockout_time, reg_number),
+            (lockout_time.isoformat(), reg_number),
         )
         conn.commit()
         conn.close()
@@ -593,7 +599,7 @@ def dispatch_credentials_with_logging(
             - 'message': str (human-readable description)
 
     Side Effects:
-        - Calls send_credentials() (Africa's Talking SMS + SMTP email)
+        - Calls send_credentials() (BRIQ Solutions SMS + SMTP email)
         - On first failure: retries via retry_send_credentials() after 10-minute grace period
         - If batch_id provided: updates batches table with sms_sent flag (True if either channel succeeded)
 
@@ -684,7 +690,7 @@ def retry_send_credentials(reg_number, otp, temp_pin, db_path="data/kiosk.db"):
         return {"success": False, "error": "NOT_FOUND", "message": "Student not found"}
 
     # Calculate time elapsed since OTP generation (otp_expiry = now + 24h, so now = otp_expiry - 24h)
-    time_elapsed = datetime.utcnow() - (otp_expiry[0] - timedelta(hours=24))
+    time_elapsed = datetime.now(timezone.utc) - (otp_expiry[0] - timedelta(hours=24))
     # Check if grace period (10 minutes) has passed
     if time_elapsed < timedelta(minutes=10):
         return {
@@ -706,7 +712,7 @@ def log_audit_event(
     cursor = conn.cursor()
     cursor.execute(
         "INSERT INTO audit_log (event_time, registration_number, event_type, failure_type, session_id) VALUES (?, ?, ?, ?, ?)",
-        (datetime.utcnow(), reg_number, event_type, failure_type, session_id),
+        (datetime.now(timezone.utc), reg_number, event_type, failure_type, session_id),
     )
     conn.commit()
     conn.close()

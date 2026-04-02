@@ -242,7 +242,7 @@ Progress  [██████████████████░░]  85%
 - [x] **3.2.2** Install SDK: `pip install africastalking`. Initialise with credentials in a config file (not hardcoded). _(0.5 hr)_
 - [x] **3.2.3** Write `send_credentials(email, phone_number, otp, temp_pin=None)` function — sends to both SMS (via Africa's Talking) and email (via SMTP). Formats message differently for returning vs first-year students. _(1.5 hrs)_
 - [x] **3.2.4** Handle send failures (SMS network error, invalid email, SMTP failure) — log failure to `batches` table, do not crash the batch. _(0.5 hr)_
-- [x] **3.2.5** Test credential delivery to both real phone and email address using production credentials. ✅ **Email verified working**. ⚠️ **SMS blocked: Messages charged but not delivered — investigating carrier/account issue.** _(0.5 hr)_
+- [x] **3.2.5** Test credential delivery to both real phone and email address using production credentials. ✅ **Email verified working**. ✅ **SMS verified working via BRIQ Solutions gateway.** _(0.5 hr)_
 - [x] **3.2.6** Implement automatic OTP credential retry with rate limiting: if `send_credentials()` returns `success=False` (both SMS and email failed), check if ≥10 minutes have passed since the last send attempt. If yes, automatically resend to both channels. If not enough time has passed, skip resend. Never expose manual resend to students at this stage. _(1 hr)_
 
 #### Subtotal: ~4.5 hrs\*\*

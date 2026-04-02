@@ -10,7 +10,7 @@ Tests the complete authentication flow for both student paths:
 - 3.6.3: Lockout enforcement (3 wrong OTPs, then 3 wrong PINs)
 
 KEY FEATURES:
-- Uses REAL SMS (Africa's Talking) delivery ✅ VERIFIED
+- Uses REAL SMS (BRIQ Solutions) delivery ✅ VERIFIED
 - Uses REAL Email (Gmail SMTP with App Password) ✅ VERIFIED
 - Temporary test database with sample student data
 - Audit log verification for all lockout events
@@ -28,12 +28,12 @@ RUNNING THE TESTS:
     python -m unittest tests.test_auth -v  # All tests
 
 CREDENTIALS STATUS:
-✅ SMS (Africa's Talking): WORKING - Sandbox/test credentials active
+✅ SMS (BRIQ Solutions): WORKING - API key and endpoint configured (config.py)
 ✅ Email (Gmail): WORKING - App password configured (config.py)
 
 WARNINGS:
 - REAL SMS/EMAILS WILL BE SENT to phone numbers and emails in the database
-- Africa's Talking sandbox: Test SMS may take 1-2 seconds
+- BRIQ Solutions: Test SMS delivery depends on BRIQ API availability
 - Gmail SMTP: Uses app-specific password for authentication
 - Each test run sends 1-2 SMS + 1-2 Emails per scenario
 """
@@ -155,9 +155,9 @@ class AuthTestBase(unittest.TestCase):
                 "registration_number": "2022-04-09050",
                 "first_name": "Samuel",
                 "surname": "Musyani",
-                "email": "samuel.musyani_22@student.udsm.ac.tz",
+                "email": "dmusyani@gmail.com",
                 "programme": "BSc. Electronics Engineering",
-                "phone_number": "+255773422381",
+                "phone_number": "+255776765680",
                 "registration_status": "active",
             },
             {
@@ -301,7 +301,7 @@ class Test361ReturningStudent(AuthTestBase):
 
         # Both SMS and Email should succeed
         self.assertTrue(
-            send_result["sms_sent"], "SMS delivery via Africa's Talking should succeed"
+            send_result["sms_sent"], "SMS delivery via BRIQ Solutions should succeed"
         )
         self.assertTrue(
             send_result["email_sent"], "Email delivery via Gmail should succeed"
@@ -411,7 +411,7 @@ class Test362FirstYearStudent(AuthTestBase):
 
         # Both SMS and Email should succeed
         self.assertTrue(
-            send_result["sms_sent"], "SMS delivery via Africa's Talking should succeed"
+            send_result["sms_sent"], "SMS delivery via BRIQ Solutions should succeed"
         )
         self.assertTrue(
             send_result["email_sent"], "Email delivery via Gmail should succeed"

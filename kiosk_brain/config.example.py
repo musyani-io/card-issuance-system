@@ -17,7 +17,7 @@ NEVER commit config.py to git - it contains sensitive API keys and passwords.
 
 BRIQ_API_KEY = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 BRIQ_SENDER_ID = "BRIQ"
-BRIQ_API_ENDPOINT = "https://api.briq.io/api/send-sms"
+BRIQ_API_ENDPOINT = "https://api.briq.io" # This is just an example
 
 # =============================================================================
 # Gmail SMTP for Email Delivery
