@@ -2,49 +2,43 @@
 
 ## Overview
 
-A distributed embedded system for autonomous ID card issuance in university environments. The system combines a Raspberry Pi 5 (4GB) application controller with an STM32 Nucleo-F401RE hardware control unit, interfaced via SPI over a multi-stage card transport mechanism. The kiosk supports batch card loading by staff and individual card collection by students with two-factor authentication (OTP + PIN).
+A distributed embedded system for autonomous ID card issuance in university environments. The system combines:
+
+- **Raspberry Pi 5 (4GB)**: Python application tier with Kivy touchscreen UI
+- **STM32 Nucleo-F401RE**: Hardware control tier via SPI communication
+- **Multi-stage Transport**: Card carousel, conveyor, OCR, and dispensing mechanisms
+
+**Core Features**: Batch card loading (staff) | Student card collection | Two-factor authentication (OTP + PIN) | OCR registration number extraction | Immutable audit logging
 
 ## System Architecture
 
-The kiosk consists of three major subsystems:
+### Computing Tiers
 
-### 1. Raspberry Pi 5 (4GB) (Application Tier)
+**Raspberry Pi 5 (Application Controller)**
 
-- **OS**: Raspberry Pi OS Lite (headless)
-- **Runtime**: Python 3.11
-- **UI Framework**: Kivy GPU-accelerated rendering on framebuffer
-- **Display**: Official 7" DSI touchscreen (800 × 480 px)
-- **Responsibilities**:
-  - Touchscreen UI (staff PIN login, student OTP/PIN entry, batch progress monitoring)
-  - OCR pipeline (camera frame preprocessing via OpenCV, character extraction via Tesseract 5)
-  - HTTPS API communication with university database
-  - SMS dispatch via Africa's Talking API
-  - SQLite database persistence
-  - SPI master protocol (initiates all hardware commands)
-  - Session state management with explicit cleanup
-  - Audit logging (all authentication events, lockouts, session traces)
+- Python 3.11 runtime with Kivy 2.3 GPU-accelerated UI
+- 7" DSI touchscreen interface (800×480 resolution)
+- OCR pipeline (OpenCV + Tesseract 5)
+- SQLite database (student records, auth credentials, audit logs)
+- SPI master communication with STM32
+- HTTPS API client for university database and SMS gateway
 
-### 2. STM32 Nucleo-F401RE (Hardware Control Tier)
+**STM32 Nucleo-F401RE (Hardware Control)**
 
-- **MCU**: ARM Cortex-M4 @ 84 MHz
-- **Development**: C with STM32 HAL library (STM32CubeIDE)
-- **Interface**: SPI slave mode (receives commands from Pi)
-- **Responsibilities**:
-  - Stepper motor pulse generation (NEMA 17 × 2) via HAL timers at precise frequencies
-  - Servo PWM control (SG90 × 2) at 50 Hz
-  - Solenoid electromagnetic lock control via MOSFET driver
-  - Sensor state polling (IR break-beams × 4, Hall-effect absolute home reference)
-  - Hardware interlock: door-open IR sensor → GPIO interrupt handler disables all motor step outputs (cannot be overridden from Pi)
-  - Motor current limiting via A4988 driver potentiometer calibration
+- SPI slave mode receiving commands from Pi
+- Motor control (NEMA 17 stepper × 2 for carousel and conveyor)
+- Servo control (SG90 × 2 for ejector and expired card latch)
+- Solenoid lock control (fail-secure design)
+- Sensor polling (4× IR break-beam, 1× Hall-effect for homing)
+- Hardware interlock: door-open sensor → automatic motor disable (failsafe)
 
-### 3. Mechanical Subsystems
+### Mechanical Subsystems
 
-- **Turntable Carousel**: 10-slot disc, GT2 belt drive, neodymium card retention
-- **Conveyor 1**: Input card transport from staff tray to turntable rear gate
-- **CSI Camera Station**: Fixed mount above Conveyor 1 for batch card OCR
-- **Expired Card Scanner**: USB camera in front-panel slot with servo latch (for returning student verification)
-- **Card Ejector**: SG90 servo flap at turntable front gate (student collection point)
-- **Staff Door Lock**: 12V solenoid with fail-secure design (locked on power loss)
+- **Turntable Carousel**: 10-slot disc with neodymium card retention; expandable to 20-slot
+- **Conveyor Systems**: Input transport (staff tray → carousel rear gate) + Output (carousel front → student collection point)
+- **Camera Stations**: CSI camera above Conveyor 1 for batch OCR; USB camera in front-panel expired card slot
+- **Dispensing**: SG90 servo flap at turntable front gate for individual card ejection
+- **Security**: 12V solenoid lock on staff access door (energized-to-lock, fail-secure)
 
 ## Development Phases
 
@@ -60,244 +54,130 @@ The kiosk consists of three major subsystems:
 
 ```bash
 card-issuance-system/
-├── README.md                          # This file
-├── BUILD.md                           # Build and deployment instructions
-├── docs/
-│   ├── kiosk_architecture.html        # Interactive system architecture diagram
-│   ├── official/                       # Official documentation (university APIs, compliance)
-│   └── primary/                        # Design rationale and technical specifications
-├── kiosk-brain/                        # Raspberry Pi Python application
-│   ├── main.py                         # Entry point (Kivy app initialization)
-│   ├── config.py                       # Configuration (API keys, timeouts, paths)
-│   ├── requirements.txt                # Python dependencies
-│   ├── README.md                       # Kiosk-brain subsystem documentation
-│   ├── modules/
-│   │   ├── api_client.py              # HTTPS university API wrapper
-│   │   ├── auth.py                    # OTP/PIN verification (bcrypt, lockout logic)
-│   │   ├── database.py                # SQLite interface (schema queries, transactions)
-│   │   ├── ocr.py                     # OpenCV + Tesseract image processing
-│   │   ├── session_manager.py         # Per-session state lifecycle
-│   │   ├── sms_client.py              # Africa's Talking SDK wrapper
-│   │   └── spi_master.py              # SPI command protocol (frame format, checksum)
-│   ├── ui/
-│   │   ├── screens.py                 # Kivy Screen subclasses (IDLE, STAFF_PIN, etc.)
-│   │   └── styles.kv                  # Kivy layout definitions (KivyLang DSL)
-│   ├── tests/
-│   │   ├── test_auth.py               # Unit tests (bcrypt, OTP validation)
-│   │   ├── test_ocr.py                # OCR pipeline regression tests
-│   │   ├── test_spi.py                # SPI frame encoding/decoding
-│   │   └── sample_cards/              # JPEG cards for OCR testing
-│   ├── db/
-│   │   ├── schema.sql                 # SQLite DDL (students, auth, audit_log tables)
-│   │   ├── init_db.py                 # Database initialization script
-│   │   └── migrations/                # Schema version control
-│   └── data/
-│       └── logs/                      # Application logs (audit trail)
-├── mock-db-api/                        # Flask development API (university DB mock)
-│   ├── app.py                          # Flask app (single /students/{reg_number} endpoint)
-│   ├── config.py                       # API key, student fixture data
-│   ├── requirements.txt                # Python dependencies
-│   └── README.md                       # Mock API documentation
-└── firmware/                           # STM32 firmware (managed separately)
-    └── STM32CubeIDE project          # C, HAL, SPI slave mode, motor control
+├── README.md                    # This file
+├── BUILD.md                     # Build and deployment guide
+├── docs/                        # Architecture diagrams and specifications
+├── kiosk-brain/                 # Raspberry Pi Python application
+│   ├── main.py                  # Kivy app entry point
+│   ├── config.py                # Environment configuration (credentials, timeouts)
+│   ├── requirements.txt         # Python dependencies
+│   ├── modules/                 # Core business logic
+│   ├── ui/                      # Kivy screens and UI components
+│   ├── tests/                   # Unit and integration tests
+│   ├── db/                      # SQLite schema and initialization
+│   └── data/logs/              # Application audit logs
+├── mock-db-api/                 # Flask mock university API (development)
+└── firmware/                    # STM32 firmware (separate repo/project)
 ```
 
-## Network Architecture
+## Architecture Details
 
-### WiFi / mDNS Layer
+### Network Communication
 
-- **Raspberry Pi ↔ Mock University DB**: HTTPS over WiFi/mobile hotspot, service discovery via mDNS
-  - Pi resolves `university-db.local` automatically (no hardcoded IP)
-  - Supported on both shared WiFi networks and mobile hotspot failover
+**Pi ↔ University Database**: HTTPS+mDNS (resolves `university-db.local` automatically, no hardcoded IPs)
 
-### API Integration Points
+- Endpoint: `GET /students/{reg_number}`
+- Timeout: 5 seconds with 3× exponential backoff retry
+- Supports WiFi and mobile hotspot failover
 
-1. **University Database API** (external)
-   - Endpoint: `GET /students/{reg_number}`
-   - Response: `{ "name": "...", "programme": "...", "phone": "+...", "status": "active|inactive|suspended" }`
-   - Timeout: 5 seconds per request
-   - Retries: 3 with exponential backoff
-   - Auth: Bearer token in HTTP header
+**Pi ↔ SMS Gateway**: HTTPS to BRIQ Solutions API
 
-2. **Africa's Talking SMS Gateway** (external)
-   - Method: HTTP POST `/message/send`
-   - Credentials: API key and sender name stored in `config.py`
-   - Supported: Returning student OTP, first-year OTP + temporary PIN
-   - Retry queue: Failed sends queued in SQLite `batches` table, background thread retries every 15 minutes
+- Endpoint: POST `/v1/message/send-instant`
+- Credentials: API key, sender ID in `config.py`
+- Retry queue: Failed sends stored in SQLite, background retry every 15 min
 
-### SPI Protocol (Pi Master ↔ STM32 Slave)
+**Pi ↔ STM32**: SPI protocol (local communication only)
 
-- **Frame Format**: `[COMMAND_BYTE][PARAMETER_BYTE][CHECKSUM]` (Pi → STM32)
-- **Response**: `[STATUS_BYTE][DATA_BYTE][CHECKSUM]` (STM32 → Pi)
-- **Commands**:
-  - `ROTATE_TO_SLOT(slot_index)` — Rotate carousel to target slot
-  - `EJECT_CARD()` — Push card through front-gate ejector servo
-  - `UNLOCK_DOOR()` — De-energize solenoid lock
-  - `LOCK_DOOR()` — Energize solenoid lock
-  - `LATCH_CARD()` / `RELEASE_CARD()` — Expired slot servo control
-  - `GET_SENSOR_STATE()` — Read all 5 sensor states (packed byte)
-  - `HOME_CAROUSEL()` — Rotate until hall-effect sensor triggers, reset step counter to zero
-- **Safety**: Pi crash → STM32 receives no commands → all motors remain stopped
+- Frame format: [COMMAND][PARAMETER][CHECKSUM]
+- Commands: Carousel rotation, card ejection, lock/unlock, sensor polling, homing
+- Safety: Pi crash → STM32 receives no commands → all motors remain stopped
 
-## Database Schema
+### Authentication & Sessions
 
-SQLite file stored on 64GB microSD at runtime. Three critical tables:
+**Two-Factor Authentication**
 
-### `students` Table
+- **Factor 1 (OTP)**: 6-digit code sent via SMS + email, bcrypt-hashed in DB, 24h expiry
+- **Factor 2 (PIN)**: 4–6 digits; returning students use existing PIN, first-years create permanent PIN after temp PIN validation
+- **Lockout**: 3 consecutive failures → 30-min cooldown (OTP) or 24-h hard lockout (PIN)
 
-```sql
-CREATE TABLE students (
-  reg_number TEXT PRIMARY KEY,
-  first_name TEXT NOT NULL,
-  surname TEXT NOT NULL,
-  programme TEXT,
-  phone TEXT,
-  status TEXT CHECK(status IN ('active', 'inactive', 'suspended')),
-  added_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-```
+**Session Management**
 
-### `authentication` Table
+- Per-transaction state tracked in volatile SessionManager object
+- Explicit cleanup on transaction completion or 5-min timeout
+- All events (success/failure) logged to immutable audit_log table
 
-```sql
-CREATE TABLE authentication (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  reg_number TEXT NOT NULL FOREIGN KEY REFERENCES students(reg_number),
-  otp_hash TEXT,
-  otp_expiry DATETIME,
-  pin_hash TEXT,
-  pin_attempts_today INTEGER DEFAULT 0,
-  pin_lockout_until DATETIME,
-  created_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-```
+### Database
 
-### `audit_log` Table
+**SQLite schema** includes:
 
-```sql
-CREATE TABLE audit_log (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  reg_number TEXT,
-  event_type TEXT CHECK(event_type IN ('session_start', 'otp_sent', 'otp_verify_fail', 'pin_verify_fail', 'otp_lockout', 'pin_lockout', 'pin_lockout_admin_review', 'collection_success', 'card_rejected_ocr')),
-  details TEXT,
-  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-```
+- `students`: Registration number (PK), name, email, phone, programme, status
+- `authentication`: OTP hash, PIN hash, is_temp_pin flag, failed attempt counters, lockout expiry
+- `cards`: Card ID, batch reference, slot index, status, timestamps
+- `audit_log`: Immutable event log (session_start, otp_sent, auth_failed, collection_success, etc.)
+- `batches`: Batch metadata, card counts, timestamps
 
-Automated cleanup: Background cron job purges `students` records older than 120 days every four months (prevents carousel slot index exhaustion).
+**Automatic cleanup**: Background cron purges old records every 120 days (carousel slot exhaustion prevention)
 
-## Power Architecture
+### Power Architecture
 
-- **Primary Rail (12V, 10A)**: Motors, motor drivers, solenoid lock
-- **Logic Rail (5V, regulated)**: Raspberry Pi, display, STM32 logic, servo control
-- **Power Separation**: Motors on 12V rail, logic on 5V buck-converted rail (prevents stepper switching noise corruption of Pi microSD)
-- \*\*UPS (5V): Backup Li-ion cell provides 5–10 minutes runtime (Pi + display + STM32 only, not motors)
-  - Ensures SQLite database closure on mains failure before battery depletion
-  - Motors stop cleanly (no backup power) — mechanically safe
+- **Primary Rail (12V, 10A)**: Motors, drivers, solenoid lock
+- **Logic Rail (5V, regulated)**: Raspberry Pi, display, STM32, servos
+- **Separation**: Motors on 12V rail, logic on 5V buck-converter (prevents stepper noise on Pi microSD)
+- **UPS (5V Li-ion)**: Backup power for 5–10 min runtime (Pi+display+STM32 only, not motors)
+  - Ensures SQLite database closure on mains failure
+  - Motors stop cleanly (no backup) — mechanically safe
 
-## Sensors
+### Sensors
 
-| Sensor      | Type        | Purpose                                   | Position                        |
-| ----------- | ----------- | ----------------------------------------- | ------------------------------- |
-| IR Sensor 1 | Break-beam  | Staff door open detection                 | Door frame                      |
-| IR Sensor 2 | Break-beam  | Rear gate card detection                  | Turntable rear gate             |
-| IR Sensor 3 | Break-beam  | Front gate card eject confirmation        | Turntable front gate            |
-| IR Sensor 4 | Break-beam  | Expired card slot insertion               | Front panel expired slot        |
-| Hall A3144  | Hall-effect | Carousel absolute home (slot 0 reference) | Turntable frame + magnet on rim |
+| Sensor     | Type        | Purpose                                   |
+| ---------- | ----------- | ----------------------------------------- |
+| IR1        | Break-beam  | Staff door open detection                 |
+| IR2        | Break-beam  | Rear gate card detection (carousel)       |
+| IR3        | Break-beam  | Front gate card ejection confirmation     |
+| IR4        | Break-beam  | Expired card slot insertion               |
+| Hall A3144 | Hall-effect | Carousel absolute home reference (slot 0) |
 
-## Hardware Bill of Materials (BOM)
+### Bill of Materials (Key Components)
 
-| Component                   | Qty       | Notes                                             |
-| --------------------------- | --------- | ------------------------------------------------- |
-| Raspberry Pi 5 (4GB RAM)    | 1         | SoM: BCM2712, 64-bit ARMv8 @ 2.4 GHz              |
-| Official 7" DSI Touchscreen | 1         | 800 × 480, DSI ribbon                             |
-| STM32 Nucleo-F401RE         | 1         | Breakout board, 84 MHz Cortex-M4                  |
-| Pi Camera Module v2 (CSI)   | 1         | 8 MP Sony IMX219, fixed mount over Conveyor 1     |
-| USB Webcam (720p)           | 1         | Inside front-panel expired card slot              |
-| NEMA 17 Stepper Motor       | 2         | Turntable drive + Conveyor 1 drive                |
-| A4988 Stepper Driver        | 2         | Microstepping to 1/8, current-limit potentiometer |
-| SG90 Servo Motor            | 2         | Expired slot latch + front-gate ejector           |
-| 12V Solenoid Lock           | 1         | Fail-secure (energized = locked)                  |
-| IRLZ44N MOSFET              | 1         | 12V solenoid gate driver                          |
-| IR Break-Beam Sensor Module | 4         | Digital output on GPIO                            |
-| A3144 Hall-Effect Sensor    | 1         | Carousel absolute home                            |
-| GT2 Timing Belt + Pulleys   | As needed | Stepper coupling to drives                        |
-| 10-Slot Turntable Carousel  | 1         | Acrylic prototype or 3D-printed                   |
-| 12V/10A Switching PSU       | 1         | Mains 220–240V input                              |
-| 12V→5V Buck Converter (3A)  | 1         | Logic rail regulation                             |
-| 5V UPS Li-ion Module        | 1         | Backup for Pi shutdown                            |
-| Neodymium Disc Magnets      | 10        | Card retention per slot                           |
-| 64GB Class 10 microSD Card  | 1         | OS, Python env, SQLite DB file                    |
+- Raspberry Pi 5 (4GB), STM32 Nucleo-F401RE
+- Official 7" DSI touchscreen, Pi Camera Module v2 (CSI), USB webcam (720p)
+- NEMA 17 stepper motors (×2), SG90 servos (×2), 12V solenoid lock
+- A4988 stepper drivers (×2), IRLZ44N MOSFET, IR sensors (×4), Hall-effect sensor
+- 10-slot turntable carousel, GT2 timing belt and pulleys
+- 12V/10A switching PSU, 12V→5V buck converter, 5V UPS Li-ion module
+- 64GB Class 10 microSD card
 
-## Authentication Flow
+## Operation
 
-### Two-Factor Process
+### Student Card Collection Flow
 
-**Factor 1: OTP (One-Time Passcode)**
+1. **OTP Phase**: Student enters registration number → Pi queries API → generates OTP → sends via SMS+Email
+2. **OTP Verification**: Student enters 6-digit OTP on touchscreen → Pi validates against bcrypt hash
+3. **PIN Phase**:
+   - Returning student enters existing PIN
+   - First-year student receives temporary PIN in SMS, enters it, then creates permanent PIN
+4. **Collection**: Pi signals STM32 to rotate carousel to slot and eject card → student collects
+5. **Logging**: All events recorded in audit_log (timestamps, success/failure, session ID)
 
-1. Student enters registration number
-2. Pi queries university API → fetches phone number
-3. Pi generates 6-digit OTP via `secrets.randbelow(1_000_000)` (zero-padded)
-4. OTP stored as bcrypt hash in SQLite `authentication` table with 24-hour expiry
-5. SMS sent via Africa's Talking with OTP and collection instructions
-6. Student receives SMS with OTP (or retransmit with rate limit 1× per 10 minutes)
-7. Student enters 6-digit OTP on touchscreen
-8. Pi queries SQLite → validates hash and expiry
-9. **Soft lockout**: 3 consecutive OTP failures → 30-minute cooldown
+### Authentication Lockout Policy
 
-**Factor 2: PIN (Personal Identification Number)**
+- **OTP Failures**: 3 consecutive failures → 30-minute cooldown (soft lockout, retry allowed after cooldown)
+- **PIN Failures**: 3 consecutive failures → 24-hour hard lockout (flagged for administrator review)
 
-1. For **returning students**: Existing PIN demanded (4–6 digits, bcrypt verified)
-2. For **first-year students**: Temporary PIN received in SMS, must set permanent PIN on first collection visit
-3. **Lockout policy**: 3 consecutive PIN failures → 24-hour hard lockout (flagged in audit log for administrator review)
-4. On success: Card slot assignment, SMS acknowledgment
+### OCR Pipeline
 
-### Session State Machine (Kivy ScreenManager)
+**Three-Stage Processing**:
 
-```
-IDLE (student tap or staff unlock)
- ├─→ STAFF_PIN (if staff unlock triggered)
- │    ├─ [PIN correct] → CHECKLIST (staff batch loading)
- │    └─ [PIN incorrect × 3] → LOCKED (24h lockout)
- │
- └─→ HOME (student path selection)
-      ├–→ [OTP path]
-      │    ├─ OTP SCREEN → [OTP correct]
-      │    ├─ PIN SCREEN (existing or temp) → [PIN correct]
-      │    └─ CONFIRM SCREEN → [confirm] → SUCCESS → IDLE
-      │
-      └─→ [Expired card + camera scan]
-           ├─ Servo latch active, camera acquires frame
-           ├─ OCR extracts reg number, validates format
-           └─ [Reg found] → OTP SCREEN (as above)
-```
+1. **Image Capture**: CSI or USB camera (triggered by IR sensor)
+2. **Preprocessing**: Grayscale → adaptive thresholding → deskew → ROI crop (OpenCV)
+3. **Text Extraction**: Tesseract 5 with alphanumeric whitelist → regex validation against university format
 
-## OCR Pipeline
-
-1. **Image Acquisition**
-   - CSI camera: Frame buffered on Pi Camera v2 arrival (conveyor motion IR trigger)
-   - USB camera: Frame captured on expired-slot IR sensor activation
-
-2. **Preprocessing** (OpenCV)
-   - Grayscale conversion
-   - Adaptive Gaussian thresholding (handles uneven card lighting)
-   - Deskew via Hough line angle detection
-   - ROI cropping to registration number field
-   - Contrast enhancement and sharpening
-
-3. **Character Extraction** (Tesseract 5)
-   - Single-line mode (`--psm 7`)
-   - Alphanumeric character whitelist (eliminates spurious symbols)
-   - Configurable language model
-
-4. **Validation** (Regex + Confidence)
-   - Regex against university format (e.g., `T/UDSM/0001/2021`)
-   - Confidence threshold gate (tunable, default 95%)
-   - **Low-confidence diversion**: Servo flap routes low-confidence cards to reject bin (never carousel entry)
+**Confidence Gating**: Low-confidence cards routed to reject bin (never carousel)
+**Performance**: <3 seconds per card scan
 
 ## Installation & Setup
 
-### Raspberry Pi 4B
+### Raspberry Pi Environment
 
 1. **OS Installation**
 
@@ -357,103 +237,57 @@ IDLE (student tap or staff unlock)
 
 ### STM32 Firmware
 
-1. **Development Environment**
-   - Install STM32CubeIDE (free, Linux-native)
-   - Import HAL support for STM32F4 family
-
-2. **Configuration**
-   - SPI1 slave mode with interrupt handler
-   - TIM2/TIM3 for stepper pulse generation (frequency configurable)
-   - TIM4 for servo 50 Hz PWM
-   - GPIO interrupt for door-open IR sensor (priority: disables motor steps)
-
-3. **Compile & Flash**
-
-   ```bash
-   # Build project in STM32CubeIDE, then flash via ST-Link programmer
-   ```
-
-### Mock University API
-
-1. **Installation** (on development laptop)
-
-   ```bash
-   cd mock-db-api
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
-   ```
-
-2. **Run with mDNS Publishing**
-
-   ```bash
-   # Install avahi for mDNS advertising
-   sudo apt install avahi-daemon
-
-   # Launch Flask app with mDNS name resolution
-   python app.py --mdns-advertise
-   # Resolves as: university-db.local:5000
-   ```
-
-## Testing
+- Develop in STM32CubeIDE (Linux-native IDE)
+- Configure SPI1 in slave mode, GPIO interrupts, motor timers
+- Compile and flash via ST-Link programmer
+- See `firmware/` directory for project structure
 
 ### Unit Tests
 
 ```bash
 cd kiosk-brain/tests
-pytest test_auth.py       # bcrypt hashing, OTP validation, lockout logic
-pytest test_ocr.py        # OCR pipeline regression (sample_cards/*.jpg)
-pytest test_spi.py        # SPI frame encoding/decoding, checksum verification
+python -m unittest tests.test_auth -v          # Authentication tests
+python -m unittest tests.test_ocr -v           # OCR pipeline tests
+python -m unittest tests.test_spi -v           # SPI protocol tests
 ```
-
-### Integration Tests
-
-- **Mock API**: `pytest` fixtures with sample student records
-- **Database**: Transactional rollback per test (no pollution)
-- **SMS**: Africa's Talking sandbox account (free, no cost)
 
 ## Performance Targets
 
-| Metric                      | Target                                   | Notes                                                |
-| --------------------------- | ---------------------------------------- | ---------------------------------------------------- |
-| **Card throughput**         | 10–15 cards/min (batch)                  | Conveyor speed + carousel rotation + servo actuation |
-| **OCR accuracy**            | 98%+ (well-lit card)                     | Tesseract v5 + regex validation + confidence gating  |
-| **Pi startup**              | <30 seconds                              | OS boot + Kivy framebuffer init on DSI display       |
-| **SPI command latency**     | <10 ms                                   | Motor motion imperceptible to user                   |
-| **Authentication response** | <2 seconds (local), <5 seconds (network) | SQLite lookup vs. API round-trip                     |
-| **SMS delivery**            | <60 seconds                              | Africa's Talking typical delivery window             |
+| Metric              | Target                       | Notes                                 |
+| ------------------- | ---------------------------- | ------------------------------------- |
+| Card throughput     | 10–15 cards/min (batch mode) | Conveyor + carousel + servo actuation |
+| OCR accuracy        | 98%+                         | Assumes well-lit cards                |
+| Pi startup          | <30 sec                      | OS boot + Kivy init                   |
+| SPI command latency | <10 ms                       | Motor imperceptible to user           |
+| Auth response       | <2s (local) / <5s (network)  | SQLite vs API round-trip              |
+| SMS delivery        | <60 sec                      | BRIQ Solutions typical window         |
 
-## Known Limitations & Future Roadmap
+## Limitations & Future Work
 
-### Phase Release 1 (Current)
+### Current Release
 
-- **SPI**: Unencrypted frame transport (trusted local network only)
-- **OCR**: Assumes uniform diffuse lighting (field lighting in production location critical)
-- **Carousel**: 10-slot prototype (expandable to 20-slot via firmware)
-- **Mobile**: Python 3.11, Kivy 2.3.1 (ARM64 native on Pi OS)
+- SPI communication: Unencrypted (trusted local network only)
+- OCR: Assumes uniform lighting (field lighting critical for production)
+- Carousel: 10-slot prototype (expandable to 20 via firmware)
+- Python 3.11 on ARM64 with Kivy 2.3.1
 
-### Phase Release 2 (Q4 2026)
+### Planned Enhancements
 
-- SPI frame encryption (optional, based on security review)
-- Multilingual OCR (Swahili, French, Arabic character sets)
-- Network failover SMS via backup provider (Twilio fallback)
-- Wireless firmware update mechanism (over-the-air STM32 flashing)
+- **Q4 2026**: SPI frame encryption, multilingual OCR, backup SMS provider, wireless firmware updates
+- **TBD**: Biometric fingerprint scanner, on-site card printing, encrypted tamper detection
 
-### Phase Release 3 (TBD)
+## Additional Resources
 
-- Biometric fingerprint scanner integration (optional 2FA)
-- Card printer integration (on-site ID photo printing)
-- Physical security: encrypted tamper-detection switches on access panels
-
-## License
-
-[Specify license here — e.g., MIT, GPL-3.0]
+- **Architecture Diagrams**: See `docs/kiosk_architecture.html`
+- **Build Instructions**: See `BUILD.md`
+- **API Client Documentation**: `mock-db-api/README.md`
+- **Kiosk-Brain Subsystem**: `kiosk-brain/README.md`
 
 ## References
 
 - **OpenCV Documentation**: <https://docs.opencv.org/>
 - **Tesseract OCR**: <https://github.com/UB-Mannheim/tesseract/wiki>
 - **Kivy Framework**: <https://kivy.org/doc/>
-- **Africa's Talking SMS**: <https://africastalking.com/sms/api>
+- **BRIQ Solutions**: <https://docs.briq.tz/api-reference/hello-briq>
 - **SQLite**: <https://www.sqlite.org/lang.html>
 - **STM32 HAL Reference**: <https://www.st.com/resource/en/reference_manual/dm00031020-stm32f446xx-advanced-arm-based-32-bit-mcus-stm32f4-series-reference-manual-stmicroelectronics.pdf>
