@@ -1,3 +1,43 @@
+-- ============================================================================
+-- Smart ID Card Distribution Kiosk — SQLite Database Schema
+-- ============================================================================
+-- 
+-- This schema defines 5 core tables for managing student card issuance process:
+-- students, cards, authentication, audit_log, batches
+--
+-- KEY DESIGN PATTERNS:
+-- =====================
+-- 1. PRIMARY KEY: registration_number (TEXT, UNIQUE)
+--    - Students identified by unique registration number across all tables
+--    - Example: "2022-04-09050"
+--
+-- 2. AUTHENTICATION DESIGN: is_temp_pin column
+--    - is_temp_pin = FALSE (returning student or user-set PIN)
+--    - is_temp_pin = TRUE (first-year student gets temporary system-generated PIN)
+--    - After first PIN verification, student creates permanent PIN and is_temp_pin → FALSE
+--
+-- 3. CREDENTIAL VALIDATION: *_hash and *_attempts columns
+--    - otp_hash: Hashed OTP (never store plaintext)
+--    - pin_hash: Bcrypt-hashed PIN
+--    - failed_otp_attempts: Counter incremented on wrong OTP (lockout after 3)
+--    - failed_pin_attempts: Counter incremented on wrong PIN (lockout after 3)
+--    - lockout_expiry: Timestamp when 15-minute lockout ends
+--
+-- 4. AUDIT TRAIL: audit_log table (immutable, append-only)
+--    - Records every transaction for compliance and debugging
+--    - event_type: otp_sent, otp_verified, pin_verified, card_dispensed, auth_failed, etc.
+--    - failure_type: Why operation failed (invalid_otp, invalid_pin, expired, etc.)
+--    - session_id: Traces all events within one transaction session
+--
+-- 5. BATCH PROCESSING: cards and batches tables
+--    - Batch: Group of cards loaded together (e.g., "Batch_20260402_001")
+--    - Cards table: Tracks physical card location and status
+--    - Slots enable efficient batch management (slot_index = position in batch)
+--
+-- TIMESTAMPS: All *_at and *_expiry columns use TIMESTAMP for sorting and filtering
+--
+-- ============================================================================
+
 CREATE TABLE students (
     registration_number TEXT PRIMARY KEY,
     first_name TEXT NOT NULL,

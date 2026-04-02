@@ -45,7 +45,7 @@ RETURNING STUDENT (Has Prior Year PIN):
 CREDENTIAL DELIVERY STRATEGY:
 =============================
 Credentials (OTP + optional temp PIN) are sent via TWO channels:
-- SMS via Africa's Talking API (phone_number)
+- SMS via BRIQ Solutions API (phone_number)
 - Email via SMTP (email)
 
 If one channel fails, the kiosk continues (does not crash batch).

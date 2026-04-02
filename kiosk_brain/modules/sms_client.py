@@ -50,13 +50,13 @@ import sqlite3
 def format_phone_number(phone_number):
     """
     Format phone number for BRIQ API.
-    
+
     BRIQ expects format: 255XXXXXXXXX (no + prefix)
     Handles both +255... and 255... formats.
-    
+
     Args:
         phone_number: str (e.g., "+255123456789" or "255123456789")
-    
+
     Returns:
         str: Formatted phone number (e.g., "255123456789")
     """
@@ -150,21 +150,18 @@ def send_credentials(reg_num, otp, temp_pin=None, db_path="data/kiosk.db"):
     try:
         # Format phone number: remove + prefix if present (BRIQ expects 255... format)
         formatted_phone = format_phone_number(phone_number)
-        
+
         url = BRIQ_BASE_URL + "/v1/message/send-instant"
         payload = {
             "content": sms_message,
             "recipients": [formatted_phone],
-            "sender_id": BRIQ_SENDER_ID
+            "sender_id": BRIQ_SENDER_ID,
         }
-        headers = {
-            "X-API-Key": BRIQ_API_KEY,
-            "Content-Type": "application/json"
-        }
-        
+        headers = {"X-API-Key": BRIQ_API_KEY, "Content-Type": "application/json"}
+
         response = requests.post(url, json=payload, headers=headers, timeout=5)
         response_data = response.json()
-        
+
         # Check both HTTP status and response success field
         if response.status_code == 200 and response_data.get("success"):
             sms_sent = True
@@ -172,11 +169,10 @@ def send_credentials(reg_num, otp, temp_pin=None, db_path="data/kiosk.db"):
         else:
             sms_sent = False
             sms_error = response_data.get("message", f"HTTP {response.status_code}")
-    
+
     except Exception as e:
         sms_sent = False
         sms_error = f"SMS failed: {str(e)}"
-
 
     # Construct HTML email message
     email_subject = "SMARTCARD OTP KIOSK"

@@ -11,13 +11,13 @@ NEVER commit config.py to git - it contains sensitive API keys and passwords.
 """
 
 # BRIQ Solutions SMS Gateway Configuration
-  # 1. Sign up for BRIQ account at https://briq.io
-  # 2. Retrieve API key from dashboard
-  # 3. Set BRIQ_API_KEY and BRIQ_API_ENDPOINT below
+# 1. Sign up for BRIQ account at https://briq.io
+# 2. Retrieve API key from dashboard
+# 3. Set BRIQ_API_KEY and BRIQ_API_ENDPOINT below
 
 BRIQ_API_KEY = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 BRIQ_SENDER_ID = "BRIQ"
-BRIQ_API_ENDPOINT = "https://api.briq.io" # This is just an example
+BRIQ_API_ENDPOINT = "https://api.briq.io"  # This is just an example
 
 # =============================================================================
 # Gmail SMTP for Email Delivery
