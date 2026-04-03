@@ -1,3 +1,6 @@
+# =============================================================================
+# KiCad - PCB Design Files
+# =============================================================================
 # For PCBs designed using KiCad: https://www.kicad.org/
 # Format documentation: https://kicad.org/help/file-formats/
 
@@ -39,33 +42,59 @@ fp-info-cache
 # Local project settings
 *.kicad_prl
 
+# =============================================================================
+# STM32 / Embedded Development
+# =============================================================================
+# STM32CubeIDE Build Artifacts
+**/Debug/
+**/Release/
+**/build/
+**/bin/
+
+# STM32 Build Outputs
+*.o
+*.a
+*.elf
+*.hex
+*.bin
+*.map
+*.lst
+*.dis
+
+# STM32CubeIDE IDE Files
+.settings/
+.project
+.cproject
+.metadata/
+RemoteSystemsTempFiles/
+**/.mxproject
+**/.project
+
+# STM32 Code Generation
+**/Drivers/
+**/Generated_Code/
+**/generated/
+
+# STM32 IOC Project Files (working copy)
+**/*.ioc.bak
+
+# CubeMX/CubeIDE Generated
+**/.classpath
+**/STM32*_FLASH.ld.bak
+**/STM32*_RAM.ld.bak
+
+# OpenOCD & GDB Debugger
+.gdbinit
+debug.log
+openocd.log
+
+# =============================================================================
 # Virtual Environments & Configuration files
-*venv
-*venv
-*env
-kiosk_brain/venv/
-mock_db_api/.venv/
-kiosk_brain/config.py
-mock_db_api/config.py
-
 # =============================================================================
-# SENSITIVE: API Keys, Passwords, Credentials
-# =============================================================================
-.env
-.env.local
-.env.*.local
-*.key
-*.pem
-.secrets
-
-# =============================================================================
-# Python Cache & Compiled Files
-# =============================================================================
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
+venv/
+.venv/
+env/
+ENV/
 build/
 develop-eggs/
 dist/
@@ -82,6 +111,34 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
+
+kiosk_brain/venv/
+kiosk_brain/config.py
+mock_db_api/.venv/
+mock_db_api/config.py
+
+# =============================================================================
+# SENSITIVE: API Keys, Passwords, Credentials
+# =============================================================================
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+*.crt
+*.p8
+.secrets
+**/secrets.yml
+**/secrets.yaml
+
+# =============================================================================
+# Python Cache & Compiled Files
+# =============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 
 # =============================================================================
 # Testing & Coverage
@@ -110,7 +167,6 @@ kiosk_brain/data/*.db
 logs/
 *.tmp
 tmp/
-*.bak
 *.swp
 .mypy_cache/
 .dmypy.json
@@ -123,12 +179,10 @@ dmypy.json
 .idea/
 *.swp
 *.swo
-.DS_Store
-.project
-.pydevproject
-.settings/
 *.sublime-project
 *.sublime-workspace
+.DS_Store
+.pydevproject
 
 # =============================================================================
 # OS Files
@@ -136,17 +190,7 @@ dmypy.json
 Thumbs.db
 .AppleDouble
 .LSOverride
-# Runtime data
-kiosk_brain/data/kiosk.db
-kiosk_brain/data/logs/
-
-# Python cache
-__pycache__/
-*.pyc
-
-# IDE / OS stuff
 .DS_Store
-.vscode/
-*.swp
-STM32CubeIDE_Project/Debug/
-STM32CubeIDE_Project/Release/
+
+# Runtime data
+kiosk_brain/data/logs/
