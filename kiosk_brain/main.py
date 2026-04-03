@@ -77,7 +77,7 @@ class KioskApp(App):
     Main Kivy application for the Smart ID Card Distribution Kiosk.
 
     Responsibilities:
-        - Initialize Kivy ScreenManager with all 10 UI screens
+        - Initialize Kivy ScreenManager with all 14 UI screens (9 student + 4 staff + error)
         - Wire screen transitions to SessionManager state updates
         - Schedule inactivity timeout checks every 1 second
         - Handle graceful shutdown (teardown, cleanup)
@@ -101,14 +101,16 @@ class KioskApp(App):
             sm (ScreenManager): Root widget for Kivy app (displays current screen)
 
         Side Effects:
-            - Creates 10 screen instances (IdleScreen, WelcomeScreen, RegEntryScreen, etc.)
+            - Creates 14 screen instances (9 student: Idle/Welcome/RegEntry/OTP/PIN/PINSetup/Confirmation/Success/Locked + 4 staff: StaffPIN/PreScan/BatchProgress/BatchSummary + Error)
             - Adds all screens to ScreenManager
             - Binds all button callbacks to screen transitions
             - Schedules _check_timeout() on 1-second interval
             - Stores sm reference as self.sm (for timeout handler)
 
         **Screen Transition Graph Wiring:**
+            STUDENT WORKFLOW:
             idle.collect_button → WELCOME (start session)
+            idle.swipe_down → STAFF_PIN (staff access)
             welcome.ret_button → OTP_ENTRY (returning student flow)
             welcome.first_button → REG_ENTRY (first-year student flow)
             reg_entry.submit_button → OTP_ENTRY (reg number captured)
@@ -118,6 +120,13 @@ class KioskApp(App):
             confirmation.ok_button → SUCCESS (card dispensed)
             success → IDLE (auto-return after 8 seconds)
             locked → IDLE (auto-return when countdown reaches 0:00)
+
+            STAFF WORKFLOW:
+            idle.swipe_down → STAFF_PIN (staff login via 6-digit PIN)
+            staff_pin.submit_button → STAFF_CHECKLIST (pre-scan checks)
+            staff_checklist.start_button → BATCH_PROGRESS (live scan feed)
+            batch_progress.stop_button → BATCH_SUMMARY (final counts)
+            batch_summary.logout_button → IDLE (return to student standby)
 
         **Timeout Handler Scheduling:**
             Clock.schedule_interval(lambda dt: self._check_timeout(), 1)
@@ -138,6 +147,10 @@ class KioskApp(App):
         locked_screen = LockedScreen()
         success_screen = SuccessScreen()
         idle_screen = IdleScreen()
+        staff_pin_screen = StaffPINScreen()
+        pre_scan_screen = PreScanChecklistScreen()
+        batch_progress_screen = BatchProgressScreen()
+        batch_summary_screen = BatchSummaryScreen()
 
         # Register all screens with name identifiers
         sm.add_widget(welcome_screen)
@@ -150,6 +163,10 @@ class KioskApp(App):
         sm.add_widget(locked_screen)
         sm.add_widget(success_screen)
         sm.add_widget(idle_screen)
+        sm.add_widget(staff_pin_screen)
+        sm.add_widget(pre_scan_screen)
+        sm.add_widget(batch_progress_screen)
+        sm.add_widget(batch_summary_screen)
 
         # Wire idle screen button → welcome (start new session)
         idle_screen.collect_button.bind(
@@ -160,13 +177,15 @@ class KioskApp(App):
         welcome_screen.ret_button.bind(
             on_press=lambda x: (
                 session_manager.update_activity(),  # Initialize session on button press
-                setattr(sm, "current", SCREEN_OTP_ENTRY),  # Returning student
+                setattr(session_manager, "student_type", "returning"),  # Returning student path
+                setattr(sm, "current", SCREEN_OTP_ENTRY),
             )
         )
         welcome_screen.first_button.bind(
             on_press=lambda x: (
                 session_manager.update_activity(),  # Initialize session on button press
-                setattr(sm, "current", SCREEN_REG_ENTRY),  # First-year student
+                setattr(session_manager, "student_type", "first_year"),  # First-year student path
+                setattr(sm, "current", SCREEN_REG_ENTRY),
             )
         )
 
@@ -183,13 +202,14 @@ class KioskApp(App):
             )
         )
 
-        # Wire PIN entry → Confirmation (update activity timestamp on transition)
-        pin_entry_screen.submit_button.bind(
-            on_press=lambda x: (
-                session_manager.update_activity(),  # Reset inactivity timeout
-                setattr(sm, "current", SCREEN_CONFIRMATION),
-            )
-        )
+        # Wire PIN entry → PIN setup (first-year) or Confirmation (returning)
+        def on_pin_entry_submit(x):
+            session_manager.update_activity()  # Reset inactivity timeout
+            if session_manager.student_type == "first_year":
+                setattr(sm, "current", SCREEN_PIN_SETUP)  # First-year: setup permanent PIN
+            else:
+                setattr(sm, "current", SCREEN_CONFIRMATION)  # Returning: dispense card
+        pin_entry_screen.submit_button.bind(on_press=on_pin_entry_submit)
 
         # Wire PIN setup (first-year) → Confirmation (first-time PIN set)
         pin_setup_screen.submit_button.bind(
@@ -217,6 +237,21 @@ class KioskApp(App):
 
         # Bind to success screen's on_enter event
         success_screen.bind(on_enter=lambda screen: schedule_success_return())
+
+        # Wire pre-scan checklist → batch progress (Start Scan button)
+        pre_scan_screen.start_button.bind(
+            on_press=lambda x: setattr(sm, "current", SCREEN_BATCH_PROGRESS)
+        )
+
+        # Wire batch progress → batch summary (Stop Scan button)
+        batch_progress_screen.stop_button.bind(
+            on_press=lambda x: setattr(sm, "current", SCREEN_BATCH_SUMMARY)
+        )
+
+        # Wire batch summary → idle (Logout button, return to student standby)
+        batch_summary_screen.logout_button.bind(
+            on_press=lambda x: setattr(sm, "current", SCREEN_IDLE)
+        )
 
         # Store ScreenManager reference for timeout handler access
         self.sm = sm

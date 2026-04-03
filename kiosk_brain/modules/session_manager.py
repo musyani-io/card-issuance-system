@@ -72,6 +72,7 @@ class SessionManager:
         auth_status: Result of last auth attempt ('SUCCESS', 'INVALID', 'LOCKED', etc.)
         start_time: Unix timestamp when session started (first screen transition)
         last_activity_time: Unix timestamp of last button press / text entry
+        student_type: "first_year" or "returning" - set by Welcome screen button choice
 
     **WARNING:** This class is NOT thread-safe. Use only in Kivy main thread.
     """
@@ -89,6 +90,7 @@ class SessionManager:
         self.auth_status = None
         self.start_time = None
         self.last_activity_time = None
+        self.student_type = None  # "first_year" or "returning" - set by Welcome screen choice
 
     def teardown(self):
         """
@@ -113,6 +115,7 @@ class SessionManager:
         self.auth_status = None
         self.start_time = None
         self.last_activity_time = None
+        self.student_type = None
 
     def update_activity(self):
         """
