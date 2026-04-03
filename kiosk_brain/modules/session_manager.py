@@ -90,7 +90,9 @@ class SessionManager:
         self.auth_status = None
         self.start_time = None
         self.last_activity_time = None
-        self.student_type = None  # "first_year" or "returning" - set by Welcome screen choice
+        self.student_type = (
+            None  # "first_year" or "returning" - set by Welcome screen choice
+        )
 
     def teardown(self):
         """

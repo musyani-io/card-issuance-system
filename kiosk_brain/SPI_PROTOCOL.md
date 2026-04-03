@@ -14,7 +14,7 @@ Checksum is XOR of first two bytes to detect 1-bit corruption.
 
 ## Command Frame Format
 
-```
+```bash
 Byte 0 [CMD]:     Command code (0x10–0x41, see table)
 Byte 1 [PARAM]:   Parameter (slot index, etc.) or 0x00
 Byte 2 [CHECKSUM]: XOR(CMD ^ PARAM)
@@ -24,7 +24,7 @@ Example: Rotate to slot 5 → `[0x10, 0x05, 0x15]`
 
 ## Response Frame Format
 
-```
+```bash
 Byte 0 [STATUS]:   Response code (0x00–0x04, see table)
 Byte 1 [DATA]:     Payload (sensor flags, error detail, etc.)
 Byte 2 [CHECKSUM]: XOR(STATUS ^ DATA)
@@ -57,7 +57,7 @@ Byte 2 [CHECKSUM]: XOR(STATUS ^ DATA)
 
 ## Sensor State Payload (Data byte for RESP_SENSOR_STATE_PAYLOAD)
 
-```
+```bashs
 Bit 7 [Door Open]         : 1 = rear door unlocked/open
 Bit 6 [Card at Rear Gate] : 1 = card at carousel entry sensor
 Bit 5 [Card at Front Gate]: 1 = card at ejection slot

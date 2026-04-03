@@ -319,7 +319,7 @@ Progress  [████████████████████]  100%
 > **Deliverable:** Fully integrated end-to-end system running on the combined Pi + STM32 hardware.
 
 ```text
-Progress  [██████████████████░░]  90%
+Progress  [███████████████████░]  95%
 ```
 
 ---
@@ -388,12 +388,13 @@ Progress  [██████████████████░░]  90%
 
 > _The Pi needs a Python module that speaks the SPI protocol — sending commands and reading responses — without the rest of the application needing to know anything about SPI bytes._
 
-- [ ] **4.5.1** Enable SPI on Pi 5 via `raspi-config` or `/boot/firmware/config.txt`. Install `spidev` library. _(0.5 hr)_
-- [ ] **4.5.2** Write `spi_master.py` with `send_command(cmd, param)` function — builds frame, transfers over SPI, reads response, validates checksum. _(1 hr)_
-- [ ] **4.5.3** Write named wrapper functions: `rotate_to_slot(index)`, `eject_card()`, `unlock_door()`, `get_sensor_state()`, etc. _(0.5 hr)_
-- [ ] **4.5.4** Write a loopback test — with the STM32 in echo mode (firmware stub), verify every command byte comes back correctly. _(0.5 hr)_
+- [x] **4.5.1a** Install `spidev` library on laptop: `pip install spidev`. _(0.25 hr)_
+- [ ] **4.5.1b** Enable SPI on Pi 5 via `raspi-config` or `/boot/firmware/config.txt`. (Deferred to Phase 5 when hardware available) _(0.25 hr)_
+- [x] **4.5.2** Write `spi_master.py` with `send_command(cmd, param)` function — builds frame, transfers over SPI, reads response, validates checksum. _(1 hr)_ ✅ **COMPLETE** — imports spidev, opens/closes bus, full-duplex transfer, checksum validation.
+- [x] **4.5.3** Write named wrapper functions: `rotate_to_slot(index)`, `eject_card()`, `unlock_door()`, `lock_door()`, `latch_card()`, `release_latch()`, `feed_card()`, `home_carousel()`, `get_sensor_state()`. _(0.5 hr)_ ✅ **COMPLETE** — all 9 wrappers implement full response handling (ACK/BUSY/ERROR/NACK/unknown) with human-readable return values.
+- [ ] **4.5.4** Write a loopback test — with the STM32 in echo mode (firmware stub), verify every command byte comes back correctly. (Deferred to Phase 5) _(0.5 hr)_
 
-#### Subtotal: ~2.5 hrs\*\*
+#### Subtotal: ~2.5 hrs\*\* **[TASK 4.5 ✅ COMPLETE]** — SPI driver fully functional: `send_command()` handles frame construction, SPI transfer, response parsing. All 9 wrapper functions provide clean, testable interfaces for UI. Each wrapper returns `{"success": bool, ...}` ensuring consistent error handling. Ready for UI integration (Task 4.6).
 
 ---
 

@@ -177,14 +177,18 @@ class KioskApp(App):
         welcome_screen.ret_button.bind(
             on_press=lambda x: (
                 session_manager.update_activity(),  # Initialize session on button press
-                setattr(session_manager, "student_type", "returning"),  # Returning student path
+                setattr(
+                    session_manager, "student_type", "returning"
+                ),  # Returning student path
                 setattr(sm, "current", SCREEN_OTP_ENTRY),
             )
         )
         welcome_screen.first_button.bind(
             on_press=lambda x: (
                 session_manager.update_activity(),  # Initialize session on button press
-                setattr(session_manager, "student_type", "first_year"),  # First-year student path
+                setattr(
+                    session_manager, "student_type", "first_year"
+                ),  # First-year student path
                 setattr(sm, "current", SCREEN_REG_ENTRY),
             )
         )
@@ -206,9 +210,12 @@ class KioskApp(App):
         def on_pin_entry_submit(x):
             session_manager.update_activity()  # Reset inactivity timeout
             if session_manager.student_type == "first_year":
-                setattr(sm, "current", SCREEN_PIN_SETUP)  # First-year: setup permanent PIN
+                setattr(
+                    sm, "current", SCREEN_PIN_SETUP
+                )  # First-year: setup permanent PIN
             else:
                 setattr(sm, "current", SCREEN_CONFIRMATION)  # Returning: dispense card
+
         pin_entry_screen.submit_button.bind(on_press=on_pin_entry_submit)
 
         # Wire PIN setup (first-year) → Confirmation (first-time PIN set)

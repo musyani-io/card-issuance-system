@@ -461,6 +461,7 @@ class IdleScreen(Screen):
         swipe_threshold = 50
         if touch.y < self.touch_down_y - swipe_threshold:
             from kivy.app import App
+
             App.get_running_app().sm.current = SCREEN_STAFF_PIN
         return super().on_touch_up(touch)
 
@@ -526,17 +527,20 @@ class PINSetupScreen(Screen):
         layout.add_widget(self.confirm_input)
         layout.add_widget(self.submit_button)
 
+
 class StaffPINScreen(Screen):
     def __init__(self, **kw):
         super().__init__(**kw)
         self.name = SCREEN_STAFF_PIN
-        layout = BoxLayout(orientation='vertical', padding=10, spacing=10)
+        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
         self.add_widget(layout)
 
-        title = Label(text='Staff PIN entry', size_hint_y=0.2)
-        self.pin_input = TextInput(text='', multiline=False, input_filter='int', password=True, size_hint_y=0.3)
+        title = Label(text="Staff PIN entry", size_hint_y=0.2)
+        self.pin_input = TextInput(
+            text="", multiline=False, input_filter="int", password=True, size_hint_y=0.3
+        )
         keypad = create_number_keypad(cols=3)
-        self.submit_button = Button(text='Unlock', size_hint_y=0.2)
+        self.submit_button = Button(text="Unlock", size_hint_y=0.2)
 
         layout.add_widget(title)
         layout.add_widget(self.pin_input)
@@ -565,32 +569,45 @@ class StaffPINScreen(Screen):
         elif button.text == "ENTER":
             self.submit_button.trigger_action()
 
+
 class PreScanChecklistScreen(Screen):
     def __init__(self, **kw):
         super().__init__(**kw)
         self.name = SCREEN_STAFF_CHECKLIST
-        layout = BoxLayout(orientation='vertical', padding=10, spacing=10)
+        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
         self.add_widget(layout)
 
-        title = Label(text='Pre-Scan Checklist', size_hint_y=0.15)
+        title = Label(text="Pre-Scan Checklist", size_hint_y=0.15)
         layout.add_widget(title)
 
         self.checklist_items = [
-            {'name': 'Door Lock Status', 'label': Label(text='🔴 Door Lock', size_hint_y=0.2)},
-            {'name': 'Database Connected', 'label': Label(text='🔴 Database', size_hint_y=0.2)},
-            {'name': 'Available Slots', 'label': Label(text='🔴 Slots Available', size_hint_y=0.2)},
-            {'name': 'No Active Session', 'label': Label(text='🔴 No Active Session', size_hint_y=0.2)},
+            {
+                "name": "Door Lock Status",
+                "label": Label(text="🔴 Door Lock", size_hint_y=0.2),
+            },
+            {
+                "name": "Database Connected",
+                "label": Label(text="🔴 Database", size_hint_y=0.2),
+            },
+            {
+                "name": "Available Slots",
+                "label": Label(text="🔴 Slots Available", size_hint_y=0.2),
+            },
+            {
+                "name": "No Active Session",
+                "label": Label(text="🔴 No Active Session", size_hint_y=0.2),
+            },
         ]
         for item in self.checklist_items:
-            layout.add_widget(item['label'])
+            layout.add_widget(item["label"])
 
-        self.start_button = Button(text='Start Scan', size_hint_y=0.2, disabled=True)
+        self.start_button = Button(text="Start Scan", size_hint_y=0.2, disabled=True)
         layout.add_widget(self.start_button)
 
     def update_checklist(self, checks):
         for i, item in enumerate(self.checklist_items):
-            status = '✓ ' if checks[i] else '✗ '
-            item['label'].text = ('🟢 ' if checks[i] else '🔴 ') + item['name']
+            status = "✓ " if checks[i] else "✗ "
+            item["label"].text = ("🟢 " if checks[i] else "🔴 ") + item["name"]
         all_pass = all(checks)
         self.start_button.disabled = not all_pass
 
@@ -599,54 +616,62 @@ class BatchProgressScreen(Screen):
     def __init__(self, **kw):
         super().__init__(**kw)
         self.name = SCREEN_BATCH_PROGRESS
-        layout = BoxLayout(orientation='vertical', padding=10, spacing=10)
+        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
         self.add_widget(layout)
 
-        title = Label(text='Batch Progress', size_hint_y=0.15)
+        title = Label(text="Batch Progress", size_hint_y=0.15)
         layout.add_widget(title)
 
-        self.current_card_label = Label(text='Card: --', size_hint_y=0.15)
-        self.ocr_result_label = Label(text='OCR: --', size_hint_y=0.15)
-        self.decision_label = Label(text='Decision: --', size_hint_y=0.15)
+        self.current_card_label = Label(text="Card: --", size_hint_y=0.15)
+        self.ocr_result_label = Label(text="OCR: --", size_hint_y=0.15)
+        self.decision_label = Label(text="Decision: --", size_hint_y=0.15)
         layout.add_widget(self.current_card_label)
         layout.add_widget(self.ocr_result_label)
         layout.add_widget(self.decision_label)
 
-        self.counts_label = Label(text='Stored: 0 | Rejected: 0 | Failed: 0', size_hint_y=0.15)
+        self.counts_label = Label(
+            text="Stored: 0 | Rejected: 0 | Failed: 0", size_hint_y=0.15
+        )
         layout.add_widget(self.counts_label)
 
-        self.progress_label = Label(text='Progress: 0/0', size_hint_y=0.1)
+        self.progress_label = Label(text="Progress: 0/0", size_hint_y=0.1)
         layout.add_widget(self.progress_label)
 
-        self.stop_button = Button(text='Stop Scan', size_hint_y=0.15)
+        self.stop_button = Button(text="Stop Scan", size_hint_y=0.15)
         layout.add_widget(self.stop_button)
 
-    def update_progress(self, card_num, ocr_text, decision, stored, rejected, failed, total):
-        self.current_card_label.text = f'Card: {card_num}'
-        self.ocr_result_label.text = f'OCR: {ocr_text}'
-        self.decision_label.text = f'Decision: {decision}'
-        self.counts_label.text = f'Stored: {stored} | Rejected: {rejected} | Failed: {failed}'
-        self.progress_label.text = f'Progress: {card_num}/{total}'
+    def update_progress(
+        self, card_num, ocr_text, decision, stored, rejected, failed, total
+    ):
+        self.current_card_label.text = f"Card: {card_num}"
+        self.ocr_result_label.text = f"OCR: {ocr_text}"
+        self.decision_label.text = f"Decision: {decision}"
+        self.counts_label.text = (
+            f"Stored: {stored} | Rejected: {rejected} | Failed: {failed}"
+        )
+        self.progress_label.text = f"Progress: {card_num}/{total}"
 
 
 class BatchSummaryScreen(Screen):
     def __init__(self, **kw):
         super().__init__(**kw)
         self.name = SCREEN_BATCH_SUMMARY
-        layout = BoxLayout(orientation='vertical', padding=10, spacing=10)
+        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
         self.add_widget(layout)
 
-        title = Label(text='Batch Summary', size_hint_y=0.1)
+        title = Label(text="Batch Summary", size_hint_y=0.1)
         layout.add_widget(title)
 
-        self.summary_label = Label(text='', size_hint_y=0.7)
+        self.summary_label = Label(text="", size_hint_y=0.7)
         layout.add_widget(self.summary_label)
 
-        self.logout_button = Button(text='Logout', size_hint_y=0.15)
+        self.logout_button = Button(text="Logout", size_hint_y=0.15)
         layout.add_widget(self.logout_button)
 
-    def set_summary(self, scanned, stored, inactive_held, rejected, sms_sent, sms_failed):
-        summary_text = f'''Batch Complete
+    def set_summary(
+        self, scanned, stored, inactive_held, rejected, sms_sent, sms_failed
+    ):
+        summary_text = f"""Batch Complete
         
 Scanned: {scanned}
 Stored: {stored}
@@ -655,5 +680,5 @@ Rejected: {rejected}
 
 SMS Status:
 Sent: {sms_sent}
-Failed: {sms_failed}'''
+Failed: {sms_failed}"""
         self.summary_label.text = summary_text

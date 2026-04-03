@@ -43,6 +43,9 @@ Planned Functions:
 - calculate_checksum(byte0, byte1) - XOR checksum for frame validation
 - handle_spi_error(error_code) - Error recovery and retry logic
 """
+
+import spidev
+
 # Carousel commands
 CMD_ROTATE_TO_SLOT = 0x10
 CMD_EJECT_CARD = 0x11
@@ -68,15 +71,147 @@ RESP_BUSY = 0x03
 RESP_SENSOR_STATE = 0x04
 RESP_ERROR = 0x05
 
+
 def build_command_frames(cmd_byte, param_byte=0x00):
     checksum = cmd_byte ^ param_byte
     return [cmd_byte, param_byte, checksum]
 
+
 def parse_response_frame(frame_bytes):
     if len(frame_bytes) != 3:
         return None, None, False
-    
+
     status, data, checksum = frame_bytes[0], frame_bytes[1], frame_bytes[2]
     expected_checksum = status ^ data
-    is_valid = (checksum == expected_checksum)
+    is_valid = checksum == expected_checksum
     return status, data, is_valid
+
+
+def send_command(cmd_byte, param_byte=0x00, timeout_ms=100):
+    frame = build_command_frames(cmd_byte, param_byte)
+
+    bus = spidev.SpiDev()
+    bus.open(0, 0)
+    response_frame = bus.xfer(frame)
+    bus.close()
+    status, data, is_valid = parse_response_frame(response_frame)
+
+    if not is_valid:
+        return {"status": RESP_ERROR, "data": 0x00, "error": "Checksum mismatch"}
+
+    return {"status": status, "data": data, "is_valid": is_valid}
+
+
+def rotate_to_slot(slot_index):
+    result = send_command(CMD_ROTATE_TO_SLOT, param_byte=slot_index)
+    if result["status"] == RESP_ACK:
+        return {"success": True, "slot": slot_index}
+    elif result["status"] == RESP_BUSY:
+        return {"success": False, "error": "Stepper still moving, retry in 100ms"}
+    elif result["status"] == RESP_ERROR:
+        return {"success": False, "error": "Hardware error"}
+    elif result["status"] == RESP_NACK:
+        return {"success": False, "error": "Invalid slot index"}
+    else:
+        return {"success": False, "error": f"Unknown response: {result["status"]}"}
+
+
+def eject_card():
+    result = send_command(CMD_EJECT_CARD)
+    if result["status"] == RESP_ACK:
+        return {"success": True}
+    elif result["status"] == RESP_BUSY:
+        return {"success": False, "error": "Servo still moving, retry in 100ms"}
+    elif result["status"] == RESP_ERROR:
+        return {"success": False, "error": "Hardware error"}
+    elif result["status"] == RESP_NACK:
+        return {"success": False, "error": "Invalid command"}
+    else:
+        return {"success": False, "error": f"Unknown response: {result["status"]}"}
+
+
+def unlock_door():
+    result = send_command(CMD_UNLOCK_DOOR)
+    if result["status"] == RESP_ACK:
+        return {"success": True}
+    elif result["status"] == RESP_BUSY:
+        return {"success": False, "error": "Solenoid not stable, retry in 100ms"}
+    elif result["status"] == RESP_ERROR:
+        return {"success": False, "error": "Hardware error"}
+    elif result["status"] == RESP_NACK:
+        return {"success": False, "error": "Invalid command"}
+    else:
+        return {"success": False, "error": f"Unknown response: {result["status"]}"}
+
+
+def get_sensor_state():
+    result = send_command(CMD_GET_SENSOR_STATE)
+    if result["status"] == RESP_SENSOR_STATE:
+        door_open = bool(result["data"] & 0x80)
+        card_rear = bool(result["data"] & 0x40)
+
+        return {"sucess": True, "door_open": door_open, "card_rear": card_rear}
+    elif result["status"] == RESP_ERROR:
+        return {"success": False, "error": "Sensor poll hardware error"}
+    else:
+        return {"success": False, "error": f"Unknown response: {result["status"]}"}
+
+
+def lock_door():
+    result = send_command(CMD_LOCK_DOOR)
+    if result["status"] == RESP_ACK:
+        return {"success": True}
+    elif result["status"] == RESP_BUSY:
+        return {"success": False, "error": "Solenoid still moving, retry in 100ms"}
+    elif result["status"] == RESP_ERROR:
+        return {"success": False, "error": "Hardware error"}
+    else:
+        return {"success": False, "error": f"Unexpected response: {result['status']}"}
+
+
+def latch_card():
+    result = send_command(CMD_LATCH_CARD)
+    if result["status"] == RESP_ACK:
+        return {"success": True}
+    elif result["status"] == RESP_BUSY:
+        return {"success": False, "error": "Servo still moving, retry in 100ms"}
+    elif result["status"] == RESP_ERROR:
+        return {"success": False, "error": "Hardware error"}
+    else:
+        return {"success": False, "error": f"Unexpected response: {result['status']}"}
+
+
+def release_latch():
+    result = send_command(CMD_RELEASE_LATCH)
+    if result["status"] == RESP_ACK:
+        return {"success": True}
+    elif result["status"] == RESP_BUSY:
+        return {"success": False, "error": "Servo still moving, retry in 100ms"}
+    elif result["status"] == RESP_ERROR:
+        return {"success": False, "error": "Hardware error"}
+    else:
+        return {"success": False, "error": f"Unexpected response: {result['status']}"}
+
+
+def feed_card():
+    result = send_command(CMD_FEED_CARD)
+    if result["status"] == RESP_ACK:
+        return {"success": True}
+    elif result["status"] == RESP_BUSY:
+        return {"success": False, "error": "Motor still moving, retry in 100ms"}
+    elif result["status"] == RESP_ERROR:
+        return {"success": False, "error": "Hardware error"}
+    else:
+        return {"success": False, "error": f"Unexpected response: {result['status']}"}
+
+
+def home_carousel():
+    result = send_command(CMD_HOME_CAROUSEL)
+    if result["status"] == RESP_ACK:
+        return {"success": True, "carousel_homed": True}
+    elif result["status"] == RESP_BUSY:
+        return {"success": False, "error": "Carousel still moving, retry in 100ms"}
+    elif result["status"] == RESP_ERROR:
+        return {"success": False, "error": "Hall sensor not found, carousel misaligned"}
+    else:
+        return {"success": False, "error": f"Unexpected response: {result['status']}"}
