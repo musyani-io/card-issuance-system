@@ -43,3 +43,40 @@ Planned Functions:
 - calculate_checksum(byte0, byte1) - XOR checksum for frame validation
 - handle_spi_error(error_code) - Error recovery and retry logic
 """
+# Carousel commands
+CMD_ROTATE_TO_SLOT = 0x10
+CMD_EJECT_CARD = 0x11
+CMD_LATCH_CARD = 0x12
+CMD_RELEASE_LATCH = 0x13
+
+# Door commands
+CMD_LOCK_DOOR = 0x20
+CMD_UNLOCK_DOOR = 0x21
+
+# Conveyor commands
+CMD_FEED_CARD = 0x30
+CMD_DIVERT_REJECT = 0x31
+
+# Sensor commands
+CMD_GET_SENSOR_STATE = 0x40
+CMD_HOME_CAROUSEL = 0x41
+
+# Response commands
+RESP_ACK = 0x00
+RESP_NACK = 0x01
+RESP_BUSY = 0x03
+RESP_SENSOR_STATE = 0x04
+RESP_ERROR = 0x05
+
+def build_command_frames(cmd_byte, param_byte=0x00):
+    checksum = cmd_byte ^ param_byte
+    return [cmd_byte, param_byte, checksum]
+
+def parse_response_frame(frame_bytes):
+    if len(frame_bytes) != 3:
+        return None, None, False
+    
+    status, data, checksum = frame_bytes[0], frame_bytes[1], frame_bytes[2]
+    expected_checksum = status ^ data
+    is_valid = (checksum == expected_checksum)
+    return status, data, is_valid

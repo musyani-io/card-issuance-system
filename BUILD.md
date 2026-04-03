@@ -319,7 +319,7 @@ Progress  [████████████████████]  100%
 > **Deliverable:** Fully integrated end-to-end system running on the combined Pi + STM32 hardware.
 
 ```text
-Progress  [███████████████░░░░░]  77%
+Progress  [██████████████████░░]  90%
 ```
 
 ---
@@ -375,12 +375,12 @@ Progress  [███████████████░░░░░]  77%
 
 > _The Pi and STM32 speak over SPI. Before writing any driver code, define the exact byte-level protocol — command codes, response codes, and the meaning of every byte in each frame._
 
-- [ ] **4.4.1** Define command byte table: `ROTATE_TO_SLOT`, `EJECT_CARD`, `LATCH_CARD`, `RELEASE_LATCH`, `LOCK_DOOR`, `UNLOCK_DOOR`, `FEED_CARD`, `DIVERT_REJECT`, `GET_SENSOR_STATE`, `HOME_CAROUSEL`. _(1 hr)_
-- [ ] **4.4.2** Define response byte table: `ACK`, `NACK`, `BUSY`, `SENSOR_STATE_PAYLOAD`, `ERROR`. _(0.5 hr)_
-- [ ] **4.4.3** Define frame structure: `[CMD_BYTE] [PARAM_BYTE] [CHECKSUM]` for commands, `[STATUS_BYTE] [DATA_BYTE] [CHECKSUM]` for responses. _(0.5 hr)_
-- [ ] **4.4.4** Document the full protocol in `SPI_PROTOCOL.md` — this is the contract between Pi software and STM32 firmware. _(0.5 hr)_
+- [x] **4.4.1** Define command byte table: `ROTATE_TO_SLOT`, `EJECT_CARD`, `LATCH_CARD`, `RELEASE_LATCH`, `LOCK_DOOR`, `UNLOCK_DOOR`, `FEED_CARD`, `DIVERT_REJECT`, `GET_SENSOR_STATE`, `HOME_CAROUSEL`. _(1 hr)_
+- [x] **4.4.2** Define response byte table: `ACK`, `NACK`, `BUSY`, `SENSOR_STATE_PAYLOAD`, `ERROR`. _(0.5 hr)_
+- [x] **4.4.3** Define frame structure: `[CMD_BYTE] [PARAM_BYTE] [CHECKSUM]` for commands, `[STATUS_BYTE] [DATA_BYTE] [CHECKSUM]` for responses. _(0.5 hr)_
+- [x] **4.4.4** Document the full protocol in `SPI_PROTOCOL.md` — this is the contract between Pi software and STM32 firmware. _(0.5 hr)_
 
-#### Subtotal: ~2.5 hrs\*\*
+#### Subtotal: ~2.5 hrs\*\* **[TASK 4.4 ✅ COMPLETE]** — Command constants (0x10–0x41) and response constants (0x00–0x04) defined in `spi_master.py`. Frame encoding/decoding helper functions (`build_command_frame()`, `parse_response_frame()`) implemented. SPI_PROTOCOL.md created as formal specification: command/response tables, frame formats, sensor payload encoding, error handling, timing. Protocol is now ready for STM32 firmware implementation (Phase 5)
 
 ---
 
