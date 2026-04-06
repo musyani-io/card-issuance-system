@@ -130,6 +130,7 @@ mock_db_api/config.py
 .secrets
 **/secrets.yml
 **/secrets.yaml
+db
 
 # =============================================================================
 # Python Cache & Compiled Files

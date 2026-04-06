@@ -152,17 +152,19 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 
 ---
 
-### Task 2.2 — Flask Mock University Database API
+### Task 2.2 — Flask Mock University Database API → MySQL Backend
 
-> _The real university database won't be available during development. This Flask API on your laptop stands in for it, serving realistic student records so the Pi can do a real API lookup during batch loading._
+> _Migrate from in-memory dictionary to a real MySQL database on your PC. The API endpoints remain unchanged, so the Pi's API client code needs no modification._
 
-- [x] **2.2.1** Set up a Flask project on the development laptop with a virtual environment. _(0.5 hr)_
-- [x] **2.2.2** Populate a mock dataset of at least 30 student records (registration number, first name, surname, email, phone, programme, year of study, date of birth, national ID, faculty, registration status). _(0.5 hr)_
-- [x] **2.2.3** Implement `GET /students/{reg_number}` endpoint — returns student record (including `registration_status`) or 404 if not found. Extract status from the response as needed. _(0.5 hr)_
-- [x] **2.2.4** Add basic API key header authentication to the endpoint — the Pi will include this in every request. _(0.5 hr)_
-- [x] **2.2.5** Configure mDNS hostname so the Pi can resolve `university-db.local` — install `avahi-daemon` on the laptop if Linux, or use Bonjour on Windows/macOS. _(1 hr)_
+- [x] **2.2.1** Verify MySQL installation and service running on PC. Test root connection with `mysql -u root -p -e "SELECT 1;"`. _(0.5 hr)_
+- [x] **2.2.2** Create MySQL database `card_issuance` and `students` table schema (reg*number PK, name, email, phone, programme, year, DOB, national ID, faculty, registration_status). *(0.5 hr)\_
+- [x] **2.2.3** Create `mock_db_api/config.py` with database credentials from environment variables: DB*HOST, DB_USER, DB_PASSWORD. Use `os.getenv()` with fallback defaults. *(0.25 hr)\_
+- [x] **2.2.4** Update `requirements.txt` to add `mysql-connector-python==8.0.33` and `python-dotenv==1.0.0` for credential management. _(0.25 hr)_
+- [x] **2.2.5** Rewrite `mock_db_api/app.py` to query MySQL instead of dictionary: replace mock dataset lookup with `cursor.execute("SELECT * FROM students WHERE reg_number = %s")` and parameterized queries. _(1 hr)_
+- [x] **2.2.6** Test Flask API locally with curl: verify GET endpoint returns correct student data, 404 on missing registration, API key auth still required. _(0.5 hr)_
+- [ ] **2.2.7** Test Pi API client against new MySQL backend: run existing `api_client.py` unchanged to prove backward compatibility — Pi code needs zero modifications. _(0.5 hr)_
 
-**Status:** ✅ COMPLETE (3 hrs spent)
+**Status:** ⏳ NOT STARTED — Ready for MySQL integration (3 hrs estimated)
 
 ---
 
@@ -201,7 +203,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 
 ---
 
-**Phase 2 Summary:** Schema (Task 2.1 ✅), Flask API (Task 2.2 ✅), API Client (Task 2.3 ✅ with full documentation), Card Ingestion and Cleanup deferred. **12/12 hrs estimated time allocated; 9 hrs spent.** Progress: 60% (3 of 5 tasks complete).
+**Phase 2 Summary:** Schema (Task 2.1 ✅), Flask API with MySQL migration (Task 2.2 ⏳ 7 subtasks deferred), API Client (Task 2.3 ✅ with full documentation), Card Ingestion and Cleanup deferred. **12/12 hrs estimated time allocated; 9 hrs spent so far.** Progress: 60% (2.5 of 5 tasks moving to completion). Task 2.2 requires MySQL setup and provides backward-compatible API (Pi code unchanged).
 
 #### Phase 2 Total Estimated Time: ~12 hrs\*\*
 
