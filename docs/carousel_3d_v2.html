@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Carousel 3D</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#fff;font-family:'Segoe UI',sans-serif;color:#333}
+#wrap{width:100%;background:#fff}
+canvas{width:100%!important;display:block}
+.bar{background:#f5f5f5;border-top:2px solid #e0e0e0;padding:10px 14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{background:#fff;border:1.5px solid #bbb;color:#444;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.03em;transition:all .12s}
+.btn:hover{border-color:#1D9E75;color:#1D9E75;background:#f0faf6}
+.btn.on{border-color:#1D9E75;color:#fff;background:#1D9E75}
+.hint{font-size:10px;color:#aaa;margin-left:auto}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;padding:12px 14px;background:#fafafa;border-top:1px solid #eee}
+.card{background:#fff;border:1px solid #e8e8e8;border-radius:8px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.ck{font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:#aaa;margin-bottom:5px}
+.cv{font-size:11.5px;color:#555;line-height:1.55}
+.cv b{color:#222;font-weight:600}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle}
+#info{text-align:center;padding:8px;background:#f0faf6;border-top:2px solid #1D9E75;font-size:12px;color:#1D9E75;font-weight:600;min-height:36px}
+</style>
+</head>
+<body>
+<div id="wrap">
+<canvas id="cvs" height="520"></canvas>
+<div id="info">Drag to orbit · Scroll to zoom · Click buttons below</div>
+<div class="bar">
+  <button class="btn" id="bMat">🟫 Plywood mode</button>
+  <button class="btn" id="bAuto">▶ Auto-rotate</button>
+  <button class="btn" id="bNext">→ Next slot</button>
+  <button class="btn" id="bCard">↓ Load a card</button>
+  <button class="btn" id="bTop">⬆ Top view</button>
+  <button class="btn" id="bRst">⟳ Reset view</button>
+  <span class="hint">drag · scroll · pinch</span>
+</div>
+<div class="grid">
+  <div class="card"><div class="ck">Disc</div><div class="cv"><b>400mm</b> diameter · <b>10mm</b> thick solid disc</div></div>
+  <div class="card"><div class="ck">Slots</div><div class="cv"><b>10 slots</b> at 36° apart · <b>58×86mm</b> CR80 pocket</div></div>
+  <div class="card"><div class="ck">Guide walls</div><div class="cv"><b>6mm</b> side walls · <b>18mm</b> tall · inner retaining lip</div></div>
+  <div class="card"><div class="ck">Bearing</div><div class="cv">Lazy-susan <b>160mm OD</b> ring bearing plate below disc</div></div>
+  <div class="card"><div class="ck">Drive</div><div class="cv">NEMA 14 + GT2 belt · A4988 driver · STEP/DIR</div></div>
+  <div class="card"><div class="ck">Home sensor</div><div class="cv">A3144 hall-effect on frame · magnet on rim at Slot 0</div></div>
+  <div class="card"><div class="ck">Gates</div><div class="cv"><span class="dot" style="background:#7B68EE"></span><b>Rear</b> staff load · <span class="dot" style="background:#1D9E75"></span><b>Front</b> student eject</div></div>
+  <div class="card"><div class="ck">Retention</div><div class="cv">Neodymium magnet at each pocket floor holds CR80 card</div></div>
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ── RENDERER ─────────────────────────────────────────────────────
+const canvas = document.getElementById('cvs');
+const infoEl = document.getElementById('info');
+
+const W = () => canvas.parentElement.clientWidth;
+const H = () => Math.min(Math.round(W() * 0.65), 520);
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.setClearColor(0xffffff, 1);
+
+function resize() {
+  const w = W(), h = H();
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+
+// ── CAMERA ────────────────────────────────────────────────────────
+const camera = new THREE.PerspectiveCamera(40, W()/H(), 1, 5000);
+let sph = { r: 780, theta: 0.6, phi: 0.72 };
+const tgt = new THREE.Vector3(0, 20, 0);
+
+function updateCam() {
+  camera.position.set(
+    tgt.x + sph.r * Math.sin(sph.phi) * Math.sin(sph.theta),
+    tgt.y + sph.r * Math.cos(sph.phi),
+    tgt.z + sph.r * Math.sin(sph.phi) * Math.cos(sph.theta)
+  );
+  camera.lookAt(tgt);
+}
+updateCam();
+resize();
+window.addEventListener('resize', resize);
+
+// ── SCENE ─────────────────────────────────────────────────────────
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xffffff);
+scene.fog = new THREE.Fog(0xffffff, 900, 2200);
+
+// ── LIGHTS ────────────────────────────────────────────────────────
+scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+
+const sun = new THREE.DirectionalLight(0xfff5e0, 1.1);
+sun.position.set(400, 700, 300);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -400;
+sun.shadow.camera.right = 400;
+sun.shadow.camera.top = 400;
+sun.shadow.camera.bottom = -400;
+sun.shadow.camera.far = 1800;
+sun.shadow.bias = -0.0003;
+scene.add(sun);
+
+const fill = new THREE.DirectionalLight(0xc8d8ff, 0.35);
+fill.position.set(-400, 200, -300);
+scene.add(fill);
+
+const bot = new THREE.DirectionalLight(0xffffff, 0.12);
+bot.position.set(0, -300, 0);
+scene.add(bot);
+
+// ── GROUND PLANE ─────────────────────────────────────────────────
+const gnd = new THREE.Mesh(
+  new THREE.PlaneGeometry(1800, 1800),
+  new THREE.MeshLambertMaterial({ color: 0xf2f2f2 })
+);
+gnd.rotation.x = -Math.PI / 2;
+gnd.position.y = -75;
+gnd.receiveShadow = true;
+scene.add(gnd);
+
+// Grid lines on ground
+const grid = new THREE.GridHelper(1400, 28, 0xd8d8d8, 0xd8d8d8);
+grid.position.y = -74;
+scene.add(grid);
+
+// ── MATERIAL FACTORY ──────────────────────────────────────────────
+const ML = (c, opts = {}) => new THREE.MeshLambertMaterial({ color: c, ...opts });
+
+// PLA palette (light grey/off-white)
+let mDisc   = ML(0xe8e4de);
+let mPocket = ML(0xd8d0c8);
+let mWall   = ML(0xddd8d0);
+let mHub    = ML(0xd0ccc4);
+
+// Metal / hardware
+const mShaft  = ML(0x9a9a9a);
+const mBear   = ML(0xaaaaaa);
+const mRace   = ML(0x606060);
+const mBolt   = ML(0x888888);
+const mMotor  = ML(0x3a3a3a);
+const mMotorF = ML(0x505050);
+const mPulley = ML(0x222222);
+const mBelt   = ML(0x181818);
+const mMag    = ML(0xc8c8d8);
+const mSensor = ML(0xcc8800);
+const mSensH  = ML(0x444444);
+
+// Gate colors
+const mRearG  = ML(0x7B68EE);   // purple
+const mFrontG = ML(0x1D9E75);   // green
+const mRearP  = ML(0x4a3fbf);
+const mFrontP = ML(0x0e6e50);
+
+// Card colors
+const mCardBg = ML(0xf9f5ec);
+const mStripe = ML(0x1a1a2e);
+const mChip   = ML(0xd4a830);
+const mCardPh = ML(0xe0d8d0);
+const mTextLn = ML(0xcccccc);
+
+// Slot-0 highlight
+const mSlot0 = ML(0x4dbf96);
+
+let isPLA = true;
+
+function applyMaterial() {
+  if (isPLA) {
+    mDisc.color.set(0xe8e4de);
+    mPocket.color.set(0xd0cac0);
+    mWall.color.set(0xddd8d0);
+    mHub.color.set(0xd0ccc4);
+  } else {
+    // Plywood — warm brown
+    mDisc.color.set(0xc8922a);
+    mPocket.color.set(0xa8721a);
+    mWall.color.set(0xbc8424);
+    mHub.color.set(0xb07820);
+  }
+}
+
+// ── GEOMETRY HELPERS ──────────────────────────────────────────────
+function cyl(rT, rB, h, segs, mat, x=0, y=0, z=0, ry=0) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(rT, rB, h, segs), mat);
+  m.position.set(x, y, z);
+  if (ry) m.rotation.y = ry;
+  m.castShadow = true;
+  m.receiveShadow = true;
+  return m;
+}
+
+function box(w, h, d, mat, x=0, y=0, z=0, ry=0) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  m.position.set(x, y, z);
+  if (ry) m.rotation.y = ry;
+  m.castShadow = true;
+  m.receiveShadow = true;
+  return m;
+}
+
+// ── CONSTANTS ─────────────────────────────────────────────────────
+const DR  = 200;  // disc radius
+const DH  = 10;   // disc height
+const NS  = 10;   // num slots
+const PCR = 152;  // pocket centre radius
+const PW  = 58;   // pocket width
+const PL  = 84;   // pocket length
+const WH  = 20;   // wall height
+const IR  = 110;  // inner retaining wall radius
+
+// ── ROTATING GROUP ────────────────────────────────────────────────
+const rotG = new THREE.Group();
+scene.add(rotG);
+
+// Main disc
+rotG.add(cyl(DR, DR, DH, 80, mDisc, 0, 0, 0));
+
+// Centre hub boss
+rotG.add(cyl(24, 24, 24, 32, mHub, 0, DH/2+12, 0));
+rotG.add(cyl(6, 6, 32, 16, mShaft, 0, DH/2+9, 0));
+
+// Faint spoke lines on disc top (visual only)
+for (let i = 0; i < NS; i++) {
+  const a = i * 36 * Math.PI / 180;
+  const spoke = box(2, 1, DR*0.82, ML(0xcccccc), 0, DH/2+0.6,
+    DR*0.82*0.5 * Math.cos(a));
+  spoke.rotation.y = a;
+  rotG.add(spoke);
+}
+
+// ── SLOTS ─────────────────────────────────────────────────────────
+const loadedSlots = new Set([2, 5, 8]);
+const slotGroups = [];
+
+for (let i = 0; i < NS; i++) {
+  const g = new THREE.Group();
+  g.rotation.y = -i * 36 * Math.PI / 180;
+  rotG.add(g);
+  slotGroups.push(g);
+
+  const isS0 = i === 0;
+  const pm   = isS0 ? mSlot0 : mPocket;
+
+  // Pocket floor
+  const pf = box(PW, DH+0.5, PL, pm, 0, 0, PCR);
+  g.add(pf);
+
+  // Outer opening indicator strip (lighter)
+  const strip = box(PW, DH+1, 3, ML(isS0 ? 0x80dfc0 : 0xe8e0d8), 0, 0, PCR + PL/2 - 1.5);
+  g.add(strip);
+
+  // Left wall
+  g.add(box(6, DH + WH, PL, mWall, -(PW/2+3), WH/2, PCR));
+  // Right wall
+  g.add(box(6, DH + WH, PL, mWall, (PW/2+3), WH/2, PCR));
+  // Inner lip
+  g.add(box(PW+12, DH + WH, 8, mWall, 0, WH/2, IR));
+
+  // Neodymium magnet
+  g.add(cyl(5, 5, 3, 12, mMag, 0, -DH/2+2, PCR));
+
+  // Slot-0 rim dot
+  if (isS0) {
+    g.add(cyl(6, 6, 5, 12, mSlot0, 0, 0, DR));
+  }
+
+  // Pre-loaded cards
+  if (loadedSlots.has(i)) {
+    g.add(makeCard(0, DH/2+0.8, PCR));
+  }
+}
+
+// ── CARD MESH FACTORY ────────────────────────────────────────────
+function makeCard(x, y, z) {
+  const g = new THREE.Group();
+  g.position.set(x, y, z);
+  // Card body
+  const body = new THREE.Mesh(new THREE.BoxGeometry(54, 1.2, 86), mCardBg);
+  body.castShadow = true;
+  g.add(body);
+  // Mag stripe
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(54, 1.4, 12), mStripe);
+  stripe.position.z = 32;
+  g.add(stripe);
+  // Chip
+  const chip = new THREE.Mesh(new THREE.BoxGeometry(12, 1.4, 10), mChip);
+  chip.position.set(-15, 0, -16);
+  g.add(chip);
+  // Photo placeholder
+  const photo = new THREE.Mesh(new THREE.BoxGeometry(18, 1.4, 22), mCardPh);
+  photo.position.set(17, 0, -16);
+  g.add(photo);
+  // Text lines
+  for (let n = 0; n < 3; n++) {
+    const tl = new THREE.Mesh(new THREE.BoxGeometry(28, 1.4, 2.5), mTextLn);
+    tl.position.set(-5, 0, 2 + n * 5);
+    g.add(tl);
+  }
+  return g;
+}
+
+// ── HALL-EFFECT MAGNET ON RIM ─────────────────────────────────────
+const hallMag = cyl(5, 5, 8, 12, mMag, 0, 0, DR);
+hallMag.rotation.x = Math.PI/2;
+rotG.add(hallMag);
+
+// ── STATIC GROUP ──────────────────────────────────────────────────
+const statG = new THREE.Group();
+scene.add(statG);
+
+// Centre main shaft
+statG.add(cyl(6, 6, 100, 16, mShaft, 0, -40, 0));
+
+// Lazy-susan bearing plates
+statG.add(cyl(82, 82, 15, 52, mBear, 0, -DH/2-8, 0));
+statG.add(cyl(55, 55, 16, 52, mRace, 0, -DH/2-8, 0));
+statG.add(cyl(40, 40, 15, 52, mBear, 0, -DH/2-8, 0));
+
+// Disc pulley on shaft
+statG.add(cyl(16, 16, 24, 24, mPulley, 0, -62, 0));
+statG.add(cyl(19, 19, 3.5, 24, mPulley, 0, -51, 0));
+statG.add(cyl(19, 19, 3.5, 24, mPulley, 0, -73, 0));
+
+// ── NEMA 14 MOTOR ─────────────────────────────────────────────────
+const MX = 268, MY = -62;
+statG.add(box(35, 35, 38, mMotor, MX, MY, 0));
+statG.add(box(34, 34, 1.5, mMotorF, MX, MY, -20.5));
+statG.add(cyl(4, 4, 30, 12, mShaft, MX, MY+28, 0));
+
+// Motor pulley
+statG.add(cyl(12, 12, 20, 20, mPulley, MX, MY+18, 0));
+statG.add(cyl(14.5, 14.5, 3.5, 20, mPulley, MX, MY+27.5, 0));
+statG.add(cyl(14.5, 14.5, 3.5, 20, mPulley, MX, MY+8.5, 0));
+
+// Motor mounting bracket
+statG.add(box(8, 55, 44, ML(0x5a5a5a), MX-22, MY, 0));
+
+// GT2 Belt (two runs)
+const BL = MX;
+statG.add(box(BL, 3, 8, mBelt, MX/2, MY+14, 0));
+statG.add(box(BL, 3, 8, mBelt, MX/2, MY-14, 0));
+
+// Belt ends on disc pulley
+statG.add(box(12, 30, 8, mBelt, 6, MY, 0));
+
+// ── GATES ─────────────────────────────────────────────────────────
+function gate(postMat, crossMat, labelMat, zPos) {
+  const g = new THREE.Group();
+  const pH = 50, pW = 8;
+  // Posts
+  g.add(box(pW, pH, pW, postMat, -38, pH/2+DH/2, zPos));
+  g.add(box(pW, pH, pW, postMat,  38, pH/2+DH/2, zPos));
+  // Cross beam
+  g.add(box(86, pW, pW, crossMat, 0, pH+DH/2, zPos));
+  // Label plate
+  g.add(box(72, 12, 3, labelMat, 0, pH+DH/2, zPos+5));
+  return g;
+}
+statG.add(gate(mRearG,  mRearP,  ML(0x2e2080), DR+14));
+statG.add(gate(mFrontG, mFrontP, ML(0x084a30), -(DR+14)));
+
+// ── HALL SENSOR ON FRAME ──────────────────────────────────────────
+statG.add(box(10, 16, 7, mSensor, 4, 6, DR+30));
+statG.add(box(6, 6, 24, mSensH, 0, 6, DR+18));
+
+// ── FLYING CARD ───────────────────────────────────────────────────
+const flyCardG = makeCard(0, 80, DR-5);
+flyCardG.visible = false;
+scene.add(flyCardG);
+
+// ── ROTATION STATE ────────────────────────────────────────────────
+let discAngle = 0;
+let curSlot   = 0;
+let rotAnim   = null;
+let cardAnim  = null;
+let autoOn    = false;
+let autoT     = 0;
+let nextEmpty = 0;   // next slot to load into
+
+function eio(t) { return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2; }
+
+function rotateTo(slot, dur = 950) {
+  if (rotAnim) return false;
+  const ta = -slot * 36 * Math.PI / 180;
+  let delta = ((ta - discAngle) % (2*Math.PI) + 3*Math.PI) % (2*Math.PI) - Math.PI;
+  rotAnim = { t0: performance.now(), dur, from: discAngle, delta };
+  curSlot = slot;
+  return true;
+}
+
+function startCardDrop() {
+  // find next empty slot
+  let tgt = -1;
+  for (let i = 0; i < NS; i++) {
+    const idx = (curSlot + i) % NS;
+    if (!loadedSlots.has(idx)) { tgt = idx; break; }
+  }
+  if (tgt < 0) {
+    infoEl.textContent = 'All 10 slots full — click Reset view to clear.';
+    return;
+  }
+  if (!rotateTo(tgt, 700)) return;
+
+  infoEl.textContent = `Rotating disc to align Slot ${tgt} with the rear gate…`;
+
+  setTimeout(() => {
+    flyCardG.visible = true;
+    flyCardG.position.set(0, 90, DR - 8);
+    flyCardG.rotation.set(0, 0, 0);
+    loadedSlots.add(tgt);
+    const endY = DH/2 + 0.8;
+    const t0   = performance.now();
+    const dur  = 950;
+    const slot = tgt;
+    const slotAngle = -slot * 36 * Math.PI / 180;
+
+    infoEl.textContent = `Card sliding from rear gate into Slot ${slot}…`;
+
+    cardAnim = {
+      t0, dur,
+      update(t) {
+        const ep = eio(t);
+        const z = (DR - 8) - ((DR - 8) - PCR) * ep;
+        const y = 90 - (90 - endY) * ep;
+        flyCardG.position.set(0, y, z);
+      },
+      done() {
+        flyCardG.visible = false;
+        // Add card mesh to the rotating disc at the correct slot
+        const sg = slotGroups[slot];
+        sg.add(makeCard(0, DH/2+0.8, PCR));
+        infoEl.textContent = `✓ Card seated in Slot ${slot}. IR sensor confirmed. OTP SMS will dispatch after batch completes.`;
+      }
+    };
+  }, 720);
+}
+
+// ── ORBIT CONTROLS ────────────────────────────────────────────────
+let dragging = false, lx = 0, ly = 0;
+canvas.addEventListener('mousedown', e => { dragging=true; lx=e.clientX; ly=e.clientY; });
+window.addEventListener('mouseup', () => { dragging=false; });
+window.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  sph.theta -= (e.clientX - lx) * 0.006;
+  sph.phi    = Math.max(0.06, Math.min(1.52, sph.phi + (e.clientY - ly) * 0.006));
+  lx = e.clientX; ly = e.clientY;
+  updateCam();
+});
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  sph.r = Math.max(180, Math.min(1800, sph.r + e.deltaY * 0.65));
+  updateCam();
+}, { passive: false });
+
+let pinchD = 0, tlx = 0, tly = 0;
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) { tlx=e.touches[0].clientX; tly=e.touches[0].clientY; }
+  if (e.touches.length === 2) pinchD = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+}, { passive: true });
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length === 1) {
+    sph.theta -= (e.touches[0].clientX-tlx)*0.006;
+    sph.phi = Math.max(0.06, Math.min(1.52, sph.phi+(e.touches[0].clientY-tly)*0.006));
+    tlx=e.touches[0].clientX; tly=e.touches[0].clientY; updateCam();
+  }
+  if (e.touches.length === 2) {
+    const d = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+    sph.r = Math.max(180, Math.min(1800, sph.r-(d-pinchD)*2.2)); pinchD=d; updateCam();
+  }
+}, { passive: false });
+
+// ── BUTTONS ───────────────────────────────────────────────────────
+document.getElementById('bMat').addEventListener('click', function() {
+  isPLA = !isPLA; applyMaterial();
+  this.textContent = isPLA ? '🟫 Plywood mode' : '⬜ 3D print mode';
+  infoEl.textContent = isPLA ? 'Switched to 3D print (PLA) material — light grey.' : 'Switched to plywood material — warm brown.';
+});
+
+document.getElementById('bAuto').addEventListener('click', function() {
+  autoOn = !autoOn;
+  this.classList.toggle('on', autoOn);
+  this.textContent = autoOn ? '⏹ Stop' : '▶ Auto-rotate';
+  infoEl.textContent = autoOn ? 'Auto-rotating through all 10 slots…' : 'Auto-rotate stopped.';
+});
+
+document.getElementById('bNext').addEventListener('click', () => {
+  const next = (curSlot + 1) % NS;
+  rotateTo(next);
+  infoEl.textContent = `Rotating to Slot ${next}…`;
+});
+
+document.getElementById('bCard').addEventListener('click', () => { startCardDrop(); });
+
+document.getElementById('bTop').addEventListener('click', () => {
+  sph.phi = 0.06; sph.r = 680; updateCam();
+  infoEl.textContent = 'Top view — all 10 slots visible. Slot 0 marked in teal.';
+});
+
+document.getElementById('bRst').addEventListener('click', () => {
+  sph = { r: 780, theta: 0.6, phi: 0.72 }; updateCam();
+  autoOn = false;
+  document.getElementById('bAuto').classList.remove('on');
+  document.getElementById('bAuto').textContent = '▶ Auto-rotate';
+  infoEl.textContent = 'View reset.';
+});
+
+// ── RENDER LOOP ───────────────────────────────────────────────────
+const clock = new THREE.Clock();
+let lastAuto = 0;
+
+(function loop() {
+  requestAnimationFrame(loop);
+  const dt  = clock.getDelta();
+  const now = performance.now();
+
+  // Rotation anim
+  if (rotAnim) {
+    const t = Math.min((now - rotAnim.t0) / rotAnim.dur, 1);
+    const a = rotAnim.from + rotAnim.delta * eio(t);
+    rotG.rotation.y = a;
+    if (t >= 1) {
+      discAngle = rotAnim.from + rotAnim.delta;
+      rotAnim   = null;
+      if (!cardAnim && !autoOn)
+        infoEl.textContent = `Slot ${curSlot} aligned with gate.`;
+    }
+  }
+
+  // Auto-rotate
+  if (autoOn && !rotAnim && !cardAnim) {
+    autoT += dt;
+    if (autoT > 1.4) {
+      autoT = 0;
+      const next = (curSlot + 1) % NS;
+      rotateTo(next, 750);
+      infoEl.textContent = `Auto — moving to Slot ${next}…`;
+    }
+  }
+
+  // Card anim
+  if (cardAnim) {
+    const t = Math.min((now - cardAnim.t0) / cardAnim.dur, 1);
+    cardAnim.update(t);
+    if (t >= 1) { cardAnim.done(); cardAnim = null; }
+  }
+
+  renderer.render(scene, camera);
+})();
+</script>
+</body>
+</html>

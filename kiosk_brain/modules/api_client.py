@@ -29,9 +29,9 @@ import requests
 import time
 
 # Development API credentials (should move to config.py in production)
-API_KEY = "dev-api-key-12345"
+API_KEY = "test-key-12345"
 # mDNS resolved hostname (no hardcoded IP needed, survives network changes)
-BASE_URL = "http://university-db.local:5000"
+BASE_URL = "http://localhost:5000"
 
 
 def get_student(reg_number):

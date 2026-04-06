@@ -10,9 +10,9 @@
 
 ```text
 Phase 1 — OCR Pipeline            [░░░░░░░░░░░░░░░░░░░░]   0%   Wk 1–2
-Phase 2 — Database & Mock API     [████████████░░░░░░░░]  60%   Wk 2–3
+Phase 2 — Database & Mock API     [██████████████████░░]  90%   Wk 2–3
 Phase 3 — Auth & SMS              [████████████████████]  100%   Wk 3–4
-Phase 4 — Kivy UI & SPI           [███████████████░░░░░]  77%   Wk 4–5
+Phase 4 — Kivy UI & SPI           [███████████████████░]  95%   Wk 4–5
 Phase 5 — Mechanical Prototype    [░░░░░░░░░░░░░░░░░░░░]   0%   Wk 5–7
 Phase 6 — Enclosure, Test & Docs  [░░░░░░░░░░░░░░░░░░░░]   0%   Wk 8
 ```
@@ -162,9 +162,9 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 - [x] **2.2.4** Update `requirements.txt` to add `mysql-connector-python==8.0.33` and `python-dotenv==1.0.0` for credential management. _(0.25 hr)_
 - [x] **2.2.5** Rewrite `mock_db_api/app.py` to query MySQL instead of dictionary: replace mock dataset lookup with `cursor.execute("SELECT * FROM students WHERE reg_number = %s")` and parameterized queries. _(1 hr)_
 - [x] **2.2.6** Test Flask API locally with curl: verify GET endpoint returns correct student data, 404 on missing registration, API key auth still required. _(0.5 hr)_
-- [ ] **2.2.7** Test Pi API client against new MySQL backend: run existing `api_client.py` unchanged to prove backward compatibility — Pi code needs zero modifications. _(0.5 hr)_
+- [x] **2.2.7** Test Pi API client against new MySQL backend: run existing `api_client.py` unchanged to prove backward compatibility — Pi code needs zero modifications. _(0.5 hr)_
 
-**Status:** ⏳ NOT STARTED — Ready for MySQL integration (3 hrs estimated)
+**Status:** ✅ COMPLETE — MySQL backend fully integrated with auto-generated email column, API key updated to test-key-12345
 
 ---
 
@@ -203,7 +203,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 
 ---
 
-**Phase 2 Summary:** Schema (Task 2.1 ✅), Flask API with MySQL migration (Task 2.2 ⏳ 7 subtasks deferred), API Client (Task 2.3 ✅ with full documentation), Card Ingestion and Cleanup deferred. **12/12 hrs estimated time allocated; 9 hrs spent so far.** Progress: 60% (2.5 of 5 tasks moving to completion). Task 2.2 requires MySQL setup and provides backward-compatible API (Pi code unchanged).
+**Phase 2 Summary:** Schema (Task 2.1 ✅), Flask API with MySQL migration (Task 2.2 ✅ all 7 subtasks complete), API Client (Task 2.3 ✅ with full documentation), Card Ingestion and Cleanup deferred. **12/12 hrs estimated time allocated; ~10 hrs spent.** Progress: 90% (3.5 of 5 tasks complete). Task 2.2 complete: MySQL backend with auto-generated emails, Flask API tested, Pi client verified unchanged.
 
 #### Phase 2 Total Estimated Time: ~12 hrs\*\*
 
