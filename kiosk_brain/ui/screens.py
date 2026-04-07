@@ -72,6 +72,20 @@ from kivy.uix.button import Button
 from kivy.uix.textinput import TextInput
 from kivy.uix.gridlayout import GridLayout
 from ui.constants import *
+from ui.styled_widgets import (
+    setup_screen_background,
+    create_primary_button,
+    create_secondary_button,
+    create_danger_button,
+    create_numpad_button,
+    create_title_label,
+    create_subtitle_label,
+    create_success_label,
+    create_error_label,
+    create_info_label,
+    create_standard_label,
+    create_styled_textinput,
+)
 
 
 def create_number_keypad(cols=3, callback=None):
@@ -99,11 +113,11 @@ def create_number_keypad(cols=3, callback=None):
     keypad = GridLayout(cols=cols, spacing=5, size_hint_y=0.4)
 
     for i in range(1, 10):
-        keypad.add_widget(Button(text=str(i)))
+        keypad.add_widget(create_numpad_button(text=str(i)))
 
-    keypad.add_widget(Button(text="DEL"))
-    keypad.add_widget(Button(text="0"))
-    keypad.add_widget(Button(text="ENTER"))
+    keypad.add_widget(create_numpad_button(text="DEL"))
+    keypad.add_widget(create_numpad_button(text="0"))
+    keypad.add_widget(create_numpad_button(text="ENTER"))
 
     return keypad
 
@@ -134,16 +148,17 @@ class WelcomeScreen(Screen):
     def __init__(self, **kw):
         super().__init__(**kw)
         self.name = SCREEN_WELCOME
+        setup_screen_background(self)
         layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
         self.add_widget(layout)
-        title_label = Label(text="Welcome to Card Issuance Kiosk", size_hint_y=0.3)
-        instruction_label = Label(
+        title_label = create_title_label(text="Welcome to Card Issuance Kiosk", size_hint_y=0.3)
+        instruction_label = create_subtitle_label(
             text="Select your option below to get your ID card.", size_hint_y=0.3
         )
 
-        choice = GridLayout(cols=2)
-        self.ret_button = Button(text="Returning Student", size_hint_y=0.1)
-        self.first_button = Button(text="First-Year Student", size_hint_y=0.2)
+        choice = GridLayout(cols=2, spacing=10)
+        self.ret_button = create_primary_button(text="Returning Student", size_hint_y=0.2)
+        self.first_button = create_primary_button(text="First-Year Student", size_hint_y=0.2)
 
         layout.add_widget(title_label)
         layout.add_widget(instruction_label)
@@ -182,15 +197,16 @@ class OTPEntryScreen(Screen):
     def __init__(self, **kw):
         super().__init__(**kw)
         self.name = SCREEN_OTP_ENTRY
+        setup_screen_background(self)
         layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
         self.add_widget(layout)
 
-        otp_label = Label(text="Enter OTP sent to your phone", size_hint_y=0.3)
-        otp_input = TextInput(
-            text="", multiline=False, input_filter="int", size_hint_y=0.2
+        otp_label = create_subtitle_label(text="Enter OTP sent to your phone", size_hint_y=0.3)
+        otp_input = create_styled_textinput(
+            text="", input_filter="int", size_hint_y=0.2
         )
         self.otp_input = otp_input
-        self.submit_button = Button(text="Submit", size_hint_y=0.2)
+        self.submit_button = create_primary_button(text="Submit", size_hint_y=0.2)
         otp_keypad = create_number_keypad(cols=3)
 
         layout.add_widget(otp_label)
@@ -262,15 +278,16 @@ class PINEntryScreen(Screen):
     def __init__(self, **kw):
         super().__init__(**kw)
         self.name = SCREEN_PIN_ENTRY
+        setup_screen_background(self)
         layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
         self.add_widget(layout)
 
-        pin_label = Label(text="Enter your 4-6 digit pin", size_hint_y=0.3)
-        pin_input = TextInput(
-            text="", multiline=False, input_filter="int", password=True, size_hint_y=0.2
+        pin_label = create_subtitle_label(text="Enter your 4-6 digit pin", size_hint_y=0.3)
+        pin_input = create_styled_textinput(
+            text="", input_filter="int", password=True, size_hint_y=0.2
         )
         self.pin_input = pin_input
-        self.submit_button = Button(text="Submit", size_hint_y=0.2)
+        self.submit_button = create_primary_button(text="Submit", size_hint_y=0.2)
         pin_keypad = create_number_keypad(cols=3)
 
         layout.add_widget(pin_label)
@@ -332,14 +349,15 @@ class ConfirmationScreen(Screen):
     def __init__(self, **kw):
         super().__init__(**kw)
         self.name = SCREEN_CONFIRMATION
+        setup_screen_background(self)
         layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
         self.add_widget(layout)
 
-        success_label = Label(text="Ready to dispense your card", size_hint_y=0.4)
-        info_label = Label(
+        success_label = create_subtitle_label(text="Ready to dispense your card", size_hint_y=0.4)
+        info_label = create_info_label(
             text="Your ID Card will be dispensed shortly...", size_hint_y=0.3
         )
-        self.ok_button = Button(text="OK", size_hint_y=0.2)
+        self.ok_button = create_primary_button(text="OK", size_hint_y=0.2)
 
         layout.add_widget(success_label)
         layout.add_widget(info_label)
@@ -379,12 +397,13 @@ class ErrorScreen(Screen):
     def __init__(self, **kw):
         super().__init__(**kw)
         self.name = SCREEN_ERROR
+        setup_screen_background(self)
         layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
         self.add_widget(layout)
 
-        error_label = Label(text="Authentication failed", size_hint_y=0.4)
-        info_label = Label(text="Please try again or contact support", size_hint_y=0.3)
-        self.retry_button = Button(text="Try Again", size_hint_y=0.2)
+        error_label = create_error_label(text="Authentication failed", size_hint_y=0.4)
+        info_label = create_info_label(text="Please try again or contact support", size_hint_y=0.3)
+        self.retry_button = create_danger_button(text="Try Again", size_hint_y=0.2)
 
         layout.add_widget(error_label)
         layout.add_widget(info_label)
@@ -427,12 +446,13 @@ class RegEntryScreen(Screen):
     def __init__(self, **kw):
         super().__init__(**kw)
         self.name = SCREEN_REG_ENTRY
+        setup_screen_background(self)
         layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
         self.add_widget(layout)
 
-        reg_label = Label(text="Enter your registration number", size_hint_y=0.3)
-        self.reg_input = TextInput(text="", multiline=False, size_hint_y=0.2)
-        self.submit_button = Button(text="Submit", size_hint_y=0.2)
+        reg_label = create_subtitle_label(text="Enter your registration number", size_hint_y=0.3)
+        self.reg_input = create_styled_textinput(text="", size_hint_y=0.2)
+        self.submit_button = create_primary_button(text="Submit", size_hint_y=0.2)
 
         layout.add_widget(reg_label)
         layout.add_widget(self.reg_input)
@@ -443,12 +463,13 @@ class IdleScreen(Screen):
     def __init__(self, **kw):
         super().__init__(**kw)
         self.name = SCREEN_IDLE
+        setup_screen_background(self)
         self.touch_down_y = 0
         layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
         self.add_widget(layout)
 
-        message = Label(text="Collect My\nID Card", size_hint_y=0.5)
-        self.collect_button = Button(text="Collect My Card", size_hint_y=0.3)
+        message = create_title_label(text="Collect My\nID Card", size_hint_y=0.5)
+        self.collect_button = create_primary_button(text="Collect My Card", size_hint_y=0.3)
 
         layout.add_widget(message)
         layout.add_widget(self.collect_button)
@@ -470,14 +491,15 @@ class SuccessScreen(Screen):
     def __init__(self, **kw):
         super().__init__(**kw)
         self.name = SCREEN_SUCCESS
+        setup_screen_background(self)
         layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
         self.add_widget(layout)
 
-        success_message = Label(
+        success_message = create_success_label(
             text="Card dispensed Succesfully!\n\nPlease collect your card",
             size_hint_y=0.5,
         )
-        info_message = Label(text="Thank you for using the kiosk", size_hint_y=0.3)
+        info_message = create_info_label(text="Thank you for using the kiosk", size_hint_y=0.3)
 
         layout.add_widget(success_message)
         layout.add_widget(info_message)
@@ -487,17 +509,18 @@ class LockedScreen(Screen):
     def __init__(self, **kw):
         super().__init__(**kw)
         self.name = SCREEN_LOCKED
+        setup_screen_background(self)
         layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
         self.add_widget(layout)
 
-        lockout_message = Label(
+        lockout_message = create_error_label(
             text="Registration number temporarily locked", size_hint_y=0.3
         )
-        info_message = Label(
+        info_message = create_info_label(
             text="Too many failed attempts.\nPlease wait before trying again",
             size_hint_y=0.3,
         )
-        self.timer_label = Label(text="Time remaining: 30:00", size_hint_y=0.3)
+        self.timer_label = create_subtitle_label(text="Time remaining: 30:00", size_hint_y=0.3)
 
         layout.add_widget(lockout_message)
         layout.add_widget(info_message)
@@ -508,18 +531,19 @@ class PINSetupScreen(Screen):
     def __init__(self, **kw):
         super().__init__(**kw)
         self.name = SCREEN_PIN_SETUP
+        setup_screen_background(self)
         layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
         self.add_widget(layout)
 
-        pin_label = Label(text="Enter new 4-6 digit PIN", size_hint_y=0.3)
-        self.pin_input = TextInput(
-            text="", multiline=False, input_filter="int", password=True, size_hint_y=0.3
+        pin_label = create_subtitle_label(text="Enter new 4-6 digit PIN", size_hint_y=0.3)
+        self.pin_input = create_styled_textinput(
+            text="", input_filter="int", password=True, size_hint_y=0.3
         )
-        confirm_label = Label(text="Confirm your new PIN", size_hint_y=0.3)
-        self.confirm_input = TextInput(
-            text="", multiline=False, input_filter="int", size_hint_y=0.3
+        confirm_label = create_subtitle_label(text="Confirm your new PIN", size_hint_y=0.3)
+        self.confirm_input = create_styled_textinput(
+            text="", input_filter="int", size_hint_y=0.3
         )
-        self.submit_button = Button(text="Set PIN", size_hint_y=0.2)
+        self.submit_button = create_primary_button(text="Set PIN", size_hint_y=0.2)
 
         layout.add_widget(pin_label)
         layout.add_widget(self.pin_input)
@@ -532,15 +556,16 @@ class StaffPINScreen(Screen):
     def __init__(self, **kw):
         super().__init__(**kw)
         self.name = SCREEN_STAFF_PIN
+        setup_screen_background(self)
         layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
         self.add_widget(layout)
 
-        title = Label(text="Staff PIN entry", size_hint_y=0.2)
-        self.pin_input = TextInput(
-            text="", multiline=False, input_filter="int", password=True, size_hint_y=0.3
+        title = create_title_label(text="Staff PIN entry", size_hint_y=0.2)
+        self.pin_input = create_styled_textinput(
+            text="", input_filter="int", password=True, size_hint_y=0.3
         )
         keypad = create_number_keypad(cols=3)
-        self.submit_button = Button(text="Unlock", size_hint_y=0.2)
+        self.submit_button = create_primary_button(text="Unlock", size_hint_y=0.2)
 
         layout.add_widget(title)
         layout.add_widget(self.pin_input)
@@ -574,34 +599,35 @@ class PreScanChecklistScreen(Screen):
     def __init__(self, **kw):
         super().__init__(**kw)
         self.name = SCREEN_STAFF_CHECKLIST
+        setup_screen_background(self)
         layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
         self.add_widget(layout)
 
-        title = Label(text="Pre-Scan Checklist", size_hint_y=0.15)
+        title = create_title_label(text="Pre-Scan Checklist", size_hint_y=0.15)
         layout.add_widget(title)
 
         self.checklist_items = [
             {
                 "name": "Door Lock Status",
-                "label": Label(text="🔴 Door Lock", size_hint_y=0.2),
+                "label": create_info_label(text="🔴 Door Lock", size_hint_y=0.2),
             },
             {
                 "name": "Database Connected",
-                "label": Label(text="🔴 Database", size_hint_y=0.2),
+                "label": create_info_label(text="🔴 Database", size_hint_y=0.2),
             },
             {
                 "name": "Available Slots",
-                "label": Label(text="🔴 Slots Available", size_hint_y=0.2),
+                "label": create_info_label(text="🔴 Slots Available", size_hint_y=0.2),
             },
             {
                 "name": "No Active Session",
-                "label": Label(text="🔴 No Active Session", size_hint_y=0.2),
+                "label": create_info_label(text="🔴 No Active Session", size_hint_y=0.2),
             },
         ]
         for item in self.checklist_items:
             layout.add_widget(item["label"])
 
-        self.start_button = Button(text="Start Scan", size_hint_y=0.2, disabled=True)
+        self.start_button = create_primary_button(text="Start Scan", size_hint_y=0.2, disabled=True)
         layout.add_widget(self.start_button)
 
     def update_checklist(self, checks):
@@ -616,28 +642,29 @@ class BatchProgressScreen(Screen):
     def __init__(self, **kw):
         super().__init__(**kw)
         self.name = SCREEN_BATCH_PROGRESS
+        setup_screen_background(self)
         layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
         self.add_widget(layout)
 
-        title = Label(text="Batch Progress", size_hint_y=0.15)
+        title = create_title_label(text="Batch Progress", size_hint_y=0.15)
         layout.add_widget(title)
 
-        self.current_card_label = Label(text="Card: --", size_hint_y=0.15)
-        self.ocr_result_label = Label(text="OCR: --", size_hint_y=0.15)
-        self.decision_label = Label(text="Decision: --", size_hint_y=0.15)
+        self.current_card_label = create_info_label(text="Card: --", size_hint_y=0.15)
+        self.ocr_result_label = create_info_label(text="OCR: --", size_hint_y=0.15)
+        self.decision_label = create_info_label(text="Decision: --", size_hint_y=0.15)
         layout.add_widget(self.current_card_label)
         layout.add_widget(self.ocr_result_label)
         layout.add_widget(self.decision_label)
 
-        self.counts_label = Label(
+        self.counts_label = create_info_label(
             text="Stored: 0 | Rejected: 0 | Failed: 0", size_hint_y=0.15
         )
         layout.add_widget(self.counts_label)
 
-        self.progress_label = Label(text="Progress: 0/0", size_hint_y=0.1)
+        self.progress_label = create_subtitle_label(text="Progress: 0/0", size_hint_y=0.1)
         layout.add_widget(self.progress_label)
 
-        self.stop_button = Button(text="Stop Scan", size_hint_y=0.15)
+        self.stop_button = create_danger_button(text="Stop Scan", size_hint_y=0.15)
         layout.add_widget(self.stop_button)
 
     def update_progress(
@@ -656,16 +683,17 @@ class BatchSummaryScreen(Screen):
     def __init__(self, **kw):
         super().__init__(**kw)
         self.name = SCREEN_BATCH_SUMMARY
+        setup_screen_background(self)
         layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
         self.add_widget(layout)
 
-        title = Label(text="Batch Summary", size_hint_y=0.1)
+        title = create_title_label(text="Batch Summary", size_hint_y=0.1)
         layout.add_widget(title)
 
-        self.summary_label = Label(text="", size_hint_y=0.7)
+        self.summary_label = create_info_label(text="", size_hint_y=0.7)
         layout.add_widget(self.summary_label)
 
-        self.logout_button = Button(text="Logout", size_hint_y=0.15)
+        self.logout_button = create_secondary_button(text="Logout", size_hint_y=0.15)
         layout.add_widget(self.logout_button)
 
     def set_summary(

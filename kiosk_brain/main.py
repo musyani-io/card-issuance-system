@@ -67,6 +67,7 @@ Config.set("graphics", "height", "400")
 from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager
 from kivy.clock import Clock
+from modules.auth import verify_otp, verify_pin, set_pin
 
 # Global session manager instance (shared across all screens)
 session_manager = SessionManager()
@@ -195,35 +196,31 @@ class KioskApp(App):
 
         # Wire reg entry → OTP entry
         reg_entry_screen.submit_button.bind(
-            on_press=lambda x: setattr(sm, "current", SCREEN_OTP_ENTRY)
+            on_press=lambda x: self.handle_reg_submit(reg_entry_screen)
         )
 
         # Wire OTP entry → PIN entry (update activity timestamp on transition)
+        # Note: error_screen reference stored for handler to access
+        self.error_screen = error_screen
         otp_entry_screen.submit_button.bind(
             on_press=lambda x: (
                 session_manager.update_activity(),  # Reset inactivity timeout
-                setattr(sm, "current", SCREEN_PIN_ENTRY),
+                self.handle_otp_submit(otp_entry_screen),
             )
         )
 
-        # Wire PIN entry → PIN setup (first-year) or Confirmation (returning)
-        def on_pin_entry_submit(x):
-            session_manager.update_activity()  # Reset inactivity timeout
-            if session_manager.student_type == "first_year":
-                setattr(
-                    sm, "current", SCREEN_PIN_SETUP
-                )  # First-year: setup permanent PIN
-            else:
-                setattr(sm, "current", SCREEN_CONFIRMATION)  # Returning: dispense card
+        # Store screen references for PIN handlers
+        self.pin_entry_screen = pin_entry_screen
+        self.pin_setup_screen = pin_setup_screen
+        
+        # Wire PIN entry → verify PIN before routing
+        pin_entry_screen.submit_button.bind(
+            on_press=lambda x: self.handle_pin_submit(pin_entry_screen)
+        )
 
-        pin_entry_screen.submit_button.bind(on_press=on_pin_entry_submit)
-
-        # Wire PIN setup (first-year) → Confirmation (first-time PIN set)
+        # Wire PIN setup (first-year) → verify and store new PIN
         pin_setup_screen.submit_button.bind(
-            on_press=lambda x: (
-                session_manager.update_activity(),  # Reset inactivity timeout
-                setattr(sm, "current", SCREEN_CONFIRMATION),
-            )
+            on_press=lambda x: self.handle_pin_setup_submit(pin_setup_screen)
         )
 
         # Wire confirmation → success (card dispensed, ready for collection)
@@ -297,6 +294,87 @@ class KioskApp(App):
             # Inactivity timeout triggered
             session_manager.teardown()  # Reset all session state
             setattr(self.sm, "current", SCREEN_WELCOME)  # Return to idle screen
+
+    def handle_otp_submit(self, otp_entry_screen):
+        """
+        Verify OTP and route to PIN entry or error screen.
+        
+        Args:
+            otp_entry_screen: OTPEntryScreen instance with otp_input field
+        """
+        result = verify_otp(session_manager.reg_number, otp_entry_screen.otp_input.text)
+        if result["success"]:
+            otp_entry_screen.otp_input.text = ""
+            setattr(self.sm, "current", SCREEN_PIN_ENTRY)
+        else:
+            self.error_screen.error_label.text = result["message"]
+            setattr(self.sm, "current", SCREEN_ERROR)
+
+    def handle_reg_submit(self, reg_entry_screen):
+        if not reg_entry_screen.reg_input.text.strip():
+            self.error_screen.error_label.text = "Registration number cannot be empty"
+            setattr(self.sm, "current", SCREEN_ERROR)
+        else:
+            setattr(session_manager, "reg_number", reg_entry_screen.reg_input.text)
+            setattr(self.sm, "current", SCREEN_OTP_ENTRY)
+
+    def handle_pin_submit(self, pin_entry_screen):
+        """
+        Verify PIN and route to PIN setup (first-year) or confirmation (returning).
+        
+        Args:
+            pin_entry_screen: PINEntryScreen instance with pin_input field
+        """
+        if not pin_entry_screen.pin_input.text.strip():
+            self.error_screen.error_label.text = "PIN cannot be empty"
+            setattr(self.sm, "current", SCREEN_ERROR)
+            return
+        
+        result = verify_pin(session_manager.reg_number, pin_entry_screen.pin_input.text)
+        if result["success"]:
+            pin_entry_screen.pin_input.text = ""
+            session_manager.update_activity()
+            # Route based on student type: first-year goes to PIN setup, returning goes to confirmation
+            if session_manager.student_type == "first_year":
+                setattr(self.sm, "current", SCREEN_PIN_SETUP)
+            else:
+                setattr(self.sm, "current", SCREEN_CONFIRMATION)
+        else:
+            self.error_screen.error_label.text = result["message"]
+            setattr(self.sm, "current", SCREEN_ERROR)
+
+    def handle_pin_setup_submit(self, pin_setup_screen):
+        """
+        Verify PIN strength, set permanent PIN for first-year students.
+        
+        Args:
+            pin_setup_screen: PINSetupScreen instance with pin_input and confirm_input fields
+        """
+        pin1 = pin_setup_screen.pin_input.text.strip()
+        pin2 = pin_setup_screen.confirm_input.text.strip()
+        
+        # Validate: both fields filled
+        if not pin1 or not pin2:
+            self.error_screen.error_label.text = "Both PIN fields required"
+            setattr(self.sm, "current", SCREEN_ERROR)
+            return
+        
+        # Validate: PINs match
+        if pin1 != pin2:
+            self.error_screen.error_label.text = "PINs do not match. Try again."
+            setattr(self.sm, "current", SCREEN_ERROR)
+            return
+        
+        # Call set_pin() to store permanent PIN and mark is_temp_pin=FALSE
+        result = set_pin(session_manager.reg_number, pin1)
+        if result["success"]:
+            pin_setup_screen.pin_input.text = ""
+            pin_setup_screen.confirm_input.text = ""
+            session_manager.update_activity()
+            setattr(self.sm, "current", SCREEN_CONFIRMATION)
+        else:
+            self.error_screen.error_label.text = result["message"]
+            setattr(self.sm, "current", SCREEN_ERROR)
 
 
 if __name__ == "__main__":
