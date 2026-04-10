@@ -44,36 +44,36 @@
 
 **Input specification:**
 
-- Nominal input voltage: **\_** V
-- Input range (±10% tolerance): **\_** V to **\_** V
+- Nominal input voltage: **12** V
+- Input range (±10% tolerance): **10.8** V to **13.2** V
 - Expected PSU ripple contribution: **\_** mV
 
 **Output specification:**
 
 - Target output voltage: 5.0V
-- Allowed tolerance: ±**\_** % → voltage range: **\_** V to **\_** V
-- Rated load current (continuous): **\_** A
-- Maximum transient load (servo startup): **\_** A
-- Output ripple budget: **\_** mV peak-to-peak
-- Acceptable ripple percentage: **\_** % of output (typically 2–5%)
-- Thermal limit: MOSFET/diode junction <**\_** °C @ ambient 25°C
+- Allowed tolerance: ±**5**% → voltage range: **4.75** V to **5.25** V
+- Rated load current (continuous): **2.5** A (Two servos won't work simultaneously)
+- Maximum transient load (servo startup): **1.5** A
+- Output ripple budget: **100** mV peak-to-peak
+- Acceptable ripple percentage: **2** % of output (typically 2–5%)
+- Thermal limit: MOSFET/diode junction <**100** °C @ ambient 25°C
 
 #### For 12V→3.3V Converter
 
 **Input specification:**
 
-- Nominal input voltage: **\_** V (same as 5V converter)
-- Input range: **\_** V to **\_** V
+- Nominal input voltage: **12** V (same as 5V converter)
+- Input range: **10.8** V to **13.2** V
 
 **Output specification:**
 
 - Target output voltage: 3.3V
-- Allowed tolerance: ±**\_** % → voltage range: **\_** V to **\_** V
-- Rated load current (continuous): **\_** A
-- Maximum transient load: **\_** A
+- Allowed tolerance: ±**5** % → voltage range: **3.135** V to **3.465** V
+- Rated load current (continuous): **1** A
+- Maximum transient load: **2** A
 - Output ripple budget: **\_** mV peak-to-peak
 - Acceptable ripple percentage: **\_** %
-- Thermal limit: <**\_** °C
+- Thermal limit: <**100** °C
 
 **Record** these specifications; use them as verification targets throughout all phases.
 
@@ -81,23 +81,25 @@
 
 ### 1.2: Select Switching Frequency & Topology _(0.5 hr)_
 
-**Design choice: Switching Frequency**
+#### Design choice: Switching Frequency
 
 Candidates: 50 kHz, 100 kHz, 200 kHz
 
-- 50 kHz: **\_** (larger inductor, **\_**)
-- 100 kHz: **\_** (moderate inductor, **\_**)
-- 200 kHz: **\_** (smaller inductor, **\_**)
+Formula: L = (Vin - Vout) x D / (f x ΔI_L), while D = (Vout + Vf_diode) / Vin
 
-**Selected frequency:** **\_** kHz  
-**Rationale:** ****************\_****************
+- 50 kHz: **73.88** uH
+- 100 kHz: **36.94** uH
+- 200 kHz: **18.47** uH
 
-**Design choice: Converter Topology**
+**Selected frequency:** **100** kHz  
+**Rationale:** Because, the inductor value are readily available in THT, and also, no thermal stress compared to higher frequency switching.
+
+#### Design choice: Converter Topology
 
 Candidates: Synchronous buck (high-side MOSFET + low-side MOSFET), Non-synchronous buck (MOSFET + passive diode freewheeling)
 
-**Selected topology:** **********\_**********  
-**Rationale:** ****************\_****************
+**Selected topology:** Non-synchronous buck (MOSFET + Passive diode)  
+**Rationale:** Just enough efficiency (75-85%), all THT components, only one controller (not need of external IC)
 
 ---
 
@@ -105,21 +107,21 @@ Candidates: Synchronous buck (high-side MOSFET + low-side MOSFET), Non-synchrono
 
 #### Controller Options Comparison
 
-| **Controller** | **Package** | **Frequency** | **Advantage** | **Disadvantage** |
-| -------------- | ----------- | ------------- | ------------- | ---------------- |
-| SG3525         | **\_**      | **\_** Hz     | **\_**        | **\_**           |
-| LM3480         | **\_**      | **\_** Hz     | **\_**        | **\_**           |
-| Other: **\_**  | **\_**      | **\_** Hz     | **\_**        | **\_**           |
+| **Controller** | **Package** | **Frequency**     | **Advantage**                                                                         | **Disadvantage**                                |
+| -------------- | ----------- | ----------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| **SG3525**     | **DIP 16**  | **100 - 500** kHz | **Soft start, flexible freq, circuit protection, fine tolerance (1%)and THT package** | \*\*\*\*                                        |
+| **TL494**      | **PDIP 16** | **1 - 300** kHz   | **Flexible freq and THT package**                                                     | **Fixed V<sub>out</sub>, wider tolerance (5%)** |
+| **MC34063**    | **PDIP 8**  | **100** kHz       | **Flexible V<sub>out</sub>, higher output current (1.5A) and THT package**            | **Fixed frequency**                             |
 
-**Selected controller:** **********\_**********
+**Selected controller:** SG3525
 
 **Key parameters from datasheet:**
 
 - Reference voltage (Vref): **\_** V
-- Maximum frequency: **\_** kHz
-- Soft-start pin available: Yes / No
+- Maximum frequency: **500** kHz
+- Soft-start pin available: Yes
 - Error amplifier gain (Aol): **\_** V/V
-- Pin configuration: **\_** (DIP / SOIC / other)
+- Pin configuration: **DIP 16**
 
 ---
 
@@ -131,13 +133,13 @@ Candidates: Synchronous buck (high-side MOSFET + low-side MOSFET), Non-synchrono
 
 Where:
 
-- Vout = desired output voltage = **\_** V
+- Vout = desired output voltage = **5** V
 - Vf_diode = diode forward drop ≈ **\_** V (check datasheet)
 - Vin = nominal input voltage = **\_** V
 
 **Calculation:**
 
-```
+```bash
 D = (_____ + _____) / _____
 D = _____ / _____
 D = _____ (as decimal)
@@ -164,7 +166,7 @@ D = _____% (as percentage)
 2. **\_** (Vds=***V, Id=***A, Rds=\_\_\_Ω)
 3. **\_** (Vds=***V, Id=***A, Rds=\_\_\_Ω)
 
-**Selected MOSFET:** **********\_**********
+**Selected MOSFET:** \***\*\*\*\*\***\_\***\*\*\*\*\***
 
 **Verification:**
 
@@ -186,7 +188,7 @@ Where:
 
 **Calculation:**
 
-```
+```bash
 P_mosfet = (_____) ² × _____ × _____
 P_mosfet = _____ × _____ × _____
 P_mosfet = _____ W
@@ -194,7 +196,7 @@ P_mosfet = _____ W
 
 **Estimate switching loss** (typically 10–30% of conduction loss at 100 kHz):
 
-```
+```bash
 P_switching ≈ _____ W
 Total MOSFET loss = _____ + _____ = _____ W
 ```
@@ -220,8 +222,8 @@ Total MOSFET loss = _____ + _____ = _____ W
 2. **\_** (Vr=***V, If=***A, trr=\_\_\_ns) — Schottky option for lower loss
 3. **\_** (Vr=***V, If=***A, trr=\_\_\_ns)
 
-**Selected for breadboard:** **********\_**********  
-**Planned upgrade for PCB:** **********\_**********
+**Selected for breadboard:** \***\*\*\*\*\***\_\***\*\*\*\*\***  
+**Planned upgrade for PCB:** \***\*\*\*\*\***\_\***\*\*\*\*\***
 
 **Verification:**
 
@@ -423,14 +425,14 @@ Vout_actual = _____ V
 
 **Summarize all loss contributions:**
 
-| Loss Source              | Calculation                    | Power        |
-| ------------------------ | ------------------------------ | ------------ |
-| MOSFET conduction        | (from 1.4.3)                   | **\_** W     |
-| MOSFET switching         | (estimated 1.4.3)              | **\_** W     |
-| Diode forward drop       | (from 1.4.5)                   | **\_** W     |
-| Inductor DC resistance   | I² × DCR = **\_**² × **\_**    | **\_** W     |
-| Gate drive & control     | (typical 5–10% of MOSFET loss) | **\_** W     |
-| **Total converter loss** |                                | ****\_** W** |
+| Loss Source              | Calculation                    | Power            |
+| ------------------------ | ------------------------------ | ---------------- |
+| MOSFET conduction        | (from 1.4.3)                   | **\_** W         |
+| MOSFET switching         | (estimated 1.4.3)              | **\_** W         |
+| Diode forward drop       | (from 1.4.5)                   | **\_** W         |
+| Inductor DC resistance   | I² × DCR = **\_**² × **\_**    | **\_** W         |
+| Gate drive & control     | (typical 5–10% of MOSFET loss) | **\_** W         |
+| **Total converter loss** |                                | \***\*\_** W\*\* |
 
 **Calculate efficiency:**
 
@@ -526,12 +528,12 @@ D = _____
 
 #### 1.5.2 MOSFET (typically same as 5V)
 
-**Selected:** **********\_********** (same as 5V? Yes / No)
+**Selected:** \***\*\*\*\*\***\_\***\*\*\*\*\*** (same as 5V? Yes / No)
 
 #### 1.5.3 Diode (typically same as 5V)
 
-**Selected for breadboard:** **********\_**********  
-**Planned upgrade for PCB:** **********\_**********
+**Selected for breadboard:** \***\*\*\*\*\***\_\***\*\*\*\*\***  
+**Planned upgrade for PCB:** \***\*\*\*\*\***\_\***\*\*\*\*\***
 
 #### 1.5.4 Inductor Calculation
 
@@ -570,7 +572,7 @@ R1 = _____
 
 #### 1.5.7 Compensation Network
 
-**Same as 5V converter?** Yes / No - Why? **********\_\_\_**********
+**Same as 5V converter?** Yes / No - Why? \***\*\*\*\*\***\_\_\_\***\*\*\*\*\***
 
 **Selected values:**
 
@@ -581,13 +583,13 @@ R1 = _____
 
 #### 1.5.8 Total Losses & Efficiency
 
-| Loss      | Calculation | Power        |
-| --------- | ----------- | ------------ |
-| MOSFET    |             | **\_** W     |
-| Diode     |             | **\_** W     |
-| Inductor  |             | **\_** W     |
-| Other     |             | **\_** W     |
-| **Total** |             | ****\_** W** |
+| Loss      | Calculation | Power            |
+| --------- | ----------- | ---------------- |
+| MOSFET    |             | **\_** W         |
+| Diode     |             | **\_** W         |
+| Inductor  |             | **\_** W         |
+| Other     |             | **\_** W         |
+| **Total** |             | \***\*\_** W\*\* |
 
 ```bash
 P_out = 3.3V × _____ A = _____ W
@@ -692,7 +694,7 @@ T_junction = _____ + _____ = _____°C (safe? Yes/No)
 
 ## Phase 2: Breadboard Prototype & Testing _(3–4 hrs)_
 
-_(To be completed after Phase 1 design is finalized and LTspice sims pass)_
+(To be completed after Phase 1 design is finalized and LTspice sims pass)
 
 ### 2.1 Build 12V→5V Converter on Breadboard
 
@@ -726,7 +728,7 @@ _(To be completed after Phase 1 design is finalized and LTspice sims pass)_
 
 ## Phase 3: Perf Board Assembly & Validation _(2–2.5 hrs)_
 
-_(To be completed after breadboard testing passes)_
+(To be completed after breadboard testing passes)
 
 ### 3.1 Layout Perf Board
 
@@ -749,7 +751,7 @@ _(To be completed after breadboard testing passes)_
 
 ## Phase 4: PCB Design & Manufacturing _(2–3 hrs preparation + fabrication)_
 
-_(To be completed after perf board validation)_
+(To be completed after perf board validation)
 
 ### 4.1 KiCAD PCB Layout
 
@@ -762,7 +764,7 @@ _(To be completed after perf board validation)_
 
 ### 4.2 Add Protection Circuits
 
-_(Not on breadboard/perf board; PCB only)_
+(Not on breadboard/perf board; PCB only)
 
 - [ ] Input fuse (**\_** A slow-blow)
 - [ ] NTC inrush thermistor (**\_** Ω @ 25°C)
@@ -786,7 +788,7 @@ _(Not on breadboard/perf board; PCB only)_
 
 ## Phase 5: PCB Validation & Integration _(1–2 hrs post-manufacturing)_
 
-_(To be completed after PCB fabrication & assembly)_
+(To be completed after PCB fabrication & assembly)
 
 ### 5.1 Static Power-Up
 

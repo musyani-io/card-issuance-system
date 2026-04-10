@@ -155,9 +155,9 @@ class AuthTestBase(unittest.TestCase):
                 "registration_number": "2022-04-09050",
                 "first_name": "Samuel",
                 "surname": "Musyani",
-                "email": "dmusyani@gmail.com",
+                "email": "samuel.musyani_22@student.udsm.ac.tz",
                 "programme": "BSc. Electronics Engineering",
-                "phone_number": "+255776765680",
+                "phone_number": "+255773422381",
                 "registration_status": "active",
             },
             {
