@@ -117,7 +117,7 @@ Candidates: Synchronous buck (high-side MOSFET + low-side MOSFET), Non-synchrono
 
 **Key parameters from datasheet:**
 
-- Reference voltage (Vref): **\_** V
+- Reference voltage (Vref): **5.1** V
 - Maximum frequency: **500** kHz
 - Soft-start pin available: Yes
 - Error amplifier gain (Aol): **\_** V/V
@@ -351,7 +351,7 @@ ESR ≤ 0.133 Ω
 
 Where:
 
-- Vref = internal reference voltage = **\_** V (from controller datasheet)
+- Vref = internal reference voltage = **5.1** V (from controller datasheet)
 - Vout = desired output = 5.0V
 - R1 = top resistor (from Vout to feedback pin)
 - R2 = bottom resistor (from feedback pin to GND)
