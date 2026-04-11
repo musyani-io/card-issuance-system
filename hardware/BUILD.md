@@ -87,9 +87,9 @@ Candidates: 50 kHz, 100 kHz, 200 kHz
 
 Formula: L = (Vin - Vout) x D / (f x ΔI_L), while D = (Vout + Vf_diode) / Vin
 
-- 50 kHz: **73.88** uH
-- 100 kHz: **36.94** uH
-- 200 kHz: **18.47** uH
+- 50 kHz: **85.86** uH
+- 100 kHz: **42.93** uH
+- 200 kHz: **21.46** uH
 
 **Selected frequency:** **100** kHz  
 **Rationale:** Because, the inductor value are readily available in THT, and also, no thermal stress compared to higher frequency switching.
@@ -134,19 +134,19 @@ Candidates: Synchronous buck (high-side MOSFET + low-side MOSFET), Non-synchrono
 Where:
 
 - Vout = desired output voltage = **5** V
-- Vf_diode = diode forward drop ≈ **\_** V (check datasheet)
-- Vin = nominal input voltage = **\_** V
+- Vf_diode = diode forward drop ≈ **0.525** V (check datasheet)
+- Vin = nominal input voltage = **12** V
 
 **Calculation:**
 
 ```bash
-D = (_____ + _____) / _____
-D = _____ / _____
-D = _____ (as decimal)
-D = _____% (as percentage)
+D = (5 + 0.525) / 12 (1N5822 diode will used)
+D = 5.525 / 12
+D = 0.4604 (as decimal)
+D = 46.04% (as percentage)
 ```
 
-**Interpretation:** MOSFET is ON for \_**\_% of each switching cycle, OFF for \_\_**%.
+**Interpretation:** MOSFET is ON for **46.04% of each switching cycle, OFF for 53.96**%.
 
 ---
 
@@ -154,25 +154,25 @@ D = _____% (as percentage)
 
 **Requirements:**
 
-- Vds(max) ≥ **\_** V (input voltage)
-- Id(max) ≥ **\_** A (rated load current)
-- Rds(on) @ Vgs=10V ≤ **\_** Ω (low conduction loss)
+- Vds(max) ≥ **13.2** V (input voltage)
+- Id(max) ≥ **3** A (rated load current)
+- Rds(on) @ Vgs=10V ≤ **0.22** Ω (low conduction loss)
 - Package: TO-220 (breadboard-friendly)
 - Readily available in THT
 
 **Candidates considered:**
 
-1. **\_** (Vds=***V, Id=***A, Rds=\_\_\_Ω)
-2. **\_** (Vds=***V, Id=***A, Rds=\_\_\_Ω)
-3. **\_** (Vds=***V, Id=***A, Rds=\_\_\_Ω)
+1. **IRFZ44N** (Vds=55V, Id=49A, Rds=17.5mΩ)
+2. **IRF540N** (Vds=100V, Id=33A, Rds=44mΩ)
+3. **IRLU024N** (Vds=55V, Id=17A, Rds=65mΩ) - Logic level
 
-**Selected MOSFET:** \***\*\*\*\*\***\_\***\*\*\*\*\***
+**Selected MOSFET:** **IRFZ44N**
 
 **Verification:**
 
-- Vds margin: **\_** V chosen / **\_** V required = **\_** × headroom ✓
-- Id margin: **\_** A chosen / **\_** A required = **\_** × headroom ✓
-- Rds(on) suitable for conduction loss budget? Yes / No
+- Vds margin: **55** V chosen / **13.2** V required = **4.17** × headroom ✓
+- Id margin: **49** A chosen / **2.5** A required = **19.6** × headroom ✓
+- Rds(on) suitable for conduction loss budget? Yes
 
 ---
 
@@ -182,23 +182,23 @@ D = _____% (as percentage)
 
 Where:
 
-- I_out = rated output current = **\_** A
-- Rds(on) = on-resistance @ Vgs = **\_** Ω
-- D = duty cycle = **\_** (from 1.4.1)
+- I_out = rated output current = **2.5** A
+- Rds(on) = on-resistance @ Vgs = **17.5** mΩ
+- D = duty cycle = **0.4604** (from 1.4.1)
 
 **Calculation:**
 
 ```bash
-P_mosfet = (_____) ² × _____ × _____
-P_mosfet = _____ × _____ × _____
-P_mosfet = _____ W
+P_mosfet = (2.5) ² × 17.5m × 0.4604
+P_mosfet = 6.25 × 17.5m × 0.4604
+P_mosfet = 0.05 W
 ```
 
 **Estimate switching loss** (typically 10–30% of conduction loss at 100 kHz):
 
 ```bash
-P_switching ≈ _____ W
-Total MOSFET loss = _____ + _____ = _____ W
+P_switching ≈ 0.015 W
+Total MOSFET loss = 0.05 + 0.015 = 0.065 W
 ```
 
 ---
@@ -238,14 +238,14 @@ Total MOSFET loss = _____ + _____ = _____ W
 
 Where:
 
-- Vf = forward voltage drop ≈ **\_** V (from datasheet)
-- I_diode_avg = I_out × (1 - D) = **\_** × (1 - **\_**) = **\_** A
+- Vf = forward voltage drop ≈ **0.525** V (from datasheet)
+- I_diode_avg = I_out × (1 - D) = **2.5** × (1 - **0.508**) = **1.23** A
 
 **Calculation:**
 
 ```bash
-P_diode = _____ V × _____ A
-P_diode = _____ W
+P_diode = 0.525 V × 1.23 A
+P_diode = 0.645 W
 ```
 
 ---
@@ -254,40 +254,40 @@ P_diode = _____ W
 
 **Choose desired current ripple percentage:**
 
-- Ripple = **\_** % of I_out (typical 20–50%)
-- ΔI_L = **\_** A (equals ripple fraction × output current)
+- Ripple = **30** % of I_out (typical 20–50%)
+- ΔI_L = **0.75** A (equals ripple fraction × output current)
 
 **Formula:** L = (Vin - Vout) × D / (f × ΔI_L)
 
 Where:
 
-- Vin - Vout = voltage across inductor during ON time = **\_** - **\_** = **\_** V
-- D = duty cycle = **\_**
-- f = switching frequency = **\_** Hz
-- ΔI_L = chosen ripple = **\_** A
+- Vin - Vout = voltage across inductor during ON time = **12** - **5** = **7** V
+- D = duty cycle = **46.04** %
+- f = switching frequency = **100** kHz
+- ΔI_L = chosen ripple = **0.75** A
 
 **Calculation:**
 
 ```bash
-L = (_____ × _____) / (_____ × _____)
-L = _____ / _____
-L = _____ µH
+L = (7 × 0.4604) / (100k × 0.75)
+L = 3.22 / 75k
+L = 42.93 µH
 ```
 
-**Round to nearest standard value:** L = **\_** µH
+**Round to nearest standard value:** L = **47** µH
 
 **Calculate peak inductor current:**
 
 ```bash
 I_L_peak = I_out + (ΔI_L / 2)
-I_L_peak = _____ + (_____ / 2)
-I_L_peak = _____ A
+I_L_peak = 2.5 + (0.75 / 2)
+I_L_peak = 1.67 A
 ```
 
 **Inductor specification:**
 
-- Inductance: **\_** µH ±10%
-- Current rating (continuous): ≥ **\_** A (use I_L_peak with 1.5× margin)
+- Inductance: **47** µH ±10%
+- Current rating (continuous): ≥ **2.5** A (use I_L_peak with 1.5× margin)
 - DCR (required): ≤ **\_** Ω (low resistance to minimize loss)
 - Core material: ferrite preferred
 - Package: THT or SMD with adapter if needed
@@ -300,40 +300,40 @@ I_L_peak = _____ A
 
 **Capacitor ripple contribution:**
 
-- Target: ΔV_cap = **\_** mV (half of total budget)
+- Target: ΔV_cap = **50** mV (half of total budget)
 - Formula: C ≥ (I_out × (1-D)) / (f × ΔV_cap)
 
 **Calculation:**
 
 ```bash
-C ≥ (_____ × _____) / (_____ × _____)
-C ≥ _____ / _____
-C ≥ _____ µF
+C ≥ (2.5 × (1 - 0.4604)) / (100k × 100m)
+C ≥ 1.62 / 10k
+C ≥ 162 µF
 ```
 
-**Round up to standard value:** C = **\_** µF minimum
+**Round up to standard value:** C = **220** µF minimum
 
 **Select capacitors:**
 
 - Type: Aluminum electrolytic (bulk) + ceramic (low-ESR)
-- Voltage rating: ≥ **\_** V (recommend 1.5–2× output voltage)
-- Quantity: **\_** pieces of **\_** µF aluminum + **\_** piece of **\_** µF ceramic
+- Voltage rating: ≥ **10** V (recommend 1.5–2× output voltage)
+- Quantity: **2** pieces of **220** µF aluminum + **2** piece of **100** nF ceramic
 
 **ESR ripple contribution:**
 
-- Target: ΔV_ESR = **\_** mV
+- Target: ΔV_ESR = **100** mV
 - Formula: ESR ≤ ΔV_ESR / ΔI_L
 
 **Calculation:**
 
 ```bash
-ESR ≤ _____ mV / _____ A
-ESR ≤ _____ mΩ
+ESR ≤ 100 mV / 0.75 A
+ESR ≤ 0.133 Ω
 ```
 
 **Verify selected capacitors meet ESR target:**
 
-- Aluminum ESR (each): **\_** mΩ (from datasheet)
+- Aluminum ESR (each): **0.5** mΩ (from datasheet)
 - Ceramic ESR: **\_** mΩ
 - Parallel combination: **\_** mΩ ✓ (meets **\_** mΩ target?)
 
@@ -427,20 +427,20 @@ Vout_actual = _____ V
 
 | Loss Source              | Calculation                    | Power            |
 | ------------------------ | ------------------------------ | ---------------- |
-| MOSFET conduction        | (from 1.4.3)                   | **\_** W         |
-| MOSFET switching         | (estimated 1.4.3)              | **\_** W         |
-| Diode forward drop       | (from 1.4.5)                   | **\_** W         |
+| MOSFET conduction        | (from 1.4.3)                   | **0.015** W      |
+| MOSFET switching         | (estimated 1.4.3)              | **0.05** W       |
+| Diode forward drop       | (from 1.4.5)                   | **0.645** W      |
 | Inductor DC resistance   | I² × DCR = **\_**² × **\_**    | **\_** W         |
-| Gate drive & control     | (typical 5–10% of MOSFET loss) | **\_** W         |
+| Gate drive & control     | (typical 5–10% of MOSFET loss) | **0.065** W      |
 | **Total converter loss** |                                | \***\*\_** W\*\* |
 
 **Calculate efficiency:**
 
 ```bash
-P_out = Vout × I_out = _____ × _____ = _____ W
+P_out = Vout × I_out = 5 × 2.5 = 12.5 W
 η = P_out / (P_out + P_loss)
-η = _____ / (_____ + _____)
-η = _____%
+η = 12.5 / (12.5 + _____)
+η = %
 ```
 
 **Thermal analysis:**
