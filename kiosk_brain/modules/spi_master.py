@@ -83,7 +83,7 @@ def parse_response_frame(frame_bytes):
 
     status, data, checksum = frame_bytes[0], frame_bytes[1], frame_bytes[2]
     expected_checksum = status ^ data
-    is_valid = checksum == expected_checksum
+    is_valid = (checksum == expected_checksum)
     return status, data, is_valid
 
 
