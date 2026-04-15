@@ -1,6 +1,6 @@
 <mxfile host="app.diagrams.net" agent="Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:149.0) Gecko/20100101 Firefox/149.0">
   <diagram name="Page-1" id="mYuc8prQHcMQJXzWvvm3">
-    <mxGraphModel dx="1563" dy="1734" grid="1" gridSize="1" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+    <mxGraphModel dx="1287" dy="1574" grid="1" gridSize="1" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -100,9 +100,6 @@
         <mxCell id="ub_tx6bPQbAAc2E0zEvq-24" edge="1" parent="1" source="E5Vc4qlOW0jQJdsC6d3C-26" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="ub_tx6bPQbAAc2E0zEvq-21">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="ub_tx6bPQbAAc2E0zEvq-26" edge="1" parent="1" source="E5Vc4qlOW0jQJdsC6d3C-26" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="ub_tx6bPQbAAc2E0zEvq-20">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
         <mxCell id="ub_tx6bPQbAAc2E0zEvq-46" edge="1" parent="1" source="E5Vc4qlOW0jQJdsC6d3C-26" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;startArrow=classic;startFill=1;" target="ub_tx6bPQbAAc2E0zEvq-32">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
@@ -110,6 +107,9 @@
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="ub_tx6bPQbAAc2E0zEvq-49" edge="1" parent="1" source="E5Vc4qlOW0jQJdsC6d3C-26" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;startArrow=classic;startFill=1;" target="ub_tx6bPQbAAc2E0zEvq-31">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="LeAnnW7A5j2esEQeNNGv-4" edge="1" parent="1" source="E5Vc4qlOW0jQJdsC6d3C-26" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="LeAnnW7A5j2esEQeNNGv-3">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="E5Vc4qlOW0jQJdsC6d3C-26" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="&lt;div&gt;Low-level Controller&lt;/div&gt;(STM32F401RE - Nucleo Board)" vertex="1">
@@ -167,7 +167,7 @@
           <mxGeometry height="42" width="120" x="1140" y="40" as="geometry" />
         </mxCell>
         <mxCell id="ub_tx6bPQbAAc2E0zEvq-20" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Solenoid Door Lock" vertex="1">
-          <mxGeometry height="60" width="120" x="1309" y="-50.5" as="geometry" />
+          <mxGeometry height="60" width="120" x="1397" y="-50.5" as="geometry" />
         </mxCell>
         <mxCell id="ub_tx6bPQbAAc2E0zEvq-29" edge="1" parent="1" source="ub_tx6bPQbAAc2E0zEvq-21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="ub_tx6bPQbAAc2E0zEvq-27">
           <mxGeometry relative="1" as="geometry" />
@@ -206,6 +206,18 @@
         </mxCell>
         <mxCell id="ub_tx6bPQbAAc2E0zEvq-32" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="IR Sensor Pairs" vertex="1">
           <mxGeometry height="60" width="120" x="800" y="-50.5" as="geometry" />
+        </mxCell>
+        <mxCell id="LeAnnW7A5j2esEQeNNGv-1" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Level Shifting" vertex="1">
+          <mxGeometry height="30" width="85" x="920" y="-47" as="geometry" />
+        </mxCell>
+        <mxCell id="LeAnnW7A5j2esEQeNNGv-2" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="5V to 3.3V" vertex="1">
+          <mxGeometry height="30" width="60" x="932.5" y="-25" as="geometry" />
+        </mxCell>
+        <mxCell id="LeAnnW7A5j2esEQeNNGv-5" edge="1" parent="1" source="LeAnnW7A5j2esEQeNNGv-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="ub_tx6bPQbAAc2E0zEvq-20">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="LeAnnW7A5j2esEQeNNGv-3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="MOSFET Driver" vertex="1">
+          <mxGeometry height="60" width="58" x="1309" y="-50.5" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
