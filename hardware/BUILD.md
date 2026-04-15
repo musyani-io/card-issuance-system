@@ -3,7 +3,7 @@
 > **Project:** Smart ID Card Distribution Kiosk  
 > **Component:** Dual independent buck converters  
 > **Input:** 12V 10A PSU  
-> **Outputs:** 5V @ 3A (logic rail) + 3.3V @ 1.5A (IO rail)  
+> **Outputs:** 5V @ 3A (logic rail)
 > **Technology:** THT (Through-Hole) components, breadboard-testable, PCB-ready  
 > **Status:** Design phase — Phase 1 in progress
 
@@ -14,15 +14,13 @@
 ```bash
 12V 10A PSU (external power supply)
     │
-    ├──→ [12V→5V Buck Converter]
+    ├──→ [12V→5V Buck Converter] ← PRIMARY PSU
     │    PWM Controller + Switching Stage + Filtering
     │    Output: 5V Rail (3A max)
-    │    Loads: STM32 Nucleo VCC, 2× SG90 servos, IR sensors, Pi Camera
+    │    Loads: STM32 Nucleo board (5V input)
     │
-    ├──→ [12V→3.3V Buck Converter]
-    │    PWM Controller + Switching Stage + Filtering
-    │    Output: 3.3V Rail (1.5A max)
-    │    Loads: STM32 GPIO levels, A3144 hall sensor, USB camera
+    ├──→ STM32 Nucleo-F401RE (onboard 3.3V regulator)
+    │    Output: 3.3V Rail for GPIO, sensors, hall effect sensor
     │
     └──→ Motor drivers & solenoid (12V direct, separate fusing)
 ```
@@ -58,24 +56,36 @@
 - Acceptable ripple percentage: **2** % of output (typically 2–5%)
 - Thermal limit: MOSFET/diode junction <**100** °C @ ambient 25°C
 
-#### For 12V→3.3V Converter
+#### Level Shifting & Signal Safety
 
-**Input specification:**
+**Three voltage domains in this design:**
 
-- Nominal input voltage: **12** V (same as 5V converter)
-- Input range: **10.8** V to **13.2** V
+- **12V:** Motor power, solenoid coil, PSU
+- **5V:** Servo power, sensor power, logic rail
+- **3.3V:** STM32 GPIO inputs/outputs
 
-**Output specification:**
+**Component signal compatibility:**
 
-- Target output voltage: 3.3V
-- Allowed tolerance: ±**5** % → voltage range: **3.135** V to **3.465** V
-- Rated load current (continuous): **1** A
-- Maximum transient load: **2** A
-- Output ripple budget: **\_** mV peak-to-peak
-- Acceptable ripple percentage: **\_** %
-- Thermal limit: <**100** °C
+| Component            | Power     | Signal Path                         | Level Shift | Solution                                        |
+| -------------------- | --------- | ----------------------------------- | ----------- | ----------------------------------------------- |
+| **SG90 Servo (2×)**  | 5V        | STM32 → 3.3V PWM → Servo            | ✓ NO        | Direct connection (3.3V > 1.4V servo threshold) |
+| **IR Sensors (4×)**  | 5V        | Sensor 5V output → STM32 3.3V GPIO  | ❌ **YES**  | **IC Level Shifter (74LVC245 or BSS138)**       |
+| **Hall A3144**       | 5V        | Open-drain sensor → STM32 GPIO      | ✓ NO        | 10kΩ pull-up resistor to 3.3V                   |
+| **A4988 Driver**     | 12V motor | STM32 3.3V GPIO → A4988 logic input | ✓ NO        | Direct connection (TTL compatible)              |
+| **Solenoid Control** | 12V       | STM32 3.3V GPIO → MOSFET gate       | ⚠️ PARTIAL  | **Logic-level MOSFET** for full saturation      |
 
-**Record** these specifications; use them as verification targets throughout all phases.
+**Critical notes:**
+
+- **IR Sensors:** 5V output exceeds STM32 max input (3.6V) → **Mandatory IC shifter**
+- **Hall Sensor:** Open-drain output naturally fits 3.3V logic → pull-up only
+- **Solenoid:** Standard MOSFETs won't fully saturate at 3.3V gate drive → use logic-level type
+- **Servo/A4988:** Both accept 3.3V logic natively (no shifters needed)
+
+**BOM additions for signal interface:**
+
+- 1× IC Level Shifter (74LVC245, 8-channel bidirectional) for IR sensors
+- 1× 10kΩ resistor (pull-up for Hall sensor)
+- 1× Logic-level MOSFET (AO3400A or 2N7000) for solenoid gate drive
 
 ---
 
@@ -333,9 +343,9 @@ ESR ≤ 0.133 Ω
 
 **Verify selected capacitors meet ESR target:**
 
-- Aluminum ESR (each): **0.5** mΩ (from datasheet)
+- Aluminum ESR (each): **220** mΩ (from datasheet)
 - Ceramic ESR: **\_** mΩ
-- Parallel combination: **\_** mΩ ✓ (meets **\_** mΩ target?)
+- Parallel combination: **\_** mΩ ✓ (meets **133** mΩ target?)
 
 **Input filtering** (reduces PSU noise coupling to 3.3V converter):
 
@@ -352,44 +362,38 @@ ESR ≤ 0.133 Ω
 Where:
 
 - Vref = internal reference voltage = **5.1** V (from controller datasheet)
-- Vout = desired output = 5.0V
+- Vout = desired output = **5.1V** (equals Vref, so R1/R2 = 0)
 - R1 = top resistor (from Vout to feedback pin)
 - R2 = bottom resistor (from feedback pin to GND)
 
 **Rearranged for R1/R2 ratio:**
 
 ```bash
-5.0 = _____ × (1 + R1/R2)
-_____ = 1 + R1/R2
-R1/R2 = _____
+5.1 = 5.1 × (1 + R1/R2)
+1 = 1 + R1/R2
+R1/R2 = 0
 ```
 
-**Choose R2:** **\_** Ω (typically 2–10 kΩ for low noise)
+**Implication:** R1 should be **0 Ω** (omit R1, feedback traces directly to output)
 
-**Calculate R1:**
+**Practical implementation:**
+
+- **Simplest:** No R1 resistor. Connect feedback line directly from output to COMP pin (pin 9)
+- **Alternative:** R2 = **10 kΩ** (to ground), R1 = **0 Ω** (or bridge/jumper wire)
+
+**Output voltage (direct reference):**
 
 ```bash
-R1 = _____ × R2
-R1 = _____ × _____
-R1 = _____ Ω
+Vout_actual = Vref = 5.1 V
 ```
 
-**Select nearest 1% resistor value:** R1 = **\_** Ω 1%
+**Error from nominal 5V:** **+100 mV** (acceptable? Yes — within ±5% tolerance of 4.75–5.25V) ✓
 
-**Verify output voltage:**
+**Trimming strategy (optional for fine-tuning):**
 
-```bash
-Vout_actual = _____ × (1 + _____ / _____)
-Vout_actual = _____ × _____
-Vout_actual = _____ V
-```
-
-**Error from target:** **\_** V (acceptable? Yes / No)
-
-**Trimming strategy:**
-
-- Install **\_** kΩ potentiometer in parallel with R1 for field calibration
-- Or use **\_** kΩ fixed + **\_** kΩ trim potentiometer combination
+- Install **10 kΩ trim potentiometer** from output to feedback pin if exact 5.0V is required
+- This allows adjustment of R1 from 0Ω to ~10kΩ, varying output from 5.1V down to ~2.55V
+- **Recommended for breadboard:** Include the trim pot for flexibility during testing
 
 ---
 
@@ -447,16 +451,16 @@ P_out = Vout × I_out = 5 × 2.5 = 12.5 W
 
 Assume MOSFET as highest-temperature component:
 
-- Thermal resistance MOSFET (junction to case): **\_** °C/W
-- Thermal resistance case to ambient (free convection on breadboard): **\_** °C/W
-- Total: **\_** °C/W
+- Thermal resistance MOSFET (junction to case): **1.5** °C/W
+- Thermal resistance case to ambient (free convection on breadboard): **62** °C/W
+- Total: **63.5** °C/W
 
 ```bash
 ΔT = P_mosfet × Rth_total
-ΔT = _____ W × _____ °C/W
+ΔT = _____ W × 63.5 °C/W
 ΔT = _____°C rise
 
-T_junction = T_ambient + ΔT = _____ + _____ = _____°C
+T_junction = T_ambient + ΔT = 25 + _____ = _____°C
 Margin to Tj_max (125°C typical): _____ °C ✓ (safe?)
 ```
 
@@ -466,15 +470,15 @@ Margin to Tj_max (125°C typical): _____ °C ✓ (safe?)
 
 Create a table:
 
-| **Component**       | **Design Value**       | **Rating Required**                  | **Selected Part** | **Safety Margin** | **Status** |
-| ------------------- | ---------------------- | ------------------------------------ | ----------------- | ----------------- | ---------- |
-| MOSFET              | I_out=**A, Tj=**°C     | Vds≥**V, Id≥**A, Tj≤125°C            | **\_**            | **\_** ×          | ✓          |
-| Diode               | I_avg=**A, If_peak=**A | Vr≥**V, If≥**A                       | **\_**            | **\_** ×          | ✓          |
-| Inductor            | L=**µH, I_peak=**A     | L=**µH ±10%, I_rating≥**A, DCR<\_\_Ω | **\_**            | **\_** ×          | ✓          |
-| Capacitor (out)     | C≥**µF, V≥**V          | ESR<\_\_mΩ                           | **\_**            | **\_** ×          | ✓          |
-| Capacitor (in)      | C≥**µF, V≥**V          | —                                    | **\_**            | **\_** ×          | ✓          |
-| Resistors (divider) | R1=**Ω, R2=**Ω         | ±1%, 0.25W                           | **\_**            | **\_** ×          | ✓          |
-| Compensation caps   | Cfb=**nF, Cc=**nF      | **\_** V                             | **\_**            | **\_** ×          | ✓          |
+| **Component**       | **Design Value**       | **Rating Required**                   | **Selected Part** | **Safety Margin** | **Status** |
+| ------------------- | ---------------------- | ------------------------------------- | ----------------- | ----------------- | ---------- |
+| MOSFET              | I_out=49A, Tj=\*\*°C   | Vds≥13.2V, Id≥3A, Tj≤125°C            | **\_**            | **\_** ×          | ✓          |
+| Diode               | I_avg=**A, If_peak=**A | Vr≥**V, If≥**A                        | **\_**            | **\_** ×          | ✓          |
+| Inductor            | L=47µH, I_peak=1.67A   | L=47µH ±10%, I_rating≥2.5A, DCR<\_\_Ω | **\_**            | **\_** ×          | ✓          |
+| Capacitor (out)     | C≥**µF, V≥**V          | ESR<133mΩ                             | **\_**            | **\_** ×          | ✓          |
+| Capacitor (in)      | C≥**µF, V≥**V          | —                                     | **\_**            | **\_** ×          | ✓          |
+| Resistors (divider) | R1=0Ω, R2=0Ω           | ±1%, 0.25W                            | **\_**            | **\_** ×          | ✓          |
+| Compensation caps   | Cfb=**nF, Cc=**nF      | **\_** V                              | **\_**            | **\_** ×          | ✓          |
 
 **Go/No-go:** All components within safe operating area? Yes / No
 
@@ -513,129 +517,38 @@ Create a table:
 
 ---
 
-### 1.5: Design 12V→3.3V Buck Converter _(2.5 hrs total)_
+### 1.5: 3.3V Supply (Onboard Regulator)
 
-**Methodology:** Repeat all steps from 1.4 (1.4.1 through 1.4.12) with output voltage = 3.3V
+**Design Note:** STM32 Nucleo-F401RE includes onboard 3.3V LDO regulator.
 
-**Key parameter differences:**
+- **Input:** 5V from buck converter
+- **Output:** 3.3V (via internal regulator)
+- **No external converter needed**
 
-#### 1.5.1 Duty Cycle for 3.3V
+**Loads on 3.3V rail:**
 
-```bash
-D = (____ + ____) / _____
-D = _____
-```
+- STM32 GPIO and microcontroller logic (~0.1A)
+- Hall effect sensor (A3144) — **NO, this is 5V rated** (use 5V rail)
+- Future 3.3V sensor expansions
 
-#### 1.5.2 MOSFET (typically same as 5V)
-
-**Selected:** \***\*\*\*\*\***\_\***\*\*\*\*\*** (same as 5V? Yes / No)
-
-#### 1.5.3 Diode (typically same as 5V)
-
-**Selected for breadboard:** \***\*\*\*\*\***\_\***\*\*\*\*\***  
-**Planned upgrade for PCB:** \***\*\*\*\*\***\_\***\*\*\*\*\***
-
-#### 1.5.4 Inductor Calculation
-
-```bash
-L = (_____ × _____) / (_____ × _____)
-L = _____ µH
-```
-
-**Peak inductor current:**
-
-```bash
-I_L_peak = _____ A
-```
-
-**Selected inductor:** **\_** µH, **\_** A rated
-
-#### 1.5.5 Output Capacitors
-
-```bash
-C ≥ (_____ × _____) / (_____ × _____)
-C ≥ _____ µF
-```
-
-**Selected:** **\_** µF + **\_** µF ceramic
-
-#### 1.5.6 Feedback Divider for 3.3V
-
-```bash
-3.3 = _____ × (1 + R1/R2)
-R1/R2 = _____
-R2 = _____
-R1 = _____
-```
-
-**Selected values:** R1 = **\_** Ω, R2 = **\_** Ω (1% tolerance)
-
-#### 1.5.7 Compensation Network
-
-**Same as 5V converter?** Yes / No - Why? \***\*\*\*\*\***\_\_\_\***\*\*\*\*\***
-
-**Selected values:**
-
-- Cfb = **\_** nF
-- Rc = **\_** Ω
-- Cc = **\_** nF
-- Css = **\_** µF
-
-#### 1.5.8 Total Losses & Efficiency
-
-| Loss      | Calculation | Power            |
-| --------- | ----------- | ---------------- |
-| MOSFET    |             | **\_** W         |
-| Diode     |             | **\_** W         |
-| Inductor  |             | **\_** W         |
-| Other     |             | **\_** W         |
-| **Total** |             | \***\*\_** W\*\* |
-
-```bash
-P_out = 3.3V × _____ A = _____ W
-η = _____ / (_____ + _____) = _____ %
-```
-
-#### 1.5.9 Thermal Analysis
-
-```bash
-ΔT = _____ W × _____ °C/W = _____°C
-T_junction = _____ + _____ = _____°C (safe? Yes/No)
-```
-
-#### 1.5.10 Component Verification Table
-
-(Same format as 1.4.11)
-
-#### 1.5.11 Create LTspice Schematic
-
-**Schematic file:** `hardware/schematics/Buck_12V_3.3V_SG3525.asc`
-
-**Load step test:** **\_** A → **\_** A (vs. 5V which uses 0.5A→3A)
-
-**Results:**
-
-- Voltage regulation: **\_** %
-- Ripple: **\_** mV
-- Transient recovery: **\_** ms
-- Efficiency: **\_**%
+**Verification:** Check Nucleo-F401RE datasheet for 3.3V output capacity. Typical: **≥500 mA available** for external loads.
 
 ---
 
-### 1.6: Combine & Cross-Verify _(1 hr total)_
+### 1.6: Finalize Single-Converter Design _(0.5 hr)_
 
-#### 1.6.1 Merge into Single KiCAD Schematic
+#### 1.6.1 Create KiCAD Schematic
 
-**File:** `hardware/schematics/Power_Supply_Dual_Buck.sch`
+**File:** `hardware/schematics/Power_Supply_5V_Buck.sch`
 
 **Schematic structure:**
 
 - Top-level power distribution diagram
-  - Sub-sheet 1: "12V→5V Buck Converter"
-  - Sub-sheet 2: "12V→3.3V Buck Converter"
-  - Sub-sheet 3: "Protection & Filtering" (fuses, inrush, decoupling — for PCB phase)
-- Shared 12V input with common ground star point
-- Test points labeled: TP_12V_IN, TP_5V_OUT, TP_3.3V_OUT, TP_GND
+  - Main sheet: "12V→5V Buck Converter"
+  - Sub-sheet (optional): "Protection & Filtering" (fuses, inrush, decoupling — for PCB phase)
+- 12V input with ground star point
+- 5V output distribution to Nucleo board
+- Test points labeled: TP_12V_IN, TP_5V_OUT, TP_GND
 
 **Verify KiCAD schematic:**
 
@@ -643,26 +556,26 @@ T_junction = _____ + _____ = _____°C (safe? Yes/No)
 - Voltage labels on all rails
 - Component designators sequential (R1, R2, ... C1, C2, ... L1, L2, ... etc.)
 
-#### 1.6.2 LTspice Cross-Coupling Analysis
+#### 1.6.2 LTspice Verification (Single Converter)
 
-**Simulation file:** Combine both converters in single circuit
+**Simulation file:** 12V→5V buck converter standalone
 
-**Test scenario:** 5V converter @ **\_** A + 3.3V converter @ **\_** A (simultaneous load)
+**Test scenario:** 5V output loaded @ full 3A (STM32 Nucleo + external 5V devices)
 
 **Measurements:**
 
 - 5V output ripple: **\_** mV (target <100mV)
-- 3.3V output ripple: **\_** mV (target <100mV)
-- Input current (total 12V draw): **\_** A
+- Input current (12V draw): **\_** A
+- Efficiency: **\_**%
 
 **Stability check:**
 
 - Oscillation present? Yes / No → if yes, adjust compensation
-- Ripple coupling between rails? Yes / No → if yes, check ground return path
+- Settling time after startup: **\_** ms (target <50ms)
 
 **Go/No-Go Decision:**
 
-- Both ripples <100mV ✓
+- 5V ripple <100mV ✓
 - No oscillation ✓
 - Input current validates PSU capacity ✓
 - **Decision:** **\_** → **Proceed to Phase 2 (Breadboard)**
@@ -671,17 +584,14 @@ T_junction = _____ + _____ = _____°C (safe? Yes/No)
 
 ## Phase 1 Deliverables Checklist
 
-- [ ] Electrical specifications document (1.1) completed
 - [ ] Switching frequency & topology selected (1.2)
 - [ ] PWM controller evaluated & chosen (1.3)
 - [ ] 12V→5V converter fully designed (1.4.1–1.4.12)
   - [ ] All component values calculated
   - [ ] LTspice schematic simulated & verified
-- [ ] 12V→3.3V converter fully designed (1.5.1–1.5.11)
-  - [ ] All component values calculated
-  - [ ] LTspice schematic simulated & verified
-- [ ] Dual converter KiCAD schematic created (1.6.1)
-- [ ] Cross-coupling simulation complete & passed (1.6.2)
+- [ ] 3.3V onboard regulator verified (Nucleo board capability: 1.5)
+- [ ] Single converter KiCAD schematic created (1.6.1)
+- [ ] LTspice verification complete & passed (1.6.2)
 - [ ] Component bill of materials (BOM) compiled with part numbers & sources
 - [ ] All calculation worksheets saved & documented
 
@@ -817,16 +727,16 @@ T_junction = _____ + _____ = _____°C (safe? Yes/No)
 
 ## Summary Table: Expected Values
 
-| Parameter                | 12V→5V | 12V→3.3V | Unit |
-| ------------------------ | ------ | -------- | ---- |
-| Input voltage            | **\_** | **\_**   | V    |
-| Output voltage (nominal) | 5.0    | 3.3      | V    |
-| Output ripple (max)      | <100   | <100     | mV   |
-| Rated current            | **\_** | **\_**   | A    |
-| Duty cycle (D)           | **\_** | **\_**   | %    |
-| Inductor                 | **\_** | **\_**   | µH   |
-| Output capacitor         | **\_** | **\_**   | µF   |
-| Efficiency @ rated       | **\_** | **\_**   | %    |
-| MOSFET temp rise         | **\_** | **\_**   | °C   |
+| Parameter                | 12V→5V | Unit |
+| ------------------------ | ------ | ---- |
+| Input voltage            | **\_** | V    |
+| Output voltage (nominal) | 5.1    | V    |
+| Output ripple (max)      | <100   | mV   |
+| Rated current            | **\_** | A    |
+| Duty cycle (D)           | **\_** | %    |
+| Inductor                 | **\_** | µH   |
+| Output capacitor         | **\_** | µF   |
+| Efficiency @ rated       | **\_** | %    |
+| MOSFET temp rise         | **\_** | °C   |
 
 ---
