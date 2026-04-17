@@ -14,23 +14,275 @@
 ```bash
 12V 10A PSU (external power supply)
     │
-    ├──→ [12V→5V Buck Converter] ← PRIMARY PSU
-    │    PWM Controller + Switching Stage + Filtering
-    │    Output: 5V Rail (3A max)
-    │    Loads: STM32 Nucleo board (5V input)
+    ├──→ [Reverse Polarity Protection MOSFET] ──→ [12V→5V Buck Converter] ← PROTECTS MCU RAIL
+    │    Phase 0: 5A rated protection              PWM Controller + Switching Stage + Filtering
+    │    (for microcontroller circuit only)         Output: 5V Rail (up to 6A available)
+    │                                               Loads: STM32 Nucleo board (5V input)
     │
-    ├──→ STM32 Nucleo-F401RE (onboard 3.3V regulator)
-    │    Output: 3.3V Rail for GPIO, sensors, hall effect sensor
+    │                                               └─→ STM32 Nucleo-F401RE (onboard 3.3V regulator)
+    │                                                   Output: 3.3V Rail for GPIO, sensors
     │
-    └──→ Motor drivers & solenoid (12V direct, separate fusing)
+    └──→ [Separate fuse 5A] ──→ Motor drivers & solenoid (12V direct, unprotected)
+         (12V motors/solenoids connect here)
 ```
 
 **Design Philosophy:**
 
-- Separate converters (not cascaded) → no efficiency loss from rail-to-rail dropouts
+- **Protection scope:** Phase 0 MOSFET protects ONLY the 5V buck converter rail (sensitive STM32 microcontroller circuits)
+- **Motor rail:** 12V motors/solenoid connect directly to PSU with separate 5A fuse (motors are robust to reverse polarity; microcontroller is not)
 - Same PWM frequency (100 kHz) → reduces switching noise coupling
-- Identical topology → standardized design, reusable components
 - All THT components → breadboard-native, hand-solderable
+- **Current budget:** ~3A buck converter input + ~2-4A motors = ~5-7A total from PSU (well within 10A supply)
+
+---
+
+## Phase 0: Reverse Polarity Protection for 5V Buck Converter (1.5–2 hrs)
+
+> **Goal:** Protect ONLY the 12V→5V buck converter (5V MCU rail) from reverse polarity.  
+> **Scope:** 5A-rated input protection (nominal 3A buck input + 1.67× transient margin).  
+> **Method:** Active-bias Zener blocking (aggressive protection).  
+> **Protection:** Blocks reverse current; operates ~0Ω conduction loss in forward direction.  
+> **Architecture note:** 12V motor rail (A4988, solenoid) connects directly to PSU with separate 5A fuse — motors are robust to polarity reversal, protection not needed.
+
+### 0.1: Select Protection MOSFET
+
+**Requirements:**
+
+- Vds(max) ≥ **20** V (12V nominal + overshoot margin = 1.7× safety factor)
+- Id(max) ≥ **5** A (protection rating: 3A nominal input + 1.67× transient headroom)
+- Rds(on) @ Vgs=10V ≤ **\_\_**\_\_ mΩ (minimize conduction loss in forward path)
+- Package: TO-220 (breadboard-friendly)
+- Standard threshold voltage (Vgs(th) ~2-4V) acceptable
+
+**Candidates Considered:**
+
+| MOSFET  | Vds  | Id   | Rds(on) @ 10V | Vgs(th) |
+| ------- | ---- | ---- | ------------- | ------- |
+| IRF540N | 100V | 33A  | 44mΩ          | 2–4V    |
+| IRFZ44N | 55V  | 49A  | 17.5mΩ        | 2–4V    |
+| IRF3205 | 55V  | 110A | 8mΩ           | 2–4V    |
+
+**Selected MOSFET:** **IRFZ44N** (17.5mΩ, 49A rated)
+
+**Verification:**
+
+- Vds margin: **55** V rated / 12V required = **4.58** × headroom ✓
+- Id margin: **49** A rated / **5** A required = **9.8** × headroom ✓
+- Conduction loss @ 5A: P = 5² × 17.5m ≈ **0.44W** (manageable, no heatsink needed) ✓
+
+---
+
+### 0.2: Design Zener Gate Bias (Active Blocking)
+
+**Purpose:** Maintain gate at positive voltage in forward polarity (keeping MOSFET ON) while strongly suppressing any reverse-polarity gate current.
+
+**Zener voltage options:**
+
+| Vz      | Purpose                                  | Trade-offs                               |
+| ------- | ---------------------------------------- | ---------------------------------------- |
+| **5.1** | Match buck converter output (SG3525 ref) | Gate slightly underdrive~ish, but stable |
+| **5.6** | Modest overdrive above 5.1               | Better Rds saturation, slightly hotter   |
+| **6.2** | Maximum gate drive (within ratings)      | Higher Zener current → more heat loss    |
+
+**Selected Zener voltage:** **\_\_**\_\_ V (recommend **5.1V** for SG3525 compatibility)
+
+**Zener diode:**
+
+- Component: **1N4733A** (5.1V, 1W) or equivalent (**\_\_**\_\_\_\_\_\_)
+- Package: DO-41 axial (THT)
+- Power rating: ≥ **\_\_**\_\_ W (calculated below)
+
+**Zener bias circuit power dissipation:**
+
+Maximum current through Zener occurs at **reverse polarity** condition (Zener fully conducting to block gate):
+
+```bash
+P_zener = Vz × I_zener_max
+I_zener_max ≈ (Vin_max) / Rg  [worst case: no MOSFET current limiting]
+Rg = _____ Ω (from section 0.4)
+
+I_zener_max = 13.2 V / _____ Ω = _____ mA
+P_zener = 5.1 V × _____ mA = _____ mW (acceptable for 1W Zener)
+```
+
+**Zener selection verified:** Yes / No ✓
+
+---
+
+### 0.3: Calculate Gate Resistor (Rg)
+
+**Purpose:** Limit gate charging current AND set Zener bias current in forward polarity.
+
+**Formula:** Rg = (Vin_max - Vz) / Ig_desired
+
+Where:
+
+- Vin_max = maximum input voltage = **13.2** V
+- Vz = chosen Zener voltage = **\_\_**\_\_ V
+- Ig_desired = target gate current (typical 5–10 mA for fast turn-on)
+
+**Design choice (Ig_desired):** **\_\_**\_\_ mA (select 5, 7, or 10)
+
+**Calculation:**
+
+```bash
+Rg = (13.2 - _____) / (_____ × 10⁻³)
+Rg = _____ / _____
+Rg = _____ Ω
+```
+
+**Round to nearest standard resistor value:**
+
+Rg (selected) = **\_\_**\_\_ Ω (carbon film, ±5%, ≥0.5W)
+
+**Gate charging time estimate** (affects reverse-polarity response speed):
+
+```bash
+τ_gate = Rg × Cg  [from section 0.7]
+τ_gate = _____ Ω × _____ nF = _____ µs (5τ ≈ reverse response time)
+```
+
+---
+
+### 0.4: Calculate Forward-Conduction Loss
+
+**In forward polarity, Q1_protect conducts the full input current.**
+
+**Formula:** P_loss = I_in² × Rds(on)
+
+Where:
+
+- I_in = maximum input current = **5** A (protection rating; nominal ~3A for buck converter)
+  - Nominal buck input: I_in_nom ≈ Pout / η = (5V × 3A) / 0.80 ≈ 18.75W / 12V ≈ 3.1A
+  - **Protection rating:** **5A** (3A nominal + 1.67× transient margin for surge current)
+- Rds(on) = on-resistance of selected MOSFET @ 10V gate drive = **\_\_**\_\_ mΩ
+
+**Calculation:**
+
+```bash
+P_loss = (_____)² × (_____ × 10⁻³)
+P_loss = _____ × _____
+P_loss = _____ W
+```
+
+**Voltage drop across Q1_protect:**
+
+```bash
+V_drop = I_in × Rds(on) = _____ A × _____ mΩ = _____ mV
+```
+
+**Interpretation:** This **\_\_**\_\_ mV drop reduces available voltage for the buck converter:
+
+```bash
+Available input to buck = 12V - V_drop = 12 - _____ = _____ V (acceptable? Yes/No)
+```
+
+---
+
+### 0.5: Thermal Analysis (Protection MOSFET)
+
+**Assumptions:**
+
+- Thermal resistance (junction to ambient, free convection on breadboard): **Rth_j-a = 62 °C/W**
+- Ambient temperature: **25 °C**
+- Power dissipation (from 0.5): **P_loss = **\_** W**
+
+**Temperature rise:**
+
+```bash
+ΔT = P_loss × Rth_j-a
+ΔT = _____ W × 62 °C/W
+ΔT = _____ °C
+```
+
+**Junction temperature:**
+
+```bash
+Tj = T_ambient + ΔT
+Tj = 25 + _____ = _____ °C
+```
+
+**Thermal margin to absolute maximum (Tj_max = **150°C** typical for IRF540N):**
+
+```bash
+Margin = Tj_max - Tj = 150 - _____ = _____ °C (safe? Yes/No)
+```
+
+**If temperature margin <30°C:** Consider adding heat sink or reducing Rds(on) via alternate MOSFET.
+
+---
+
+### 0.6: Design Gate Capacitor (Cg)
+
+**Purpose:** Smooth gate voltage transitions; sets RC time constant with Rg to prevent oscillation.
+
+**Desired time constant (τ):** Target **1–5 µs** for balanced fast response + noise immunity.
+
+**Formula:** Cg = τ / Rg
+
+Where:
+
+- τ = chosen time constant = **\_\_**\_\_ µs (recommend **2–3 µs**)
+- Rg = gate resistor = **\_\_**\_\_ Ω (from section 0.4)
+
+**Calculation:**
+
+```bash
+Cg = _____ µs / _____ Ω
+Cg = _____ nF
+```
+
+**Round to nearest standard capacitor:**
+
+Cg (selected) = **\_\_**\_\_ nF (ceramic, ≥16V rated)
+
+**Verify gate RC time constant:**
+
+```bash
+τ_actual = Rg × Cg = _____ × _____ = _____ µs (target 1–5µs?)
+```
+
+---
+
+### 0.7: Component Verification Table (Phase 0)
+
+**Summary of all protection components:**
+
+| **Component**          | **Design Value**          | **Selected Part**      | **Rating Check** | **Status** |
+| ---------------------- | ------------------------- | ---------------------- | ---------------- | ---------- |
+| Protection MOSFET (Q1) | Vds≥**20**V, Id≥**5**A    | **IRFZ44N**            | ✓                | ✓          |
+| Rds(on) @ 10V          | ≤**17.5**mΩ               | **17.5**mΩ (datasheet) | ✓                | ✓          |
+| Zener diode (D_bias)   | Vz=**5.1**V, P≥**\_\_**mW | **1N4733A** (1W)       | ✓                | ✓          |
+| Gate resistor (Rg)     | **\_\_**Ω, P≥**\_\_**W    | **\_\_\_\_**Ω ±5%      | ✓                | ✓          |
+| Gate capacitor (Cg)    | **\_\_**nF, V≥16V         | **\_\_**nF ceramic     | ✓                | ✓          |
+| Forward P_loss         | **~0.44**W @ 5A rated     | (calculated)           | ✓ (<0.5W)        | ✓          |
+| Tj @ 25°C ambient      | **\_\_**°C                | (calculated)           | ✓ (<100°C)       | ✓          |
+| Gate RC time constant  | **\_\_**µs                | ~**2–3**µs             | ✓ (1–5µs?)       | ✓          |
+
+**Go/No-Go:** All protection components within design margin? **Yes / No**
+
+---
+
+### 0.8: Reverse-Polarity Response Timing Verification
+
+**Scenario:** User accidentally connects +12V to negative terminal (reverse polarity).
+
+**Expected response:**
+
+1. **Gate rapid discharge (via Rg to Zener):** ~5τ = **\_\_**\_\_ µs
+   - Gate voltage → 0V (off) in roughly this time
+2. **MOSFET turn-off:** ~**1–2** µs after gate reaches ground
+3. **Body diode blocks reverse current:** MOSFET acts as check-valve
+
+**Calculated response time:**
+
+```bash
+Response ≈ 5 × τ = 5 × _____ µs = _____ µs (< 100µs = safe)
+```
+
+**Load transient immunity:** If forward load step occurs (e.g., servo + stepper simultaneous), RC time constant prevents gate ringing. Target: **0-10% overshoot** on 5V rail.
+
+**Verification:** Testing during Phase 2 (breadboard) will confirm actual response via oscilloscope.
 
 ---
 
