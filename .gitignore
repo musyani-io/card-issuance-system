@@ -195,3 +195,10 @@ Thumbs.db
 
 # Runtime data
 kiosk_brain/data/logs/
+
+# =============================================================================
+# Proteus / Simulations
+# =============================================================================
+# Backup files
+*Project Backups
+*workspace

@@ -736,9 +736,7 @@ Create a table:
 
 ---
 
-#### 1.4.12 Create LTspice Schematic
-
-**Schematic file:** `hardware/schematics/Buck_12V_5V_SG3525.asc`
+#### 1.4.12 Create Proteus Schematic
 
 **Components to include:**
 
@@ -808,7 +806,7 @@ Create a table:
 - Voltage labels on all rails
 - Component designators sequential (R1, R2, ... C1, C2, ... L1, L2, ... etc.)
 
-#### 1.6.2 LTspice Verification (Single Converter)
+#### 1.6.2 Proteus Verification (Single Converter)
 
 **Simulation file:** 12V→5V buck converter standalone
 
@@ -840,10 +838,10 @@ Create a table:
 - [ ] PWM controller evaluated & chosen (1.3)
 - [ ] 12V→5V converter fully designed (1.4.1–1.4.12)
   - [ ] All component values calculated
-  - [ ] LTspice schematic simulated & verified
+  - [ ] Proteus schematic simulated & verified
 - [ ] 3.3V onboard regulator verified (Nucleo board capability: 1.5)
 - [ ] Single converter KiCAD schematic created (1.6.1)
-- [ ] LTspice verification complete & passed (1.6.2)
+- [ ] Proteus verification complete & passed (1.6.2)
 - [ ] Component bill of materials (BOM) compiled with part numbers & sources
 - [ ] All calculation worksheets saved & documented
 
@@ -856,7 +854,7 @@ Create a table:
 
 ## Phase 2: Breadboard Prototype & Testing _(3–4 hrs)_
 
-(To be completed after Phase 1 design is finalized and LTspice sims pass)
+(To be completed after Phase 1 design is finalized and Proteus sims pass)
 
 ### 2.1 Build 12V→5V Converter on Breadboard
 
