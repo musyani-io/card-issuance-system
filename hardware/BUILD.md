@@ -50,7 +50,7 @@
 
 - Vds(max) ≥ **20** V (12V nominal + overshoot margin = 1.7× safety factor)
 - Id(max) ≥ **5** A (protection rating: 3A nominal input + 1.67× transient headroom)
-- Rds(on) @ Vgs=10V ≤ **\_\_**\_\_ mΩ (minimize conduction loss in forward path)
+- Rds(on) @ Vgs=10V ≤ **0.22** Ω (minimize conduction loss in forward path)
 - Package: TO-220 (breadboard-friendly)
 - Standard threshold voltage (Vgs(th) ~2-4V) acceptable
 
@@ -84,7 +84,7 @@
 | **5.6** | Modest overdrive above 5.1               | Better Rds saturation, slightly hotter   |
 | **6.2** | Maximum gate drive (within ratings)      | Higher Zener current → more heat loss    |
 
-**Selected Zener voltage:** **\_\_**\_\_ V (recommend **5.1V** for SG3525 compatibility)
+**Selected Zener voltage:** **5.1** V
 
 **Zener diode:**
 
@@ -118,28 +118,28 @@ P_zener = 5.1 V × _____ mA = _____ mW (acceptable for 1W Zener)
 Where:
 
 - Vin_max = maximum input voltage = **13.2** V
-- Vz = chosen Zener voltage = **\_\_**\_\_ V
+- Vz = chosen Zener voltage = **5.1** V
 - Ig_desired = target gate current (typical 5–10 mA for fast turn-on)
 
-**Design choice (Ig_desired):** **\_\_**\_\_ mA (select 5, 7, or 10)
+**Design choice (Ig_desired):** **10** mA (select 5, 7, or 10)
 
 **Calculation:**
 
 ```bash
-Rg = (13.2 - _____) / (_____ × 10⁻³)
-Rg = _____ / _____
-Rg = _____ Ω
+Rg = (13.2 - 5.1) / (7 × 10⁻³)
+Rg = 8.1 / (7 × 10⁻³)
+Rg =  1157.142 Ω
 ```
 
 **Round to nearest standard resistor value:**
 
-Rg (selected) = **\_\_**\_\_ Ω (carbon film, ±5%, ≥0.5W)
+Rg (selected) = **1.2** kΩ (carbon film, ±5%, ≥0.5W)
 
 **Gate charging time estimate** (affects reverse-polarity response speed):
 
 ```bash
 τ_gate = Rg × Cg  [from section 0.7]
-τ_gate = _____ Ω × _____ nF = _____ µs (5τ ≈ reverse response time)
+τ_gate = 1 kΩ × _____ nF = _____ µs (5τ ≈ reverse response time)
 ```
 
 ---
@@ -155,26 +155,26 @@ Where:
 - I_in = maximum input current = **5** A (protection rating; nominal ~3A for buck converter)
   - Nominal buck input: I_in_nom ≈ Pout / η = (5V × 3A) / 0.80 ≈ 18.75W / 12V ≈ 3.1A
   - **Protection rating:** **5A** (3A nominal + 1.67× transient margin for surge current)
-- Rds(on) = on-resistance of selected MOSFET @ 10V gate drive = **\_\_**\_\_ mΩ
+- Rds(on) = on-resistance of selected MOSFET @ 10V gate drive = **17.5** mΩ
 
 **Calculation:**
 
 ```bash
-P_loss = (_____)² × (_____ × 10⁻³)
-P_loss = _____ × _____
-P_loss = _____ W
+P_loss = (5)² × (17.5 × 10⁻³)
+P_loss = 25 × 17.5 × 10⁻³
+P_loss =  0.4375 W
 ```
 
 **Voltage drop across Q1_protect:**
 
 ```bash
-V_drop = I_in × Rds(on) = _____ A × _____ mΩ = _____ mV
+V_drop = I_in × Rds(on) = 5 A × 17.5 mΩ =  87.5 mV
 ```
 
-**Interpretation:** This **\_\_**\_\_ mV drop reduces available voltage for the buck converter:
+**Interpretation:** This **87.5** mV drop reduces available voltage for the buck converter:
 
 ```bash
-Available input to buck = 12V - V_drop = 12 - _____ = _____ V (acceptable? Yes/No)
+Available input to buck = 12V - V_drop = 12 - 0.0875 = 11.9125 V (Acceptable)
 ```
 
 ---
@@ -185,30 +185,30 @@ Available input to buck = 12V - V_drop = 12 - _____ = _____ V (acceptable? Yes/N
 
 - Thermal resistance (junction to ambient, free convection on breadboard): **Rth_j-a = 62 °C/W**
 - Ambient temperature: **25 °C**
-- Power dissipation (from 0.5): **P_loss = **\_** W**
+- Power dissipation (from 0.4): **P_loss = **0.4375** W**
 
 **Temperature rise:**
 
 ```bash
 ΔT = P_loss × Rth_j-a
-ΔT = _____ W × 62 °C/W
-ΔT = _____ °C
+ΔT = 0.4375 W × 62 °C/W
+ΔT = 27.125 °C
 ```
 
 **Junction temperature:**
 
 ```bash
 Tj = T_ambient + ΔT
-Tj = 25 + _____ = _____ °C
+Tj = 25 + 27.125 = 52.125 °C
 ```
 
 **Thermal margin to absolute maximum (Tj_max = **150°C** typical for IRF540N):**
 
 ```bash
-Margin = Tj_max - Tj = 150 - _____ = _____ °C (safe? Yes/No)
+Margin = Tj_max - Tj = 150 - 52.125 = 97.875 °C (Safe)
 ```
 
-**If temperature margin <30°C:** Consider adding heat sink or reducing Rds(on) via alternate MOSFET.
+**If temperature margin < 30°C:** Consider adding heat sink or reducing Rds(on) via alternate MOSFET.
 
 ---
 
@@ -252,14 +252,14 @@ Cg (selected) = **\_\_**\_\_ nF (ceramic, ≥16V rated)
 | ---------------------- | ------------------------- | ---------------------- | ---------------- | ---------- |
 | Protection MOSFET (Q1) | Vds≥**20**V, Id≥**5**A    | **IRFZ44N**            | ✓                | ✓          |
 | Rds(on) @ 10V          | ≤**17.5**mΩ               | **17.5**mΩ (datasheet) | ✓                | ✓          |
-| Zener diode (D_bias)   | Vz=**5.1**V, P≥**\_\_**mW | **1N4733A** (1W)       | ✓                | ✓          |
-| Gate resistor (Rg)     | **\_\_**Ω, P≥**\_\_**W    | **\_\_\_\_**Ω ±5%      | ✓                | ✓          |
+| Zener diode (D_bias)   | Vz=**5.1**V, P≥\*\*\*\*mW | **1N4733A** (1W)       | ✓                | ✓          |
+| Gate resistor (Rg)     | **1157.142**Ω, P≥**0.5**W | **1.2**kΩ ±5%          | ✓                | ✓          |
 | Gate capacitor (Cg)    | **\_\_**nF, V≥16V         | **\_\_**nF ceramic     | ✓                | ✓          |
 | Forward P_loss         | **~0.44**W @ 5A rated     | (calculated)           | ✓ (<0.5W)        | ✓          |
-| Tj @ 25°C ambient      | **\_\_**°C                | (calculated)           | ✓ (<100°C)       | ✓          |
+| Tj @ 25°C ambient      | **52.125**°C              | (calculated)           | ✓ (<100°C)       | ✓          |
 | Gate RC time constant  | **\_\_**µs                | ~**2–3**µs             | ✓ (1–5µs?)       | ✓          |
 
-**Go/No-Go:** All protection components within design margin? **Yes / No**
+**Go/No-Go:** All protection components within design margin? **Yes**
 
 ---
 
@@ -371,7 +371,7 @@ Candidates: Synchronous buck (high-side MOSFET + low-side MOSFET), Non-synchrono
 
 | **Controller** | **Package** | **Frequency**     | **Advantage**                                                                         | **Disadvantage**                                |
 | -------------- | ----------- | ----------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| **SG3525**     | **DIP 16**  | **100 - 500** kHz | **Soft start, flexible freq, circuit protection, fine tolerance (1%)and THT package** | \*\*\*\*                                        |
+| **SG3525**     | **DIP 16**  | **100 - 500** kHz | **Soft start, flexible freq, circuit protection, fine tolerance (1%)and THT package** |                                                 |
 | **TL494**      | **PDIP 16** | **1 - 300** kHz   | **Flexible freq and THT package**                                                     | **Fixed V<sub>out</sub>, wider tolerance (5%)** |
 | **MC34063**    | **PDIP 8**  | **100** kHz       | **Flexible V<sub>out</sub>, higher output current (1.5A) and THT package**            | **Fixed frequency**                             |
 
