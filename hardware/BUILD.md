@@ -88,9 +88,9 @@
 
 **Zener diode:**
 
-- Component: **1N4733A** (5.1V, 1W) or equivalent (**\_\_**\_\_\_\_\_\_)
+- Component: **1N4733A** (5.1V, 1W)
 - Package: DO-41 axial (THT)
-- Power rating: ≥ **\_\_**\_\_ W (calculated below)
+- Power rating: ≥ **56.1** mW
 
 **Zener bias circuit power dissipation:**
 
@@ -98,14 +98,14 @@ Maximum current through Zener occurs at **reverse polarity** condition (Zener fu
 
 ```bash
 P_zener = Vz × I_zener_max
-I_zener_max ≈ (Vin_max) / Rg  [worst case: no MOSFET current limiting]
-Rg = _____ Ω (from section 0.4)
+I_zener_max ≈ (Vin_max) / Rg
+Rg = 1.2 kΩ (from section 0.4)
 
-I_zener_max = 13.2 V / _____ Ω = _____ mA
-P_zener = 5.1 V × _____ mA = _____ mW (acceptable for 1W Zener)
+I_zener_max = 13.2 V / 1.2 kΩ = 11 mA
+P_zener = 5.1 V × 11 mA = 56.1 mW
 ```
 
-**Zener selection verified:** Yes / No ✓
+**Zener selection verified:** Yes
 
 ---
 
@@ -222,24 +222,24 @@ Margin = Tj_max - Tj = 150 - 52.125 = 97.875 °C (Safe)
 
 Where:
 
-- τ = chosen time constant = **\_\_**\_\_ µs (recommend **2–3 µs**)
-- Rg = gate resistor = **\_\_**\_\_ Ω (from section 0.4)
+- τ = chosen time constant = **3** µs (recommend **2–3 µs**)
+- Rg = gate resistor = **1.2** kΩ (from section 0.4)
 
 **Calculation:**
 
 ```bash
-Cg = _____ µs / _____ Ω
-Cg = _____ nF
+Cg = 3 µs / 1.2 Ω
+Cg = 2.5 nF
 ```
 
 **Round to nearest standard capacitor:**
 
-Cg (selected) = **\_\_**\_\_ nF (ceramic, ≥16V rated)
+Cg (selected) = **2.2** nF (ceramic, ≥16V rated)
 
 **Verify gate RC time constant:**
 
 ```bash
-τ_actual = Rg × Cg = _____ × _____ = _____ µs (target 1–5µs?)
+τ_actual = Rg × Cg = 1.2k × 2.2n = 2.64 µs (target 1–5µs?)
 ```
 
 ---
@@ -252,12 +252,12 @@ Cg (selected) = **\_\_**\_\_ nF (ceramic, ≥16V rated)
 | ---------------------- | ------------------------- | ---------------------- | ---------------- | ---------- |
 | Protection MOSFET (Q1) | Vds≥**20**V, Id≥**5**A    | **IRFZ44N**            | ✓                | ✓          |
 | Rds(on) @ 10V          | ≤**17.5**mΩ               | **17.5**mΩ (datasheet) | ✓                | ✓          |
-| Zener diode (D_bias)   | Vz=**5.1**V, P≥\*\*\*\*mW | **1N4733A** (1W)       | ✓                | ✓          |
+| Zener diode (D_bias)   | Vz=**5.1**V, P≥**56.1**mW | **1N4733A** (1W)       | ✓                | ✓          |
 | Gate resistor (Rg)     | **1157.142**Ω, P≥**0.5**W | **1.2**kΩ ±5%          | ✓                | ✓          |
-| Gate capacitor (Cg)    | **\_\_**nF, V≥16V         | **\_\_**nF ceramic     | ✓                | ✓          |
+| Gate capacitor (Cg)    | **2.5**nF, V≥16V          | **2.2**nF ceramic      | ✓                | ✓          |
 | Forward P_loss         | **~0.44**W @ 5A rated     | (calculated)           | ✓ (<0.5W)        | ✓          |
 | Tj @ 25°C ambient      | **52.125**°C              | (calculated)           | ✓ (<100°C)       | ✓          |
-| Gate RC time constant  | **\_\_**µs                | ~**2–3**µs             | ✓ (1–5µs?)       | ✓          |
+| Gate RC time constant  | **2.64**µs                | ~**2–3**µs             | ✓ (1–5µs?)       | ✓          |
 
 **Go/No-Go:** All protection components within design margin? **Yes**
 
