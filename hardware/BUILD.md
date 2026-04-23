@@ -40,7 +40,7 @@
 
 > **Goal:** Protect ONLY the 12V→5V buck converter (5V MCU rail) from reverse polarity.  
 > **Scope:** 5A-rated input protection (nominal 3A buck input + 1.67× transient margin).  
-> **Method:** Active-bias Zener blocking (aggressive protection).  
+> **Method:** P-channel high-side reverse-polarity protection (gate-bias controlled).  
 > **Protection:** Blocks reverse current; operates ~0Ω conduction loss in forward direction.  
 > **Architecture note:** 12V motor rail (A4988, solenoid) connects directly to PSU with separate 5A fuse — motors are robust to polarity reversal, protection not needed.
 
@@ -50,96 +50,106 @@
 
 - Vds(max) ≥ **20** V (12V nominal + overshoot margin = 1.7× safety factor)
 - Id(max) ≥ **5** A (protection rating: 3A nominal input + 1.67× transient headroom)
-- Rds(on) @ Vgs=10V ≤ **0.22** Ω (minimize conduction loss in forward path)
+- Rds(on) @ Vgs=-10V ≤ **0.22** Ω (minimize conduction loss in forward path)
 - Package: TO-220 (breadboard-friendly)
-- Standard threshold voltage (Vgs(th) ~2-4V) acceptable
+- Standard threshold voltage (Vgs(th) ~-2 to -4V) acceptable
 
 **Candidates Considered:**
 
-| MOSFET  | Vds  | Id   | Rds(on) @ 10V | Vgs(th) |
-| ------- | ---- | ---- | ------------- | ------- |
-| IRF540N | 100V | 33A  | 44mΩ          | 2–4V    |
-| IRFZ44N | 55V  | 49A  | 17.5mΩ        | 2–4V    |
-| IRF3205 | 55V  | 110A | 8mΩ           | 2–4V    |
+| MOSFET   | Vds  | Id  | Rds(on) @ -10V | Vgs(th)   |
+| -------- | ---- | --- | -------------- | --------- |
+| IRF9540N | 100V | 23A | 117mΩ          | -2 to -4V |
+| FQP47P06 | 60V  | 47A | 26mΩ           | -2 to -4V |
+| IRF4905  | 55V  | 74A | 20mΩ           | -2 to -4V |
 
-**Selected MOSFET:** **IRFZ44N** (17.5mΩ, 49A rated)
+**Selected MOSFET:** **IRF4905**
 
 **Verification:**
 
-- Vds margin: **55** V rated / 12V required = **4.58** × headroom ✓
-- Id margin: **49** A rated / **5** A required = **9.8** × headroom ✓
-- Conduction loss @ 5A: P = 5² × 17.5m ≈ **0.44W** (manageable, no heatsink needed) ✓
+- Vds margin: **55** V rated / 12V required = **4.583** × headroom ✓
+- Id margin: **74** A rated / **5** A required = **14.8** × headroom ✓
+- Conduction loss @ 5A: P = 5² × **20m** ≈ **0.5** W (check thermal limit) ✓
 
 ---
 
-### 0.2: Design Zener Gate Bias (Active Blocking)
+### 0.2: Design Gate Bias (P-Channel High-Side)
 
-**Purpose:** Maintain gate at positive voltage in forward polarity (keeping MOSFET ON) while strongly suppressing any reverse-polarity gate current.
+**Purpose:** Pull gate below source in forward polarity (keeping P-channel MOSFET ON) and force gate toward source in reverse polarity (turning MOSFET OFF).
 
-**Zener voltage options:**
+**Gate-bias topology options:**
 
-| Vz      | Purpose                                  | Trade-offs                               |
-| ------- | ---------------------------------------- | ---------------------------------------- |
-| **5.1** | Match buck converter output (SG3525 ref) | Gate slightly underdrive~ish, but stable |
-| **5.6** | Modest overdrive above 5.1               | Better Rds saturation, slightly hotter   |
-| **6.2** | Maximum gate drive (within ratings)      | Higher Zener current → more heat loss    |
+| Method                               | Purpose                                                           | Trade-offs                           |
+| ------------------------------------ | ----------------------------------------------------------------- | ------------------------------------ |
+| **Resistor pull-up + NPN pull-down** | Simple discrete high-side control for P-MOS gate                  | More parts, transistor sizing needed |
+| **Zener-clamped gate network**       | Limits \|Vgs\| to safe value while enabling fast gate transitions | Clamp value selection is critical    |
+| **Dedicated high-side gate driver**  | Strong gate drive and cleaner switching edges                     | Higher cost and complexity           |
 
-**Selected Zener voltage:** **5.1** V
+**Selected gate-bias method:** **\_**
 
-**Zener diode:**
+**Gate-clamp Zener options (if Zener clamp method is used):**
 
-- Component: **1N4733A** (5.1V, 1W)
+| Vz       | Purpose                                               | Trade-offs                              |
+| -------- | ----------------------------------------------------- | --------------------------------------- |
+| **12** V | Conservative \|Vgs\| clamp for most P-channel devices | Slightly lower overdrive                |
+| **15** V | Stronger gate overdrive while below common ±20V limit | Higher stress if transients are present |
+| **18** V | Maximum overdrive near device limits                  | Tight transient margin required         |
+
+**Selected clamp voltage:** **\_** V
+
+**Gate-clamp device options:**
+
+- Component: **\_**
 - Package: DO-41 axial (THT)
-- Power rating: ≥ **56.1** mW
+- Power rating: ≥ **\_** mW
 
-**Zener bias circuit power dissipation:**
+**Gate-bias circuit power dissipation:**
 
-Maximum current through Zener occurs at **reverse polarity** condition (Zener fully conducting to block gate):
+Maximum current through the clamp path occurs when gate-to-source voltage is driven to its clamp level:
 
 ```bash
 P_zener = Vz × I_zener_max
-I_zener_max ≈ (Vin_max) / Rg
-Rg = 1.2 kΩ (from section 0.4)
+I_zener_max ≈ (Vs_max - Vz) / Rg
+Rg = _____ kΩ (from section 0.3)
 
-I_zener_max = 13.2 V / 1.2 kΩ = 11 mA
-P_zener = 5.1 V × 11 mA = 56.1 mW
+I_zener_max = (_____ - _____) / _____ = _____ mA
+P_zener = _____ × _____ = _____ mW
 ```
 
-**Zener selection verified:** Yes
+**Gate-bias selection verified:** **\_**
 
 ---
 
 ### 0.3: Calculate Gate Resistor (Rg)
 
-**Purpose:** Limit gate charging current AND set Zener bias current in forward polarity.
+**Purpose:** Limit gate transition current AND set gate-bias current in forward polarity.
 
-**Formula:** Rg = (Vin_max - Vz) / Ig_desired
+**Formula:** Rg = (Vs_max - |Vgs_target|) / Ig_desired
 
 Where:
 
-- Vin_max = maximum input voltage = **13.2** V
-- Vz = chosen Zener voltage = **5.1** V
+- Vs_max = maximum source voltage = **13.2** V
+- |Vgs_target| = target gate overdrive magnitude = **\_** V
 - Ig_desired = target gate current (typical 5–10 mA for fast turn-on)
 
-**Design choice (Ig_desired):** **10** mA (select 5, 7, or 10)
+**Design choice (Ig_desired):** **\_** mA (select 5, 7, or 10)
 
 **Calculation:**
 
 ```bash
-Rg = (13.2 - 5.1) / (7 × 10⁻³)
-Rg = 8.1 / (7 × 10⁻³)
-Rg =  1157.142 Ω
+Rg = (_____ - _____) / (_____ × 10⁻³)
+Rg = _____ / (_____ × 10⁻³)
+Rg =  _____ Ω
 ```
 
 **Round to nearest standard resistor value:**
 
-Rg (selected) = **1.2** kΩ (carbon film, ±5%, ≥0.5W)
+Rg (selected) = **\_** kΩ (carbon film, ±5%, ≥0.5W)
 
 **Gate charging time estimate** (affects reverse-polarity response speed):
 
 ```bash
 τ_gate = Rg × Cg  [from section 0.7]
-τ_gate = 1 kΩ × _____ nF = _____ µs (5τ ≈ reverse response time)
+τ_gate = _____ kΩ × _____ nF = _____ µs (5τ ≈ reverse response time)
 ```
 
 ---
@@ -155,26 +165,26 @@ Where:
 - I_in = maximum input current = **5** A (protection rating; nominal ~3A for buck converter)
   - Nominal buck input: I_in_nom ≈ Pout / η = (5V × 3A) / 0.80 ≈ 18.75W / 12V ≈ 3.1A
   - **Protection rating:** **5A** (3A nominal + 1.67× transient margin for surge current)
-- Rds(on) = on-resistance of selected MOSFET @ 10V gate drive = **17.5** mΩ
+- Rds(on) = on-resistance of selected MOSFET @ -10V gate drive = **\_** mΩ
 
 **Calculation:**
 
 ```bash
-P_loss = (5)² × (17.5 × 10⁻³)
-P_loss = 25 × 17.5 × 10⁻³
-P_loss =  0.4375 W
+P_loss = (5)² × (_____ × 10⁻³)
+P_loss = 25 × _____ × 10⁻³
+P_loss =  _____ W
 ```
 
 **Voltage drop across Q1_protect:**
 
 ```bash
-V_drop = I_in × Rds(on) = 5 A × 17.5 mΩ =  87.5 mV
+V_drop = I_in × Rds(on) = 5 A × _____ mΩ =  _____ mV
 ```
 
-**Interpretation:** This **87.5** mV drop reduces available voltage for the buck converter:
+**Interpretation:** This **\_** mV drop reduces available voltage for the buck converter:
 
 ```bash
-Available input to buck = 12V - V_drop = 12 - 0.0875 = 11.9125 V (Acceptable)
+Available input to buck = 12V - V_drop = 12 - _____ = _____ V (Acceptable)
 ```
 
 ---
@@ -185,27 +195,27 @@ Available input to buck = 12V - V_drop = 12 - 0.0875 = 11.9125 V (Acceptable)
 
 - Thermal resistance (junction to ambient, free convection on breadboard): **Rth_j-a = 62 °C/W**
 - Ambient temperature: **25 °C**
-- Power dissipation (from 0.4): **P_loss = **0.4375** W**
+- Power dissipation (from 0.4): **P_loss = **\_** W**
 
 **Temperature rise:**
 
 ```bash
 ΔT = P_loss × Rth_j-a
-ΔT = 0.4375 W × 62 °C/W
-ΔT = 27.125 °C
+ΔT = _____ W × 62 °C/W
+ΔT = _____ °C
 ```
 
 **Junction temperature:**
 
 ```bash
 Tj = T_ambient + ΔT
-Tj = 25 + 27.125 = 52.125 °C
+Tj = 25 + _____ = _____ °C
 ```
 
-**Thermal margin to absolute maximum (Tj_max = **150°C** typical for IRF540N):**
+**Thermal margin to absolute maximum (Tj_max = **\_**°C typical for selected P-channel MOSFET):**
 
 ```bash
-Margin = Tj_max - Tj = 150 - 52.125 = 97.875 °C (Safe)
+Margin = Tj_max - Tj = _____ - _____ = _____ °C (Safe)
 ```
 
 **If temperature margin < 30°C:** Consider adding heat sink or reducing Rds(on) via alternate MOSFET.
@@ -223,23 +233,23 @@ Margin = Tj_max - Tj = 150 - 52.125 = 97.875 °C (Safe)
 Where:
 
 - τ = chosen time constant = **3** µs (recommend **2–3 µs**)
-- Rg = gate resistor = **1.2** kΩ (from section 0.4)
+- Rg = gate resistor = **\_** kΩ (from section 0.3)
 
 **Calculation:**
 
 ```bash
-Cg = 3 µs / 1.2 Ω
-Cg = 2.5 nF
+Cg = 3 µs / _____ kΩ
+Cg = _____ nF
 ```
 
 **Round to nearest standard capacitor:**
 
-Cg (selected) = **2.2** nF (ceramic, ≥16V rated)
+Cg (selected) = **\_** nF (ceramic, ≥16V rated)
 
 **Verify gate RC time constant:**
 
 ```bash
-τ_actual = Rg × Cg = 1.2k × 2.2n = 2.64 µs (target 1–5µs?)
+τ_actual = Rg × Cg = _____ × _____ = _____ µs (target 1–5µs?)
 ```
 
 ---
@@ -248,18 +258,18 @@ Cg (selected) = **2.2** nF (ceramic, ≥16V rated)
 
 **Summary of all protection components:**
 
-| **Component**          | **Design Value**          | **Selected Part**      | **Rating Check** | **Status** |
-| ---------------------- | ------------------------- | ---------------------- | ---------------- | ---------- |
-| Protection MOSFET (Q1) | Vds≥**20**V, Id≥**5**A    | **IRFZ44N**            | ✓                | ✓          |
-| Rds(on) @ 10V          | ≤**17.5**mΩ               | **17.5**mΩ (datasheet) | ✓                | ✓          |
-| Zener diode (D_bias)   | Vz=**5.1**V, P≥**56.1**mW | **1N4733A** (1W)       | ✓                | ✓          |
-| Gate resistor (Rg)     | **1157.142**Ω, P≥**0.5**W | **1.2**kΩ ±5%          | ✓                | ✓          |
-| Gate capacitor (Cg)    | **2.5**nF, V≥16V          | **2.2**nF ceramic      | ✓                | ✓          |
-| Forward P_loss         | **~0.44**W @ 5A rated     | (calculated)           | ✓ (<0.5W)        | ✓          |
-| Tj @ 25°C ambient      | **52.125**°C              | (calculated)           | ✓ (<100°C)       | ✓          |
-| Gate RC time constant  | **2.64**µs                | ~**2–3**µs             | ✓ (1–5µs?)       | ✓          |
+| **Component**          | **Design Value**       | **Selected Part** | **Rating Check** | **Status** |
+| ---------------------- | ---------------------- | ----------------- | ---------------- | ---------- |
+| Protection MOSFET (Q1) | Vds≥**20**V, Id≥**5**A | **\_**            | **\_**           | **\_**     |
+| Rds(on) @ -10V         | ≤**\_**mΩ              | **\_**            | **\_**           | **\_**     |
+| Gate-clamp diode       | Vz=**\_**V, P≥**\_**mW | **\_**            | **\_**           | **\_**     |
+| Gate resistor (Rg)     | **\_**Ω, P≥**0.5**W    | **\_**            | **\_**           | **\_**     |
+| Gate capacitor (Cg)    | **\_**nF, V≥16V        | **\_**            | **\_**           | **\_**     |
+| Forward P_loss         | **~\_**W @ 5A rated    | (calculated)      | **\_**           | **\_**     |
+| Tj @ 25°C ambient      | **\_**°C               | (calculated)      | **\_**           | **\_**     |
+| Gate RC time constant  | **\_**µs               | **\_**            | **\_**           | **\_**     |
 
-**Go/No-Go:** All protection components within design margin? **Yes**
+**Go/No-Go:** All protection components within design margin? **\_**
 
 ---
 
@@ -269,9 +279,11 @@ Cg (selected) = **2.2** nF (ceramic, ≥16V rated)
 
 **Expected response:**
 
-1. **Gate rapid discharge (via Rg to Zener):** ~5τ = **\_\_**\_\_ µs
-   - Gate voltage → 0V (off) in roughly this time
-2. **MOSFET turn-off:** ~**1–2** µs after gate reaches ground
+1. **Gate pulled toward source (OFF state):** ~5τ = **\_\_**\_\_ µs
+
+- Gate voltage approaches source voltage in roughly this time
+
+2. **MOSFET turn-off:** ~**\_** µs after \|Vgs\| falls below threshold
 3. **Body diode blocks reverse current:** MOSFET acts as check-valve
 
 **Calculated response time:**
