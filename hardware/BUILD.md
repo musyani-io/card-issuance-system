@@ -84,7 +84,7 @@
 | **Zener-clamped gate network**       | Limits \|Vgs\| to safe value while enabling fast gate transitions | Clamp value selection is critical    |
 | **Dedicated high-side gate driver**  | Strong gate drive and cleaner switching edges                     | Higher cost and complexity           |
 
-**Selected gate-bias method:** **\_**
+**Selected gate-bias method:** **Zener-clamped gate network**
 
 **Gate-clamp Zener options (if Zener clamp method is used):**
 
@@ -94,13 +94,13 @@
 | **15** V | Stronger gate overdrive while below common ±20V limit | Higher stress if transients are present |
 | **18** V | Maximum overdrive near device limits                  | Tight transient margin required         |
 
-**Selected clamp voltage:** **\_** V
+**Selected clamp voltage:** **12** V
 
 **Gate-clamp device options:**
 
-- Component: **\_**
+- Component: **1N4742A**
 - Package: DO-41 axial (THT)
-- Power rating: ≥ **\_** mW
+- Power rating: ≥ **200** mW
 
 **Gate-bias circuit power dissipation:**
 
@@ -109,10 +109,10 @@ Maximum current through the clamp path occurs when gate-to-source voltage is dri
 ```bash
 P_zener = Vz × I_zener_max
 I_zener_max ≈ (Vs_max - Vz) / Rg
-Rg = _____ kΩ (from section 0.3)
+Rg = 0.62 kΩ (from section 0.3)
 
-I_zener_max = (_____ - _____) / _____ = _____ mA
-P_zener = _____ × _____ = _____ mW
+I_zener_max = (13.2 - 12) /  0.62k = 1.935 mA
+P_zener = 12 × 1.935 = 23.225 mW
 ```
 
 **Gate-bias selection verified:** **\_**
@@ -128,28 +128,28 @@ P_zener = _____ × _____ = _____ mW
 Where:
 
 - Vs_max = maximum source voltage = **13.2** V
-- |Vgs_target| = target gate overdrive magnitude = **\_** V
+- |Vgs_target| = target gate overdrive magnitude = **10** V
 - Ig_desired = target gate current (typical 5–10 mA for fast turn-on)
 
-**Design choice (Ig_desired):** **\_** mA (select 5, 7, or 10)
+**Design choice (Ig_desired):** **5** mA (select 5, 7, or 10)
 
 **Calculation:**
 
 ```bash
-Rg = (_____ - _____) / (_____ × 10⁻³)
-Rg = _____ / (_____ × 10⁻³)
-Rg =  _____ Ω
+Rg = (13.2 - 10) / (7 × 10⁻³)
+Rg = 3.2 / (5 × 10⁻³)
+Rg =  640 Ω
 ```
 
 **Round to nearest standard resistor value:**
 
-Rg (selected) = **\_** kΩ (carbon film, ±5%, ≥0.5W)
+Rg (selected) = **0.62** kΩ (carbon film, ±5%, ≥0.5W)
 
 **Gate charging time estimate** (affects reverse-polarity response speed):
 
 ```bash
 τ_gate = Rg × Cg  [from section 0.7]
-τ_gate = _____ kΩ × _____ nF = _____ µs (5τ ≈ reverse response time)
+τ_gate = 0.62 kΩ × 4.7 nF = 2.914 µs (5τ ≈ reverse response time)
 ```
 
 ---
@@ -165,26 +165,26 @@ Where:
 - I_in = maximum input current = **5** A (protection rating; nominal ~3A for buck converter)
   - Nominal buck input: I_in_nom ≈ Pout / η = (5V × 3A) / 0.80 ≈ 18.75W / 12V ≈ 3.1A
   - **Protection rating:** **5A** (3A nominal + 1.67× transient margin for surge current)
-- Rds(on) = on-resistance of selected MOSFET @ -10V gate drive = **\_** mΩ
+- Rds(on) = on-resistance of selected MOSFET @ -10V gate drive = **20** mΩ
 
 **Calculation:**
 
 ```bash
-P_loss = (5)² × (_____ × 10⁻³)
-P_loss = 25 × _____ × 10⁻³
-P_loss =  _____ W
+P_loss = (5)² × (20 × 10⁻³)
+P_loss = 25 × 20 × 10⁻³
+P_loss =  0.5 W
 ```
 
 **Voltage drop across Q1_protect:**
 
 ```bash
-V_drop = I_in × Rds(on) = 5 A × _____ mΩ =  _____ mV
+V_drop = I_in × Rds(on) = 5 A × 20 mΩ =  0.1 V
 ```
 
-**Interpretation:** This **\_** mV drop reduces available voltage for the buck converter:
+**Interpretation:** This **0.1** V drop reduces available voltage for the buck converter:
 
 ```bash
-Available input to buck = 12V - V_drop = 12 - _____ = _____ V (Acceptable)
+Available input to buck = 12V - V_drop = 12 - 0.1 = 11.9 V (Acceptable)
 ```
 
 ---
@@ -195,27 +195,27 @@ Available input to buck = 12V - V_drop = 12 - _____ = _____ V (Acceptable)
 
 - Thermal resistance (junction to ambient, free convection on breadboard): **Rth_j-a = 62 °C/W**
 - Ambient temperature: **25 °C**
-- Power dissipation (from 0.4): **P_loss = **\_** W**
+- Power dissipation (from 0.4): **P_loss = **0.5** W**
 
 **Temperature rise:**
 
 ```bash
 ΔT = P_loss × Rth_j-a
-ΔT = _____ W × 62 °C/W
-ΔT = _____ °C
+ΔT = 0.5 W × 62 °C/W
+ΔT = 31 °C
 ```
 
 **Junction temperature:**
 
 ```bash
 Tj = T_ambient + ΔT
-Tj = 25 + _____ = _____ °C
+Tj = 25 + 31 = 56 °C
 ```
 
-**Thermal margin to absolute maximum (Tj_max = **\_**°C typical for selected P-channel MOSFET):**
+**Thermal margin to absolute maximum (Tj_max = **175**°C typical for selected P-channel MOSFET):**
 
 ```bash
-Margin = Tj_max - Tj = _____ - _____ = _____ °C (Safe)
+Margin = Tj_max - Tj = 175 - 56 = 119 °C (Safe)
 ```
 
 **If temperature margin < 30°C:** Consider adding heat sink or reducing Rds(on) via alternate MOSFET.
@@ -233,23 +233,23 @@ Margin = Tj_max - Tj = _____ - _____ = _____ °C (Safe)
 Where:
 
 - τ = chosen time constant = **3** µs (recommend **2–3 µs**)
-- Rg = gate resistor = **\_** kΩ (from section 0.3)
+- Rg = gate resistor = **0.62** kΩ (from section 0.3)
 
 **Calculation:**
 
 ```bash
-Cg = 3 µs / _____ kΩ
-Cg = _____ nF
+Cg = 3 µs / 0.62 kΩ
+Cg = 4.84 nF
 ```
 
 **Round to nearest standard capacitor:**
 
-Cg (selected) = **\_** nF (ceramic, ≥16V rated)
+Cg (selected) = **4.7** nF (ceramic, ≥16V rated)
 
 **Verify gate RC time constant:**
 
 ```bash
-τ_actual = Rg × Cg = _____ × _____ = _____ µs (target 1–5µs?)
+τ_actual = Rg × Cg = 620 × 4.7n = 2.914 µs (on target)
 ```
 
 ---
@@ -258,18 +258,18 @@ Cg (selected) = **\_** nF (ceramic, ≥16V rated)
 
 **Summary of all protection components:**
 
-| **Component**          | **Design Value**       | **Selected Part** | **Rating Check** | **Status** |
-| ---------------------- | ---------------------- | ----------------- | ---------------- | ---------- |
-| Protection MOSFET (Q1) | Vds≥**20**V, Id≥**5**A | **\_**            | **\_**           | **\_**     |
-| Rds(on) @ -10V         | ≤**\_**mΩ              | **\_**            | **\_**           | **\_**     |
-| Gate-clamp diode       | Vz=**\_**V, P≥**\_**mW | **\_**            | **\_**           | **\_**     |
-| Gate resistor (Rg)     | **\_**Ω, P≥**0.5**W    | **\_**            | **\_**           | **\_**     |
-| Gate capacitor (Cg)    | **\_**nF, V≥16V        | **\_**            | **\_**           | **\_**     |
-| Forward P_loss         | **~\_**W @ 5A rated    | (calculated)      | **\_**           | **\_**     |
-| Tj @ 25°C ambient      | **\_**°C               | (calculated)      | **\_**           | **\_**     |
-| Gate RC time constant  | **\_**µs               | **\_**            | **\_**           | **\_**     |
+| **Component**          | **Design Value**           | **Selected Part**       | **Rating Check**                          | **Status** |
+| ---------------------- | -------------------------- | ----------------------- | ----------------------------------------- | ---------- |
+| Protection MOSFET (Q1) | Vds≥**20**V, Id≥**5**A     | **IRF4905**             | **Vds=55V, Id=74A (pass)**                | **✓**      |
+| Rds(on) @ -10V         | ≤**220**mΩ                 | **20mΩ**                | **11x better than limit**                 | **✓**      |
+| Gate-clamp diode       | Vz=**12**V, P≥**23.225**mW | **1N4742A**             | **P_rating=1W >> P_diss=23.225mW**        | **✓**      |
+| Gate resistor (Rg)     | **640**Ω, P≥**0.5**W       | **0.62kΩ ±5%**          | **Within tolerance of calc value**        | **✓**      |
+| Gate capacitor (Cg)    | **4.84**nF, V≥16V          | **4.7nF ceramic**       | **Nearest standard value, V rating pass** | **✓**      |
+| Forward P_loss         | **~0.5**W @ 5A rated       | (calculated)            | **Acceptable for TO-220 thermal budget**  | **✓**      |
+| Tj @ 25°C ambient      | **56**°C                   | (calculated)            | **Below Tj_max=175°C with large margin**  | **✓**      |
+| Gate RC time constant  | **2.914**µs                | **Rg=0.62kΩ, Cg=4.7nF** | **Within 1-5µs target**                   | **✓**      |
 
-**Go/No-Go:** All protection components within design margin? **\_**
+**Go/No-Go:** All protection components within design margin? **Yes**
 
 ---
 
@@ -279,17 +279,17 @@ Cg (selected) = **\_** nF (ceramic, ≥16V rated)
 
 **Expected response:**
 
-1. **Gate pulled toward source (OFF state):** ~5τ = **\_\_**\_\_ µs
+1. **Gate pulled toward source (OFF state):** ~5τ = **14.57** µs
 
 - Gate voltage approaches source voltage in roughly this time
 
-2. **MOSFET turn-off:** ~**\_** µs after \|Vgs\| falls below threshold
-3. **Body diode blocks reverse current:** MOSFET acts as check-valve
+1. **MOSFET turn-off:** ~**\_** µs after \|Vgs\| falls below threshold
+2. **Body diode blocks reverse current:** MOSFET acts as check-valve
 
 **Calculated response time:**
 
 ```bash
-Response ≈ 5 × τ = 5 × _____ µs = _____ µs (< 100µs = safe)
+Response ≈ 5 × τ = 5 × 2.914 µs = 14/57 µs (< 100µs = safe)
 ```
 
 **Load transient immunity:** If forward load step occurs (e.g., servo + stepper simultaneous), RC time constant prevents gate ringing. Target: **0-10% overshoot** on 5V rail.
