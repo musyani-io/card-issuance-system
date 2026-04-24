@@ -308,7 +308,7 @@ Response ≈ 5 × τ = 5 × 2.914 µs = 14/57 µs (< 100µs = safe)
 
 - Nominal input voltage: **12** V
 - Input range (±10% tolerance): **10.8** V to **13.2** V
-- Expected PSU ripple contribution: **\_** mV
+- Expected PSU ripple contribution: **100** mV
 
 **Output specification:**
 
