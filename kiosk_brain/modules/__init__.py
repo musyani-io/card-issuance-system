@@ -14,7 +14,7 @@ auth.py
   - Two-factor authentication workflow
 
 sms_client.py
-  - SMS delivery via BRIQ Solutions API (https://briq.tz)
+  - SMS delivery via BRIQ Solutions API (https://karibu.briq.tz)
   - Phone number formatting for BRIQ system
   - Graceful error handling with email fallback
   - Credential dispatch (OTP + temp PIN) to students

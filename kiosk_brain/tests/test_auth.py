@@ -152,12 +152,12 @@ class AuthTestBase(unittest.TestCase):
         # Test students from mock API
         students = [
             {
-                "registration_number": "2022-04-09050",
-                "first_name": "Samuel",
-                "surname": "Musyani",
-                "email": "samuel.musyani_22@student.udsm.ac.tz",
+                "registration_number": "2022-04-07227",
+                "first_name": "Sabrina",
+                "surname": "Mgagi",
+                "email": "sabrina.mgagi_22@student.udsm.ac.tz",
                 "programme": "BSc. Electronics Engineering",
-                "phone_number": "+255773422381",
+                "phone_number": "+255670046640",
                 "registration_status": "active",
             },
             {
@@ -262,13 +262,13 @@ class Test361ReturningStudent(AuthTestBase):
 
     def setUp(self):
         """Reset auth record before each test."""
-        self._reset_auth_record("2022-04-09050")
+        self._reset_auth_record("2022-04-07227")
         self._clear_audit_log("2022-04-09050")
 
     def test_361_returning_student_flow(self):
         """Test full returning student workflow: OTP → PIN → Success"""
 
-        reg_number = "2022-04-09050"  # Samuel Musyani
+        reg_number = "2022-04-07227"  
 
         # STEP 1: Generate OTP
         print("\n[3.6.1] STEP 1: Generate OTP")
