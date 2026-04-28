@@ -1,0 +1,5 @@
+> SPI PINS: PA4, PA5, PA6, PA7 (CS, CLK, MISO, MOSI)
+> TIM2: PA0 (On PWM channel 1) - High frequency, TIM1_CH1, TIM1_CH2: PA8, PA9 (Servo 0, 1) - Medium frequency
+> SOLENOID: PA10 (Output) - Low frequency
+> HALL-EFFECT: PA11 (Input, PULL_UP)
+> IR: PB4, PB5, PB6, PB7 (Input, PULL_UP)
