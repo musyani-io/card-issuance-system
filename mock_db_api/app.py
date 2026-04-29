@@ -20,16 +20,20 @@ def require_api_key(f):
 @app.route('/students/<reg_number>', methods=['GET'])
 @require_api_key
 def get_student(reg_number):
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM students WHERE reg_number = %s", (reg_number,))
-    student = cursor.fetchone()
-    cursor.close()
-    conn.close()
+    try:
 
-    if student:
-        return jsonify(student), 200
-    return jsonify({"error": "Student not found"}), 404
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM students WHERE reg_number = %s", (reg_number,))
+        student = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        if student:
+            return jsonify(student), 200
+        return jsonify({"error": "Student not found"}), 404
+    except Error as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     print("Starting Flask server on http://localhost:5000")

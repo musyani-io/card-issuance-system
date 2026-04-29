@@ -27,11 +27,11 @@ CONFIGURATION:
 
 import requests
 import time
+from config import UNIVERSITY_API_BASE_URL, UNIVERSITY_API_KEY
 
-# Development API credentials (should move to config.py in production)
-API_KEY = "test-key-12345"
-# mDNS resolved hostname (no hardcoded IP needed, survives network changes)
-BASE_URL = "http://localhost:5000"
+# API credentials from config.py (allows different settings for dev vs Pi)
+API_KEY = UNIVERSITY_API_KEY
+BASE_URL = UNIVERSITY_API_BASE_URL
 
 
 def get_student(reg_number):
