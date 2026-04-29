@@ -268,7 +268,7 @@ class Test361ReturningStudent(AuthTestBase):
     def test_361_returning_student_flow(self):
         """Test full returning student workflow: OTP → PIN → Success"""
 
-        reg_number = "2022-04-07227"  
+        reg_number = "2022-04-07227"
 
         # STEP 1: Generate OTP
         print("\n[3.6.1] STEP 1: Generate OTP")

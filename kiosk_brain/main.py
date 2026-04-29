@@ -212,7 +212,7 @@ class KioskApp(App):
         # Store screen references for PIN handlers
         self.pin_entry_screen = pin_entry_screen
         self.pin_setup_screen = pin_setup_screen
-        
+
         # Wire PIN entry → verify PIN before routing
         pin_entry_screen.submit_button.bind(
             on_press=lambda x: self.handle_pin_submit(pin_entry_screen)
@@ -298,7 +298,7 @@ class KioskApp(App):
     def handle_otp_submit(self, otp_entry_screen):
         """
         Verify OTP and route to PIN entry or error screen.
-        
+
         Args:
             otp_entry_screen: OTPEntryScreen instance with otp_input field
         """
@@ -321,7 +321,7 @@ class KioskApp(App):
     def handle_pin_submit(self, pin_entry_screen):
         """
         Verify PIN and route to PIN setup (first-year) or confirmation (returning).
-        
+
         Args:
             pin_entry_screen: PINEntryScreen instance with pin_input field
         """
@@ -329,7 +329,7 @@ class KioskApp(App):
             self.error_screen.error_label.text = "PIN cannot be empty"
             setattr(self.sm, "current", SCREEN_ERROR)
             return
-        
+
         result = verify_pin(session_manager.reg_number, pin_entry_screen.pin_input.text)
         if result["success"]:
             pin_entry_screen.pin_input.text = ""
@@ -346,25 +346,25 @@ class KioskApp(App):
     def handle_pin_setup_submit(self, pin_setup_screen):
         """
         Verify PIN strength, set permanent PIN for first-year students.
-        
+
         Args:
             pin_setup_screen: PINSetupScreen instance with pin_input and confirm_input fields
         """
         pin1 = pin_setup_screen.pin_input.text.strip()
         pin2 = pin_setup_screen.confirm_input.text.strip()
-        
+
         # Validate: both fields filled
         if not pin1 or not pin2:
             self.error_screen.error_label.text = "Both PIN fields required"
             setattr(self.sm, "current", SCREEN_ERROR)
             return
-        
+
         # Validate: PINs match
         if pin1 != pin2:
             self.error_screen.error_label.text = "PINs do not match. Try again."
             setattr(self.sm, "current", SCREEN_ERROR)
             return
-        
+
         # Call set_pin() to store permanent PIN and mark is_temp_pin=FALSE
         result = set_pin(session_manager.reg_number, pin1)
         if result["success"]:
