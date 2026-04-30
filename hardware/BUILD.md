@@ -14,23 +14,287 @@
 ```bash
 12V 10A PSU (external power supply)
     │
-    ├──→ [12V→5V Buck Converter] ← PRIMARY PSU
-    │    PWM Controller + Switching Stage + Filtering
-    │    Output: 5V Rail (3A max)
-    │    Loads: STM32 Nucleo board (5V input)
+    ├──→ [Reverse Polarity Protection MOSFET] ──→ [12V→5V Buck Converter] ← PROTECTS MCU RAIL
+    │    Phase 0: 5A rated protection              PWM Controller + Switching Stage + Filtering
+    │    (for microcontroller circuit only)         Output: 5V Rail (up to 6A available)
+    │                                               Loads: STM32 Nucleo board (5V input)
     │
-    ├──→ STM32 Nucleo-F401RE (onboard 3.3V regulator)
-    │    Output: 3.3V Rail for GPIO, sensors, hall effect sensor
+    │                                               └─→ STM32 Nucleo-F401RE (onboard 3.3V regulator)
+    │                                                   Output: 3.3V Rail for GPIO, sensors
     │
-    └──→ Motor drivers & solenoid (12V direct, separate fusing)
+    └──→ [Separate fuse 5A] ──→ Motor drivers & solenoid (12V direct, unprotected)
+         (12V motors/solenoids connect here)
 ```
 
 **Design Philosophy:**
 
-- Separate converters (not cascaded) → no efficiency loss from rail-to-rail dropouts
+- **Protection scope:** Phase 0 MOSFET protects ONLY the 5V buck converter rail (sensitive STM32 microcontroller circuits)
+- **Motor rail:** 12V motors/solenoid connect directly to PSU with separate 5A fuse (motors are robust to reverse polarity; microcontroller is not)
 - Same PWM frequency (100 kHz) → reduces switching noise coupling
-- Identical topology → standardized design, reusable components
 - All THT components → breadboard-native, hand-solderable
+- **Current budget:** ~3A buck converter input + ~2-4A motors = ~5-7A total from PSU (well within 10A supply)
+
+---
+
+## Phase 0: Reverse Polarity Protection for 5V Buck Converter (1.5–2 hrs)
+
+> **Goal:** Protect ONLY the 12V→5V buck converter (5V MCU rail) from reverse polarity.  
+> **Scope:** 5A-rated input protection (nominal 3A buck input + 1.67× transient margin).  
+> **Method:** P-channel high-side reverse-polarity protection (gate-bias controlled).  
+> **Protection:** Blocks reverse current; operates ~0Ω conduction loss in forward direction.  
+> **Architecture note:** 12V motor rail (A4988, solenoid) connects directly to PSU with separate 5A fuse — motors are robust to polarity reversal, protection not needed.
+
+### 0.1: Select Protection MOSFET
+
+**Requirements:**
+
+- Vds(max) ≥ **20** V (12V nominal + overshoot margin = 1.7× safety factor)
+- Id(max) ≥ **5** A (protection rating: 3A nominal input + 1.67× transient headroom)
+- Rds(on) @ Vgs=-10V ≤ **0.22** Ω (minimize conduction loss in forward path)
+- Package: TO-220 (breadboard-friendly)
+- Standard threshold voltage (Vgs(th) ~-2 to -4V) acceptable
+
+**Candidates Considered:**
+
+| MOSFET   | Vds  | Id  | Rds(on) @ -10V | Vgs(th)   |
+| -------- | ---- | --- | -------------- | --------- |
+| IRF9540N | 100V | 23A | 117mΩ          | -2 to -4V |
+| FQP47P06 | 60V  | 47A | 26mΩ           | -2 to -4V |
+| IRF4905  | 55V  | 74A | 20mΩ           | -2 to -4V |
+
+**Selected MOSFET:** **IRF4905**
+
+**Verification:**
+
+- Vds margin: **55** V rated / 12V required = **4.583** × headroom ✓
+- Id margin: **74** A rated / **5** A required = **14.8** × headroom ✓
+- Conduction loss @ 5A: P = 5² × **20m** ≈ **0.5** W (check thermal limit) ✓
+
+---
+
+### 0.2: Design Gate Bias (P-Channel High-Side)
+
+**Purpose:** Pull gate below source in forward polarity (keeping P-channel MOSFET ON) and force gate toward source in reverse polarity (turning MOSFET OFF).
+
+**Gate-bias topology options:**
+
+| Method                               | Purpose                                                           | Trade-offs                           |
+| ------------------------------------ | ----------------------------------------------------------------- | ------------------------------------ |
+| **Resistor pull-up + NPN pull-down** | Simple discrete high-side control for P-MOS gate                  | More parts, transistor sizing needed |
+| **Zener-clamped gate network**       | Limits \|Vgs\| to safe value while enabling fast gate transitions | Clamp value selection is critical    |
+| **Dedicated high-side gate driver**  | Strong gate drive and cleaner switching edges                     | Higher cost and complexity           |
+
+**Selected gate-bias method:** **Zener-clamped gate network**
+
+**Gate-clamp Zener options (if Zener clamp method is used):**
+
+| Vz       | Purpose                                               | Trade-offs                              |
+| -------- | ----------------------------------------------------- | --------------------------------------- |
+| **12** V | Conservative \|Vgs\| clamp for most P-channel devices | Slightly lower overdrive                |
+| **15** V | Stronger gate overdrive while below common ±20V limit | Higher stress if transients are present |
+| **18** V | Maximum overdrive near device limits                  | Tight transient margin required         |
+
+**Selected clamp voltage:** **12** V
+
+**Gate-clamp device options:**
+
+- Component: **1N4742A**
+- Package: DO-41 axial (THT)
+- Power rating: ≥ **200** mW
+
+**Gate-bias circuit power dissipation:**
+
+Maximum current through the clamp path occurs when gate-to-source voltage is driven to its clamp level:
+
+```bash
+P_zener = Vz × I_zener_max
+I_zener_max ≈ (Vs_max - Vz) / Rg
+Rg = 0.62 kΩ (from section 0.3)
+
+I_zener_max = (13.2 - 12) /  0.62k = 1.935 mA
+P_zener = 12 × 1.935 = 23.225 mW
+```
+
+**Gate-bias selection verified:** **\_**
+
+---
+
+### 0.3: Calculate Gate Resistor (Rg)
+
+**Purpose:** Limit gate transition current AND set gate-bias current in forward polarity.
+
+**Formula:** Rg = (Vs_max - |Vgs_target|) / Ig_desired
+
+Where:
+
+- Vs_max = maximum source voltage = **13.2** V
+- |Vgs_target| = target gate overdrive magnitude = **10** V
+- Ig_desired = target gate current (typical 5–10 mA for fast turn-on)
+
+**Design choice (Ig_desired):** **5** mA (select 5, 7, or 10)
+
+**Calculation:**
+
+```bash
+Rg = (13.2 - 10) / (7 × 10⁻³)
+Rg = 3.2 / (5 × 10⁻³)
+Rg =  640 Ω
+```
+
+**Round to nearest standard resistor value:**
+
+Rg (selected) = **0.62** kΩ (carbon film, ±5%, ≥0.5W)
+
+**Gate charging time estimate** (affects reverse-polarity response speed):
+
+```bash
+τ_gate = Rg × Cg  [from section 0.7]
+τ_gate = 0.62 kΩ × 4.7 nF = 2.914 µs (5τ ≈ reverse response time)
+```
+
+---
+
+### 0.4: Calculate Forward-Conduction Loss
+
+**In forward polarity, Q1_protect conducts the full input current.**
+
+**Formula:** P_loss = I_in² × Rds(on)
+
+Where:
+
+- I_in = maximum input current = **5** A (protection rating; nominal ~3A for buck converter)
+  - Nominal buck input: I_in_nom ≈ Pout / η = (5V × 3A) / 0.80 ≈ 18.75W / 12V ≈ 3.1A
+  - **Protection rating:** **5A** (3A nominal + 1.67× transient margin for surge current)
+- Rds(on) = on-resistance of selected MOSFET @ -10V gate drive = **20** mΩ
+
+**Calculation:**
+
+```bash
+P_loss = (5)² × (20 × 10⁻³)
+P_loss = 25 × 20 × 10⁻³
+P_loss =  0.5 W
+```
+
+**Voltage drop across Q1_protect:**
+
+```bash
+V_drop = I_in × Rds(on) = 5 A × 20 mΩ =  0.1 V
+```
+
+**Interpretation:** This **0.1** V drop reduces available voltage for the buck converter:
+
+```bash
+Available input to buck = 12V - V_drop = 12 - 0.1 = 11.9 V (Acceptable)
+```
+
+---
+
+### 0.5: Thermal Analysis (Protection MOSFET)
+
+**Assumptions:**
+
+- Thermal resistance (junction to ambient, free convection on breadboard): **Rth_j-a = 62 °C/W**
+- Ambient temperature: **25 °C**
+- Power dissipation (from 0.4): **P_loss = **0.5** W**
+
+**Temperature rise:**
+
+```bash
+ΔT = P_loss × Rth_j-a
+ΔT = 0.5 W × 62 °C/W
+ΔT = 31 °C
+```
+
+**Junction temperature:**
+
+```bash
+Tj = T_ambient + ΔT
+Tj = 25 + 31 = 56 °C
+```
+
+**Thermal margin to absolute maximum (Tj_max = **175**°C typical for selected P-channel MOSFET):**
+
+```bash
+Margin = Tj_max - Tj = 175 - 56 = 119 °C (Safe)
+```
+
+**If temperature margin < 30°C:** Consider adding heat sink or reducing Rds(on) via alternate MOSFET.
+
+---
+
+### 0.6: Design Gate Capacitor (Cg)
+
+**Purpose:** Smooth gate voltage transitions; sets RC time constant with Rg to prevent oscillation.
+
+**Desired time constant (τ):** Target **1–5 µs** for balanced fast response + noise immunity.
+
+**Formula:** Cg = τ / Rg
+
+Where:
+
+- τ = chosen time constant = **3** µs (recommend **2–3 µs**)
+- Rg = gate resistor = **0.62** kΩ (from section 0.3)
+
+**Calculation:**
+
+```bash
+Cg = 3 µs / 0.62 kΩ
+Cg = 4.84 nF
+```
+
+**Round to nearest standard capacitor:**
+
+Cg (selected) = **4.7** nF (ceramic, ≥16V rated)
+
+**Verify gate RC time constant:**
+
+```bash
+τ_actual = Rg × Cg = 620 × 4.7n = 2.914 µs (on target)
+```
+
+---
+
+### 0.7: Component Verification Table (Phase 0)
+
+**Summary of all protection components:**
+
+| **Component**          | **Design Value**           | **Selected Part**       | **Rating Check**                          | **Status** |
+| ---------------------- | -------------------------- | ----------------------- | ----------------------------------------- | ---------- |
+| Protection MOSFET (Q1) | Vds≥**20**V, Id≥**5**A     | **IRF4905**             | **Vds=55V, Id=74A (pass)**                | **✓**      |
+| Rds(on) @ -10V         | ≤**220**mΩ                 | **20mΩ**                | **11x better than limit**                 | **✓**      |
+| Gate-clamp diode       | Vz=**12**V, P≥**23.225**mW | **1N4742A**             | **P_rating=1W >> P_diss=23.225mW**        | **✓**      |
+| Gate resistor (Rg)     | **640**Ω, P≥**0.5**W       | **0.62kΩ ±5%**          | **Within tolerance of calc value**        | **✓**      |
+| Gate capacitor (Cg)    | **4.84**nF, V≥16V          | **4.7nF ceramic**       | **Nearest standard value, V rating pass** | **✓**      |
+| Forward P_loss         | **~0.5**W @ 5A rated       | (calculated)            | **Acceptable for TO-220 thermal budget**  | **✓**      |
+| Tj @ 25°C ambient      | **56**°C                   | (calculated)            | **Below Tj_max=175°C with large margin**  | **✓**      |
+| Gate RC time constant  | **2.914**µs                | **Rg=0.62kΩ, Cg=4.7nF** | **Within 1-5µs target**                   | **✓**      |
+
+**Go/No-Go:** All protection components within design margin? **Yes**
+
+---
+
+### 0.8: Reverse-Polarity Response Timing Verification
+
+**Scenario:** User accidentally connects +12V to negative terminal (reverse polarity).
+
+**Expected response:**
+
+1. **Gate pulled toward source (OFF state):** ~5τ = **14.57** µs
+
+- Gate voltage approaches source voltage in roughly this time
+
+1. **MOSFET turn-off:** ~**\_** µs after \|Vgs\| falls below threshold
+2. **Body diode blocks reverse current:** MOSFET acts as check-valve
+
+**Calculated response time:**
+
+```bash
+Response ≈ 5 × τ = 5 × 2.914 µs = 14/57 µs (< 100µs = safe)
+```
+
+**Load transient immunity:** If forward load step occurs (e.g., servo + stepper simultaneous), RC time constant prevents gate ringing. Target: **0-10% overshoot** on 5V rail.
+
+**Verification:** Testing during Phase 2 (breadboard) will confirm actual response via oscilloscope.
 
 ---
 
@@ -44,7 +308,7 @@
 
 - Nominal input voltage: **12** V
 - Input range (±10% tolerance): **10.8** V to **13.2** V
-- Expected PSU ripple contribution: **\_** mV
+- Expected PSU ripple contribution: **100** mV
 
 **Output specification:**
 
@@ -119,7 +383,7 @@ Candidates: Synchronous buck (high-side MOSFET + low-side MOSFET), Non-synchrono
 
 | **Controller** | **Package** | **Frequency**     | **Advantage**                                                                         | **Disadvantage**                                |
 | -------------- | ----------- | ----------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| **SG3525**     | **DIP 16**  | **100 - 500** kHz | **Soft start, flexible freq, circuit protection, fine tolerance (1%)and THT package** | \*\*\*\*                                        |
+| **SG3525**     | **DIP 16**  | **100 - 500** kHz | **Soft start, flexible freq, circuit protection, fine tolerance (1%)and THT package** |                                                 |
 | **TL494**      | **PDIP 16** | **1 - 300** kHz   | **Flexible freq and THT package**                                                     | **Fixed V<sub>out</sub>, wider tolerance (5%)** |
 | **MC34063**    | **PDIP 8**  | **100** kHz       | **Flexible V<sub>out</sub>, higher output current (1.5A) and THT package**            | **Fixed frequency**                             |
 
@@ -484,9 +748,7 @@ Create a table:
 
 ---
 
-#### 1.4.12 Create LTspice Schematic
-
-**Schematic file:** `hardware/schematics/Buck_12V_5V_SG3525.asc`
+#### 1.4.12 Create Proteus Schematic
 
 **Components to include:**
 
@@ -556,7 +818,7 @@ Create a table:
 - Voltage labels on all rails
 - Component designators sequential (R1, R2, ... C1, C2, ... L1, L2, ... etc.)
 
-#### 1.6.2 LTspice Verification (Single Converter)
+#### 1.6.2 Proteus Verification (Single Converter)
 
 **Simulation file:** 12V→5V buck converter standalone
 
@@ -588,10 +850,10 @@ Create a table:
 - [ ] PWM controller evaluated & chosen (1.3)
 - [ ] 12V→5V converter fully designed (1.4.1–1.4.12)
   - [ ] All component values calculated
-  - [ ] LTspice schematic simulated & verified
+  - [ ] Proteus schematic simulated & verified
 - [ ] 3.3V onboard regulator verified (Nucleo board capability: 1.5)
 - [ ] Single converter KiCAD schematic created (1.6.1)
-- [ ] LTspice verification complete & passed (1.6.2)
+- [ ] Proteus verification complete & passed (1.6.2)
 - [ ] Component bill of materials (BOM) compiled with part numbers & sources
 - [ ] All calculation worksheets saved & documented
 
@@ -604,7 +866,7 @@ Create a table:
 
 ## Phase 2: Breadboard Prototype & Testing _(3–4 hrs)_
 
-(To be completed after Phase 1 design is finalized and LTspice sims pass)
+(To be completed after Phase 1 design is finalized and Proteus sims pass)
 
 ### 2.1 Build 12V→5V Converter on Breadboard
 

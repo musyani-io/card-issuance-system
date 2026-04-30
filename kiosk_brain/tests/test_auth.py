@@ -18,7 +18,7 @@ KEY FEATURES:
 
 TEST STUDENTS (from mock_db_api/app.py):
 1. Samuel Musyani (2022-04-09050) - Returning student (existing PIN)
-2. Godson Shirima (2022-04-12357) - First-year student (temp PIN)
+2. Godson Shirima (2022-04-09050) - First-year student (temp PIN)
 
 RUNNING THE TESTS:
     cd kiosk_brain
@@ -152,21 +152,21 @@ class AuthTestBase(unittest.TestCase):
         # Test students from mock API
         students = [
             {
+                "registration_number": "2022-04-07227",
+                "first_name": "Sabrina",
+                "surname": "Mgagi",
+                "email": "sabrina.mgagi_22@student.udsm.ac.tz",
+                "programme": "BSc. Electronics Engineering",
+                "phone_number": "+255670046640",
+                "registration_status": "active",
+            },
+            {
                 "registration_number": "2022-04-09050",
                 "first_name": "Samuel",
                 "surname": "Musyani",
                 "email": "samuel.musyani_22@student.udsm.ac.tz",
-                "programme": "BSc. Electronics Engineering",
-                "phone_number": "+255773422381",
-                "registration_status": "active",
-            },
-            {
-                "registration_number": "2022-04-12357",
-                "first_name": "Godson",
-                "surname": "Shirima",
-                "email": "godson.shirima_22@student.udsm.ac.tz",
                 "programme": "BSc. Telecommunications Engineering",
-                "phone_number": "+255755981777",
+                "phone_number": "+255773422381",
                 "registration_status": "active",
             },
         ]
@@ -262,13 +262,13 @@ class Test361ReturningStudent(AuthTestBase):
 
     def setUp(self):
         """Reset auth record before each test."""
-        self._reset_auth_record("2022-04-09050")
+        self._reset_auth_record("2022-04-07227")
         self._clear_audit_log("2022-04-09050")
 
     def test_361_returning_student_flow(self):
         """Test full returning student workflow: OTP → PIN → Success"""
 
-        reg_number = "2022-04-09050"  # Samuel Musyani
+        reg_number = "2022-04-07227"
 
         # STEP 1: Generate OTP
         print("\n[3.6.1] STEP 1: Generate OTP")
@@ -372,13 +372,13 @@ class Test362FirstYearStudent(AuthTestBase):
 
     def setUp(self):
         """Reset auth record before each test."""
-        self._reset_auth_record("2022-04-12357")
-        self._clear_audit_log("2022-04-12357")
+        self._reset_auth_record("2022-04-09050")
+        self._clear_audit_log("2022-04-09050")
 
     def test_362_first_year_student_flow(self):
         """Test full first-year student workflow: OTP → temp PIN → new PIN → Success"""
 
-        reg_number = "2022-04-12357"  # Godson Shirima
+        reg_number = "2022-04-09050"  # Godson Shirima
 
         # STEP 1: Generate OTP and temp PIN
         print("\n[3.6.2] STEP 1: Generate OTP and temp PIN")
@@ -515,7 +515,7 @@ class Test363LockoutScenarios(AuthTestBase):
     def setUp(self):
         """Reset auth records before each test."""
         self._reset_auth_record("2022-04-09050")
-        self._reset_auth_record("2022-04-12357")
+        self._reset_auth_record("2022-04-09050")
         self._clear_audit_log()
 
     def test_363_otp_lockout(self):
@@ -591,7 +591,7 @@ class Test363LockoutScenarios(AuthTestBase):
     def test_363_pin_lockout(self):
         """Test PIN lockout after 3 wrong attempts (24-hour hard lockout)"""
 
-        reg_number = "2022-04-12357"  # Godson Shirima
+        reg_number = "2022-04-09050"  # Godson Shirima
 
         # Setup: Create valid OTP and PIN
         print("\n[3.6.3 PIN LOCKOUT] SETUP: Create valid OTP and PIN")
@@ -673,7 +673,7 @@ class Test363LockoutScenarios(AuthTestBase):
         otp_reg = "2022-04-09050"
 
         # Use second student for PIN lockout
-        pin_reg = "2022-04-12357"
+        pin_reg = "2022-04-09050"
 
         # OTP LOCKOUT PHASE
         print("\n--- PHASE 1: OTP Lockout ---")

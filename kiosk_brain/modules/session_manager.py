@@ -141,12 +141,17 @@ class SessionManager:
             - ELSE (subsequent touches): update only last_activity_time (reset 60-second countdown)
         """
         if self.start_time is None:
-            # First touch: initialize session timers
-            self.start_time = time.time()  # Mark session birth
-            self.last_activity_time = time.time()  # Reset timeout countdown
+            # FIRST TOUCH: Initialize session timers
+            self.start_time = (
+                time.time()
+            )  # Mark session birth (when did student start using kiosk)
+            self.last_activity_time = (
+                time.time()
+            )  # Reset timeout countdown (60-second grace period starts)
         else:
-            # Subsequent touch: only reset timeout countdown, keep session start time
-            self.last_activity_time = time.time()
+            # SUBSEQUENT TOUCHES: Only reset timeout countdown, keep session start time
+            # This allows us to track total session duration while resetting inactivity counter
+            self.last_activity_time = time.time()  # Reset 60-second countdown
 
     def is_timed_out(self, timeout_seconds=60):
         """
@@ -183,7 +188,8 @@ class SessionManager:
         if self.last_activity_time is None:
             return False
 
-        # Calculate elapsed time since last activity
+        # Calculate elapsed time since last activity (in seconds)
         elapsed_time = time.time() - self.last_activity_time
-        # Return True if inactivity exceeds threshold
+
+        # Return True if inactivity exceeds threshold (timeout triggered)
         return elapsed_time > timeout_seconds

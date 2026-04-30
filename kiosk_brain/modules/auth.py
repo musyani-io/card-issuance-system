@@ -395,7 +395,7 @@ def verify_otp(reg_number, otp_num, db_path="data/kiosk.db"):
     )
     result = cursor.fetchone()
 
-    # Student not found in batch (batch loading required)
+    # Error Case 1: Student not found in batch (batch loading required)
     if result is None:
         conn.close()
         return {
@@ -409,19 +409,21 @@ def verify_otp(reg_number, otp_num, db_path="data/kiosk.db"):
     otp_expiry = parse_db_datetime(otp_expiry_str)
     lockout_expiry = parse_db_datetime(lockout_expiry_str)
 
-    # Check if currently in OTP lockout (30-minute window)
+    # Error Case 2: Check if currently in OTP lockout (30-minute window)
     if lockout_expiry and lockout_expiry > datetime.now(timezone.utc):
         conn.close()
+        # Student in lockout period: soft lockout (recoverable after timeout)
         return {
             "success": False,
             "error": "LOCKED",
             "message": "Too many retries. Try after 30 minutes",
         }
 
-    # If no lockout set yet but failures >= 3, set the lockout now
+    # Error Case 3: If no lockout set yet but failures >= 3, set the lockout now
     if (
         not lockout_expiry or lockout_expiry <= datetime.now(timezone.utc)
     ) and failed_attempts >= 3:
+        # Threshold exceeded: set 30-minute soft lockout
         lockout_time = datetime.now(timezone.utc) + timedelta(minutes=30)
         cursor.execute(
             "UPDATE authentication SET lockout_expiry = ? WHERE registration_number = ?",
@@ -436,17 +438,20 @@ def verify_otp(reg_number, otp_num, db_path="data/kiosk.db"):
             "message": "Too many retries. Try after 30 minutes",
         }
 
-    # OTP > 24 hours old (hard lockout / expiry)
+    # Error Case 4: OTP > 24 hours old (hard lockout / expiry)
     if otp_expiry and otp_expiry < datetime.now(timezone.utc):
         conn.close()
+        # Hard expiry: OTP no longer valid regardless of attempts (requires new batch load)
         return {
             "success": False,
             "error": "EXPIRED",
             "message": "OTP has expired. Contact SMARTCARD",
         }
 
-    # Constant-time bcrypt comparison (true if hashes match, false otherwise)
+    # Core Verification: Constant-time bcrypt comparison
     is_valid = bcrypt.checkpw(otp_num.encode("utf-8"), otp_hash)
+
+    # Error Case 5: Invalid OTP (wrong password entered)
     if not is_valid:
         # Increment failed OTP attempt counter for audit logging
         cursor.execute(
@@ -462,7 +467,7 @@ def verify_otp(reg_number, otp_num, db_path="data/kiosk.db"):
             "message": "Incorrect OTP. Try again.",
         }
 
-    # OTP verified successfully; proceed to PIN verification
+    # Success Case: OTP verified successfully; proceed to PIN verification
     conn.close()
     log_audit_event(reg_number, "OTP VERIFIED", None, None, db_path)
     return {"success": True, "error": None, "message": "OTP verified successfully"}
@@ -706,13 +711,48 @@ def retry_send_credentials(reg_number, otp, temp_pin, db_path="data/kiosk.db"):
 def log_audit_event(
     reg_number, event_type, failure_type=None, session_id=None, db_path="data/kiosk.db"
 ):
-    "Log various events into the audit_log table"
+    """
+    Log authentication and collection events to audit_log table for compliance and debugging.
 
+    Args:
+        reg_number: Student registration number (links to students table)
+        event_type: Type of event (enum-like string):
+            - "OTP SENT": OTP delivered via SMS/email
+            - "OTP VERIFIED": Student entered correct OTP
+            - "OTP FAILED": Student entered incorrect OTP (enables retry)
+            - "OTP EXPIRED": OTP > 24 hours old (requires new batch load)
+            - "OTP LOCKOUT": 3 failed OTP attempts (30-minute soft lockout)
+            - "PIN VERIFIED": Student entered correct PIN
+            - "PIN FAILED": Student entered incorrect PIN (enables retry)
+            - "PIN LOCKOUT": 3 failed PIN attempts (24-hour hard lockout)
+            - "PIN SETUP": Student created permanent PIN (first-year workflow)
+            - "CARD DISPENSED": Physical card ejected to student
+            - "COLLECTION FAILURE": Card dispensing mechanism error
+            - "SESSION TIMEOUT": Student idle > 60 seconds (auto-logout)
+        failure_type: Optional reason for failure:
+            - "INVALID": Hash mismatch (wrong OTP/PIN entered)
+            - "EXPIRED": OTP/PIN expiry exceeded
+            - "RATE_LIMITED": Too many retries in short time
+            - "THRESHOLD_EXCEEDED": Lockout triggered (3 failures)
+            - "NETWORK_ERROR": API/SMS/email communication failure
+            - None if event_type is success
+        session_id: Optional unique session ID to correlate multiple events within one transaction
+                   None if not in active session (batch loading context)
+        db_path: Path to SQLite database (default: data/kiosk.db)
+
+    Side Effects:
+        - Inserts immutable audit_log row with current UTC timestamp
+        - Row never updated or deleted (append-only audit trail)
+
+    """
+    # Connect to database and prepare insert statement
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
+    # Insert audit log row with current timestamp (UTC)
     cursor.execute(
         "INSERT INTO audit_log (event_time, registration_number, event_type, failure_type, session_id) VALUES (?, ?, ?, ?, ?)",
         (datetime.now(timezone.utc), reg_number, event_type, failure_type, session_id),
     )
+    # Commit transaction to persist immutable record
     conn.commit()
     conn.close()

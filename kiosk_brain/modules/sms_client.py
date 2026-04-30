@@ -121,6 +121,7 @@ def send_credentials(reg_num, otp, temp_pin=None, db_path="data/kiosk.db"):
     )
     student = cursor.fetchone()
 
+    # Error Case 1: Student not found in database
     if student is None:
         conn.close()
         return {
@@ -130,20 +131,26 @@ def send_credentials(reg_num, otp, temp_pin=None, db_path="data/kiosk.db"):
             "email_sent": False,
         }
 
+    # Extract student contact information
     first_name, surname, email, phone_number = student
+    # Format name for personalized greeting
     first_name = first_name.upper()  # Format name for greeting
     surname = surname.upper()
+
     # Construct SMS message with OTP (and optional temp PIN)
     sms_message = f"""Dear {first_name} {surname}, your card is available at the kiosk.
     Your SMARTCARD One-Time Password (OTP) is {otp}."""
 
+    # Add temporary PIN if this is a first-year student
     if temp_pin:
         sms_message += (
             f" Temporary PIN: {temp_pin}."  # First-year students get temp PIN
         )
 
+    # Add expiry reminder (24-hour window)
     sms_message += " Fetch it within 24 hours."  # OTP expiry message
 
+    # === SMS DELIVERY VIA BRIQ SOLUTIONS ===
     # Send SMS via BRIQ API
     sms_sent = False
     sms_error = None
@@ -151,6 +158,7 @@ def send_credentials(reg_num, otp, temp_pin=None, db_path="data/kiosk.db"):
         # Format phone number: remove + prefix if present (BRIQ expects 255... format)
         formatted_phone = format_phone_number(phone_number)
 
+        # Construct BRIQ API request
         url = BRIQ_BASE_URL + "/v1/message/send-instant"
         payload = {
             "content": sms_message,
@@ -159,30 +167,38 @@ def send_credentials(reg_num, otp, temp_pin=None, db_path="data/kiosk.db"):
         }
         headers = {"X-API-Key": BRIQ_API_KEY, "Content-Type": "application/json"}
 
+        # Send POST request to BRIQ Solutions
         response = requests.post(url, json=payload, headers=headers, timeout=5)
         response_data = response.json()
 
         # Check both HTTP status and response success field
         if response.status_code == 200 and response_data.get("success"):
+            # SMS sent successfully
             sms_sent = True
             sms_error = None
         else:
+            # BRIQ API returned error (invalid number, rate limit, API failure, etc.)
             sms_sent = False
             sms_error = response_data.get("message", f"HTTP {response.status_code}")
 
     except Exception as e:
+        # Network error or timeout (connection failed, BRIQ server unreachable, etc.)
         sms_sent = False
         sms_error = f"SMS failed: {str(e)}"
 
+    # === EMAIL DELIVERY VIA GMAIL SMTP ===
     # Construct HTML email message
     email_subject = "SMARTCARD OTP KIOSK"
     email_body = f"""<html><body>Dear <b>{first_name} {surname}</b>,<br><p>Your ID Card is available at the kiosk.<br>
     Your SMARTCARD One-Time Password (OTP) is <b>{otp}</b></p>"""
 
+    # Add temporary PIN instruction if first-year student
     if temp_pin:
         email_body += f"<p>Your temporary PIN is: <b>{temp_pin}</b>. You will set a permanent PIN on collection.</p>"  # First-year instruction
 
+    # Add expiry reminder
     email_body += f"<p>Please go fetch your ID Card within 24 hours.</p></body></html>"  # Expiry reminder
+
     # Create MIME email message
     msg = MIMEText(email_body, "html")
     msg["Subject"] = email_subject
@@ -191,25 +207,33 @@ def send_credentials(reg_num, otp, temp_pin=None, db_path="data/kiosk.db"):
 
     # Send via SMTP (Gmail)
     try:
+        # Connect to Gmail SMTP server
         server = smtplib.SMTP("smtp.gmail.com", 587)  # Gmail SMTP server
         server.starttls()  # Upgrade connection to TLS
+
         # Use APP_PASSWORD (Gmail app-specific password) instead of account password
         app_password_clean = APP_PASSWORD.replace(
             " ", ""
         )  # Remove spaces from "xxxx xxxx xxxx xxxx" format
+
+        # Authenticate and send email
         server.login(SMTP_EMAIL, app_password_clean)
         server.sendmail(msg["From"], msg["To"], msg.as_string())  # Send email
         server.quit()
+
+        # Email sent successfully
         email_sent = True
         email_error = None
 
     except Exception as e:
+        # SMTP error (authentication failed, server error, invalid email, etc.)
         email_sent = False
         email_error = f"Email failed: {str(e)}"
 
     conn.close()
 
-    # Return delivery result (success if at least one channel succeeded)
+    # === RETURN DELIVERY RESULT ===
+    # Success if at least ONE channel succeeded (graceful degradation pattern)
     return {
         "success": sms_sent or email_sent,  # At least ONE channel must succeed
         "sms_sent": sms_sent,
