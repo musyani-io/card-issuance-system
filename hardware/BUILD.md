@@ -429,7 +429,7 @@ D = 46.04% (as percentage)
 **Requirements:**
 
 - Vds(max) ≥ **13.2** V (input voltage)
-- Id(max) ≥ **3** A (rated load current)
+- Id(max) ≥ **2.5** A (rated load current)
 - Rds(on) @ Vgs=10V ≤ **0.22** Ω (low conduction loss)
 - Package: TO-220 (breadboard-friendly)
 - Readily available in THT
@@ -481,13 +481,13 @@ Total MOSFET loss = 0.05 + 0.015 = 0.065 W
 
 **Calculate peak inductor current** (needed to size diode):
 
-- I_pk_approx = I_out / (1 - D) = **\_** / (1 - **\_**) = **\_** A
+- I_pk_approx = I_out / (1 - D) = **2.5** / (1 - **0.4604**) = **4.633** A
 
 **Requirements:**
 
-- Vr(max) ≥ **\_** V (reverse voltage)
-- If(max) ≥ **\_** A (peak forward current)
-- Recovery time < **\_** ns (fast recovery preferred)
+- Vr(max) ≥ **13.2** V (reverse voltage)
+- If(max) ≥ **4.633** A (peak forward current)
+- Recovery time < **200** ns (fast recovery preferred)
 - Package: axial or DO-41 THT
 
 **Candidates:**
@@ -496,8 +496,7 @@ Total MOSFET loss = 0.05 + 0.015 = 0.065 W
 2. **\_** (Vr=***V, If=***A, trr=\_\_\_ns) — Schottky option for lower loss
 3. **\_** (Vr=***V, If=***A, trr=\_\_\_ns)
 
-**Selected for breadboard:** \***\*\*\*\*\***\_\***\*\*\*\*\***  
-**Planned upgrade for PCB:** \***\*\*\*\*\***\_\***\*\*\*\*\***
+**Selected:** \***\*\*\*\*\***\_\***\*\*\*\*\***
 
 **Verification:**
 
@@ -591,7 +590,7 @@ C ≥ 162 µF
 
 - Type: Aluminum electrolytic (bulk) + ceramic (low-ESR)
 - Voltage rating: ≥ **10** V (recommend 1.5–2× output voltage)
-- Quantity: **2** pieces of **220** µF aluminum + **2** piece of **100** nF ceramic
+- Quantity: **2** pieces of **220** µF aluminum + **2** piece of **470** nF ceramic
 
 **ESR ripple contribution:**
 
@@ -608,13 +607,13 @@ ESR ≤ 0.133 Ω
 **Verify selected capacitors meet ESR target:**
 
 - Aluminum ESR (each): **220** mΩ (from datasheet)
-- Ceramic ESR: **\_** mΩ
-- Parallel combination: **\_** mΩ ✓ (meets **133** mΩ target?)
+- Ceramic ESR: **5** mΩ
+- Parallel combination: **112.5** mΩ ✓ (meets **133** mΩ target?)
 
-**Input filtering** (reduces PSU noise coupling to 3.3V converter):
+**Input filtering** (reduces PSU noise coupling):
 
-- Capacitor 1: **\_** µF, **\_** V aluminum
-- Capacitor 2: **\_** µF, **\_** V ceramic (fast transient response)
+- Capacitor 1: **220** µF, **16** V aluminum
+- Capacitor 2: **470** nF, **16** V ceramic (fast transient response)
 - Location: directly across 12V input connector
 
 ---
