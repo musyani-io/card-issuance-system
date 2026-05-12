@@ -22,6 +22,17 @@
 #include "stm32f4xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+/* External variables from main.c - needed for SPI interrupt handler */
+extern uint8_t spi_rx_buf[3];
+extern uint8_t spi_tx_buf[3];
+extern uint8_t rx_byte_count;
+extern uint8_t spi_frame_ready;
+extern void route_command(uint8_t cmd, uint8_t param);
+
+/* SPI Protocol Defines (from main.c) */
+#define SPI_FRAME_SIZE 3
+#define RESP_NACK  0x01
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -199,5 +210,43 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /* USER CODE BEGIN 1 */
+
+void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
+{
+	// Focus on SPI only
+	if (hspi->Instance == SPI1){
+
+		// Accumulate byte into buffer
+		if (rx_byte_count < SPI_FRAME_SIZE){
+			spi_rx_buf[rx_byte_count] = hspi->pRxBuffPtr[0];
+			rx_byte_count++;
+		}
+
+    // Process the frame after all 3 byte
+    if (rx_byte_count == SPI_FRAME_SIZE) {
+      
+      // Validate checksum
+      uint8_t checksum = spi_rx_buf[0] ^ spi_rx_buf[1];
+
+      if (checksum == spi_rx_buf[2]) {
+        route_command(spi_rx_buf[0], spi_rx_buf[1]);
+        spi_frame_ready = 1;
+      }
+
+      else {
+        spi_tx_buf[0] = RESP_NACK;
+        spi_tx_buf[1] = 0xFF;
+        spi_tx_buf[2] = spi_tx_buf[0] ^ spi_tx_buf[1];
+      }
+
+      // Reset byte counter
+      rx_byte_count = 0;
+
+    }
+
+    // Re-enable SPI interrupt
+    HAL_SPI_Receive_IT(hspi, &spi_rx_buf[rx_byte_count], 1);
+	}
+}
 
 /* USER CODE END 1 */

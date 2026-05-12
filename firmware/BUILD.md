@@ -33,7 +33,7 @@ The Nucleo-F401RE has 64 pins. Some are already used: PA2/PA3 (USART2), PA5 (LD2
 
 **Steps:**
 
-- [x] **5.0.1** ✅ DONE: Opened [real_time_controller.ioc](/home/musyani/Documents/Projects/card-issuance-system/firmware/real_time_controller/real_time_controller.ioc) in STM32CubeIDE. Verified pinout; USART2 and debug pins preserved. _(0.5 hr)_
+- [x] **5.0.1** ✅ DONE: Opened [real_time_controller.ioc](firmware/real_time_controller/real_time_controller.ioc) in STM32CubeIDE. Verified pinout; USART2 and debug pins preserved. _(0.5 hr)_
 
   > **Why:** See the current pinout so you don't accidentally override USART2 or the debug pins.
 
@@ -132,13 +132,13 @@ When the Pi sends a 3-byte SPI frame (e.g., `[0x10, 0x05, 0x15]` = rotate to slo
 
 **Steps:**
 
-- [ ] **5.3.1** In [Src/main.c](/home/musyani/Documents/Projects/card-issuance-system/firmware/real_time_controller/Src/main.c), add global buffers and state machine in the **USER CODE BEGIN 1** section: 3-byte SPI frame buffers, byte counter, and command/response code defines (see SPI*PROTOCOL.md).*(0.5 hr)\_
+- [x] **5.3.1** In [Src/main.c](firmware/real_time_controller/Src/main.c), add global buffers and state machine in the **USER CODE BEGIN 1** section: 3-byte SPI frame buffers, byte counter, and command/response code defines (see SPI*PROTOCOL.md).*(0.5 hr)\_
 
-- [ ] **5.3.2** In [Src/stm32f4xx_it.c](/home/musyani/Documents/Projects/card-issuance-system/firmware/real_time_controller/Src/stm32f4xx_it.c), implement `SPI1_IRQHandler()` and `HAL_SPI_RxCpltCallback()`: receive bytes until frame complete (3 bytes), validate XOR checksum, route valid commands, send error for bad checksums, reset byte counter for next frame. _(1.5 hrs)_
+- [x] **5.3.2** In [Src/stm32f4xx_it.c](firmware/real_time_controller/Src/stm32f4xx_it.c), implement `SPI1_IRQHandler()` and `HAL_SPI_RxCpltCallback()`: receive bytes until frame complete (3 bytes), validate XOR checksum, route valid commands, send error for bad checksums, reset byte counter for next frame. _(1.5 hrs)_
 
   > **This is the SPI backbone.** Every command goes through this. Get it right, and everything else flows. Get it wrong, and the Pi can't talk to the STM32.
 
-- [ ] **5.3.3** In [Src/main.c](/home/musyani/Documents/Projects/card-issuance-system/firmware/real_time_controller/Src/main.c), add a `route_command()` function in **USER CODE BEGIN 4** section: switch on command byte, dispatch to handlers (rotate, sensor read, etc.), set response ACK/ERROR, calculate response checksum. _(0.5 hr)_
+- [ ] **5.3.3** In [Src/main.c](firmware/real_time_controller/Src/main.c), add a `route_command()` function in **USER CODE BEGIN 4** section: switch on command byte, dispatch to handlers (rotate, sensor read, etc.), set response ACK/ERROR, calculate response checksum. _(0.5 hr)_
 
 - [ ] **5.3.4** Start SPI communication in `main()` after all inits: call `HAL_SPI_TransmitReceive_IT()` in **USER CODE BEGIN 2** to enable SPI frame reception. _(0.25 hr)_
 
@@ -198,9 +198,9 @@ The stepper motor needs precise, regular pulses. You'll use TIM2's interrupt to 
 
 **Steps:**
 
-- [ ] **5.5.1** In [Src/main.c](/home/musyani/Documents/Projects/card-issuance-system/firmware/real_time_controller/Src/main.c), add stepper state variables in **USER CODE BEGIN 1**: `STEPS_PER_SLOT` constant, pin/port defines for PA0, and step counters (current/target) and active flag. _(0.5 hr)_
+- [ ] **5.5.1** In [Src/main.c](firmware/real_time_controller/Src/main.c), add stepper state variables in **USER CODE BEGIN 1**: `STEPS_PER_SLOT` constant, pin/port defines for PA0, and step counters (current/target) and active flag. _(0.5 hr)_
 
-- [ ] **5.5.2** In [Src/stm32f4xx_it.c](/home/musyani/Documents/Projects/card-issuance-system/firmware/real_time_controller/Src/stm32f4xx_it.c), implement `TIM2_IRQHandler()` and `HAL_TIM_PeriodElapsedCallback()`: toggle PA0 for each step until target reached, stop timer when done. _(1 hr)_
+- [ ] **5.5.2** In [Src/stm32f4xx_it.c](firmware/real_time_controller/Src/stm32f4xx_it.c), implement `TIM2_IRQHandler()` and `HAL_TIM_PeriodElapsedCallback()`: toggle PA0 for each step until target reached, stop timer when done. _(1 hr)_
 
 - [ ] **5.5.3** Add a `rotate_to_slot(index)` function in **USER CODE BEGIN 4**: validate slot (0–9), calculate target steps, set stepper active flag, start TIM2 interrupt, return ACK/ERROR response. _(0.75 hr)_
 
@@ -230,7 +230,7 @@ Steppers lose sync if you stall or overload them. The hall sensor is your "zero"
 
 **Steps:**
 
-- [ ] **5.6.1** In [Src/main.c](/home/musyani/Documents/Projects/card-issuance-system/firmware/real_time_controller/Src/main.c), add a `home_carousel()` function in **USER CODE BEGIN 4**: rotate continuously (target*step = 9999) until hall sensor PA11 triggers (blocking loop, 5 sec timeout), reset step counter, return ACK/ERROR.*(1 hr)\_
+- [ ] **5.6.1** In [Src/main.c](firmware/real_time_controller/Src/main.c), add a `home_carousel()` function in **USER CODE BEGIN 4**: rotate continuously (target*step = 9999) until hall sensor PA11 triggers (blocking loop, 5 sec timeout), reset step counter, return ACK/ERROR.*(1 hr)\_
 
 - [ ] **5.6.2** Add a command handler for `CMD_HOME_CAROUSEL` (0x41): dispatch to `home_carousel()` in the command router. _(0.25 hr)_
 
@@ -258,7 +258,7 @@ SG90 servos are standard hobby servos. A 1 ms pulse = 0°, 1.5 ms = 90°, 2 ms =
 
 **Steps:**
 
-- [ ] **5.7.1** In [Src/main.c](/home/musyani/Documents/Projects/card-issuance-system/firmware/real_time_controller/Src/main.c), add `set_servo_angle(servo_id, angle)` function in **USER CODE BEGIN 4**: map 0–180° to 1–2 ms pulse, set TIM1 compare register for PA8 or PA9. _(0.75 hr)_
+- [ ] **5.7.1** In [Src/main.c](firmware/real_time_controller/Src/main.c), add `set_servo_angle(servo_id, angle)` function in **USER CODE BEGIN 4**: map 0–180° to 1–2 ms pulse, set TIM1 compare register for PA8 or PA9. _(0.75 hr)_
 
 - [ ] **5.7.2** In the command router, add handlers for `CMD_LATCH_CARD` (0x12) and `CMD_RELEASE_LATCH` (0x13): call `set_servo_angle()` with 180° (engaged) or 0° (released), return ACK. _(0.5 hr)_
 
@@ -285,7 +285,7 @@ The solenoid is a simple GPIO output (high = locked, low = unlocked). The IR sen
 
 **Steps:**
 
-- [ ] **5.8.1** In [Src/main.c](/home/musyani/Documents/Projects/card-issuance-system/firmware/real_time_controller/Src/main.c), add solenoid and sensor control functions in **USER CODE BEGIN 4**: `lock_door()`, `unlock_door()` for PA10, and `get_sensor_state()` to pack all 5 sensor bits per SPI*PROTOCOL.md.*(1 hr)\_
+- [ ] **5.8.1** In [Src/main.c](firmware/real_time_controller/Src/main.c), add solenoid and sensor control functions in **USER CODE BEGIN 4**: `lock_door()`, `unlock_door()` for PA10, and `get_sensor_state()` to pack all 5 sensor bits per SPI*PROTOCOL.md.*(1 hr)\_
 
 - [ ] **5.8.2** Add command handlers in the router: `CMD_LOCK_DOOR` (0x20), `CMD_UNLOCK_DOOR` (0x21), `CMD_GET_SENSOR_STATE` (0x40) dispatch to corresponding functions. _(0.5 hr)_
 
