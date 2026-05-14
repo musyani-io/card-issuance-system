@@ -70,8 +70,8 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 
-uint8_t spi_rx_buf[SPI_FRAME_SIZE] = {0};
-uint8_t spi_tx_buf[SPI_FRAME_SIZE] = {0};
+uint8_t spi_rx_buf[3] = {0};
+uint8_t spi_tx_buf[3] = {RESP_ACK, 0x00, 0x00};  // Pre-load with default ACK
 uint8_t rx_byte_count = 0;
 uint8_t spi_frame_ready = 0;
 
@@ -129,7 +129,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   // Start SPI1 in interrupt mode - listen from Pi
-  HAL_SPI_Receive_IT(&hspi1, &spi_rx_buf[0], 1);
+  HAL_SPI_TransmitReceive_IT(&hspi1, spi_tx_buf, spi_rx_buf, SPI_FRAME_SIZE);
 
   /* USER CODE END 2 */
 

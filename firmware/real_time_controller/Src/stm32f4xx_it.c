@@ -213,40 +213,27 @@ void SysTick_Handler(void)
 
 void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
 {
-	// Focus on SPI only
-	if (hspi->Instance == SPI1){
-
-		// Accumulate byte into buffer
-		if (rx_byte_count < SPI_FRAME_SIZE){
-			spi_rx_buf[rx_byte_count] = hspi->pRxBuffPtr[0];
-			rx_byte_count++;
-		}
-
-    // Process the frame after all 3 byte
-    if (rx_byte_count == SPI_FRAME_SIZE) {
-      
-      // Validate checksum
-      uint8_t checksum = spi_rx_buf[0] ^ spi_rx_buf[1];
-
-      if (checksum == spi_rx_buf[2]) {
-        route_command(spi_rx_buf[0], spi_rx_buf[1]);
-        spi_frame_ready = 1;
-      }
-
-      else {
-        spi_tx_buf[0] = RESP_NACK;
-        spi_tx_buf[1] = 0xFF;
-        spi_tx_buf[2] = spi_tx_buf[0] ^ spi_tx_buf[1];
-      }
-
-      // Reset byte counter
-      rx_byte_count = 0;
-
+  if (hspi->Instance == SPI1)
+  {
+    uint8_t checksum = spi_rx_buf[0] ^ spi_rx_buf[1];
+    
+    if (checksum == spi_rx_buf[2])
+    {
+      // Valid command - route it and prepare response
+      route_command(spi_rx_buf[0], spi_rx_buf[1]);
+      spi_frame_ready = 1;
     }
-
-    // Re-enable SPI interrupt
-    HAL_SPI_Receive_IT(hspi, &spi_rx_buf[rx_byte_count], 1);
-	}
+    else
+    {
+      // Invalid checksum - fill tx_buf with NACK
+      spi_tx_buf[0] = RESP_NACK;
+      spi_tx_buf[1] = 0xFF;
+      spi_tx_buf[2] = checksum;
+    }
+    
+    // Re-arm for next frame
+    HAL_SPI_TransmitReceive_IT(hspi, spi_tx_buf, spi_rx_buf, SPI_FRAME_SIZE);
+  }
 }
 
 /* USER CODE END 1 */
