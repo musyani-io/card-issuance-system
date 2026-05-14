@@ -138,11 +138,11 @@ When the Pi sends a 3-byte SPI frame (e.g., `[0x10, 0x05, 0x15]` = rotate to slo
 
   > **This is the SPI backbone.** Every command goes through this. Get it right, and everything else flows. Get it wrong, and the Pi can't talk to the STM32.
 
-- [ ] **5.3.3** In [Src/main.c](firmware/real_time_controller/Src/main.c), add a `route_command()` function in **USER CODE BEGIN 4** section: switch on command byte, dispatch to handlers (rotate, sensor read, etc.), set response ACK/ERROR, calculate response checksum. _(0.5 hr)_
+- [x] **5.3.3** In [Src/main.c](firmware/real_time_controller/Src/main.c), add a `route_command()` function in **USER CODE BEGIN 4** section: switch on command byte, dispatch to handlers (rotate, sensor read, etc.), set response ACK/ERROR, calculate response checksum. _(0.5 hr)_
 
-- [ ] **5.3.4** Start SPI communication in `main()` after all inits: call `HAL_SPI_TransmitReceive_IT()` in **USER CODE BEGIN 2** to enable SPI frame reception. _(0.25 hr)_
+- [x] **5.3.4** Start SPI communication in `main()` after all inits: call `HAL_SPI_TransmitReceive_IT()` in **USER CODE BEGIN 2** to enable SPI frame reception. _(0.25 hr)_
 
-- [ ] **5.3.5** Build and flash the firmware again. _(0.5 hr)_
+- [x] **5.3.5** Build and flash the firmware again. _(0.5 hr)_
 
 #### Subtotal: ~3.25 hrs
 
