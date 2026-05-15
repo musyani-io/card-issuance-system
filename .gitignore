@@ -204,3 +204,9 @@ kiosk_brain/data/logs/
 *workspace
 docs/official/.$card_issuance_block.drawio.bkp
 /hardware/Altium/rev_polarity_protection/History
+
+# =============================================================================
+# FreeCAD / 3D Design
+# =============================================================================
+# Backup files
+*.FCBak
