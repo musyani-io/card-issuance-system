@@ -428,11 +428,22 @@ def validate_registration_format(text: str) -> bool:
 # ============================================================================
 
 # TASK 1.1.2: Capture workflow configuration
-OCR_FRAME_RESOLUTION = (1280, 720)  # (width, height)
-OCR_FRAME_RATE_TARGET = 30  # fps
-
-# TASK 1.3.2: Tesseract configuration (prepared early)
-TESSERACT_PSM_MODE = 7  # PSM 7 = single text line (for registration number)
+# Import from config.py to keep settings centralized
+try:
+    from config import (
+        OCR_FRAME_RESOLUTION, OCR_FRAME_RATE, OCR_ROI_COORDINATES,
+        OCR_TESSERACT_PSM, OCR_TESSERACT_CHAR_WHITELIST, OCR_TESSERACT_MIN_CONFIDENCE,
+        OCR_REGISTRATION_FORMAT_REGEX
+    )
+except ImportError:
+    # Fallback defaults if config not available
+    OCR_FRAME_RESOLUTION = (2560, 1440)
+    OCR_FRAME_RATE = 30
+    OCR_ROI_COORDINATES = None
+    OCR_TESSERACT_PSM = 7
+    OCR_TESSERACT_CHAR_WHITELIST = "0123456789-"
+    OCR_TESSERACT_MIN_CONFIDENCE = 0.85
+    OCR_REGISTRATION_FORMAT_REGEX = r"^20\d{2}-04-\d{5}$"
 TESSERACT_CHAR_WHITELIST = "0123456789-"  # Only digits and hyphen
 
 # TASK 1.4.2: OCR decision logic thresholds

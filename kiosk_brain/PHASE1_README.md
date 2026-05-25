@@ -40,7 +40,7 @@ Verify that the Pi Camera is functional, properly positioned, and receiving adeq
 
 **Status:** ✅ IMPLEMENTED
 
-Verifies the Pi Camera can capture frames at the target resolution (1280×720).
+Verifies the Pi Camera can capture frames at the target resolution (2560×1440 QHD).
 
 **Run:**
 ```bash
@@ -58,9 +58,9 @@ python tests/test_camera.py
 **Acceptance Criteria:**
 - ✓ All 3 frames captured without errors
 - ✓ Frames saved to `tests/fixtures/ocr_frames/` directory
-- ✓ Frame dimensions are exactly 1280×720
+- ✓ Frame dimensions are exactly 2560×1440 QHD
 - ✓ Frame data type is uint8 (8-bit per channel)
-- ✓ Each frame is ~300–400 KB (JPEG compressed)
+- ✓ Each frame is ~450–500 KB (JPEG compressed)
 
 **Expected Output:**
 ```
@@ -122,10 +122,10 @@ OCR_FRAME_RATE = 30  # fps - target frame rate
 ```
 
 **Workflow Decisions Made:**
-1. **Resolution:** 1280×720 (16:9 aspect ratio)
-   - ✓ Good balance of detail and processing speed
-   - ✓ Standard for Pi Camera
-   - ✓ Can upgrade to 1920×1080 if >90% accuracy not achieved
+1. **Resolution:** 2560×1440 QHD (16:9 aspect ratio)
+   - ✓ 4× more pixels for text clarity
+   - ✓ Better OCR accuracy on small text
+   - ✓ Capture time ~600ms per frame (acceptable for batch operation)
    
 2. **Capture Mode:** Event-triggered (during staff batch loading)
    - ✓ Not continuous (saves CPU, power)

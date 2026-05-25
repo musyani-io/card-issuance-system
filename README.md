@@ -45,7 +45,7 @@ A distributed embedded system for autonomous ID card issuance in university envi
 
 | Phase | Duration  | Focus                                                                                                                        | Status |
 | ----- | --------- | ---------------------------------------------------------------------------------------------------------------------------- | ------ |
-| **1** | Weeks 1–2 | OCR pipeline (OpenCV preprocessing, Tesseract validation, regex matching)                                                    | ▯ 0%   |
+| **1** | Weeks 1–2 | OCR pipeline (OpenCV preprocessing, Tesseract validation, regex matching) — *using phone images for rapid development*        | ▯ 10%  |
 | **2** | Weeks 2–3 | Database schema (SQLite), mock university API (Flask, mDNS discovery)                                                        | ▰ 90%  |
 | **3** | Weeks 3–4 | Authentication (bcrypt hashing, 6-digit OTP generation, 4–6 digit PIN lockout logic), SMS integration (BRIQ Solutions)       | ▰ 100% |
 | **4** | Weeks 4–5 | Kivy touch UI (ScreenManager, SessionManager state machine), SPI protocol definition and Pi-side client                      | ▰ 95%  |
