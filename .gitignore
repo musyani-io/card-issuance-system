@@ -131,6 +131,7 @@ mock_db_api/config.py
 **/secrets.yml
 **/secrets.yaml
 db
+kiosk_brain/tests/fixtures/*
 
 # =============================================================================
 # Python Cache & Compiled Files
