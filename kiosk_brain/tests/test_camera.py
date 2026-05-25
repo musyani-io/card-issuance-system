@@ -100,10 +100,10 @@ def main():
     
     # Check saved files
     print("[4/4] Verifying saved frame files...")
-    output_dir = Path("ocr_frames")
+    output_dir = Path(__file__).parent / "fixtures" / "ocr_frames"
     if output_dir.exists():
         frames_on_disk = list(output_dir.glob("*.jpg"))
-        print(f"✓ Saved {len(frames_on_disk)} frame files to ocr_frames/")
+        print(f"✓ Saved {len(frames_on_disk)} frame files to tests/fixtures/ocr_frames/")
         for frame_file in sorted(frames_on_disk)[-3:]:  # Show last 3 files
             file_size_kb = frame_file.stat().st_size / 1024
             print(f"   - {frame_file.name} ({file_size_kb:.1f} KB)")

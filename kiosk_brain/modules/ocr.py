@@ -55,36 +55,34 @@ from datetime import datetime
 from typing import Dict, Optional, Tuple, Any
 import os
 import time
+import subprocess
+import tempfile
+import io
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Try to import picamera2 (Pi Camera Module 3 on Bookworm OS)
+# Check if rpicam-still (libcamera CLI tool) is available
+RPICAM_AVAILABLE = os.path.exists('/usr/bin/rpicam-still')
+
+# Try to import picamera2 (fallback, not primary)
 try:
     from picamera2 import Picamera2
     PICAMERA2_AVAILABLE = True
-    CAMERA_VERSION = 3
 except ImportError:
     PICAMERA2_AVAILABLE = False
-    CAMERA_VERSION = None
-
-# Try to import picamera (Pi Camera v2 on older Raspberry Pi OS)
-try:
-    import picamera
-    PICAMERA_AVAILABLE = True
-    if CAMERA_VERSION is None:
-        CAMERA_VERSION = 2
-except ImportError:
-    PICAMERA_AVAILABLE = False
 
 # Check if we're in SSH mode (no display)
 DISPLAY_AVAILABLE = os.environ.get('DISPLAY') is not None
 SSH_MODE = not DISPLAY_AVAILABLE
 
-if not PICAMERA2_AVAILABLE and not PICAMERA_AVAILABLE:
-    logger.warning("Neither picamera2 nor picamera available - camera capture will use OpenCV fallback")
-    logger.warning("On Raspberry Pi: install 'sudo apt install -y python3-picamera2' (v3) or 'pip install picamera' (v2)")
+if RPICAM_AVAILABLE:
+    logger.info("✓ rpicam-still detected - will use for primary camera capture")
+elif PICAMERA2_AVAILABLE:
+    logger.info("✓ picamera2 available - will use as fallback")
+else:
+    logger.warning("No camera libraries available - will use OpenCV fallback")
 
 
 class CameraCapture:
@@ -103,32 +101,41 @@ class CameraCapture:
     TASK 1.1.2: Design capture workflow (resolution, trigger mode)
     """
     
-    def __init__(self, resolution: Tuple[int, int] = (1280, 720), camera_index: int = 0, camera_version: Optional[int] = None):
+    def __init__(self, resolution: Tuple[int, int] = (1280, 720), camera_index: int = 0, camera_version: Optional[str] = None):
         """
         Initialize camera capture interface.
         
         Args:
             resolution (Tuple[int, int]): Frame dimensions (width, height). Default 1280x720.
-                                         Options: (1280, 720), (1920, 1080), (640, 480)
-            camera_index (int): Camera device index (0 = primary, 1 = secondary). 
-                               On Pi with CSI connector, typically 0.
-            camera_version (int): Force camera version (2 for Pi Camera v2, 3 for v3).
-                                 If None, auto-detect based on available libraries.
+            camera_index (int): Camera device index (0 = primary).
+            camera_version (str): Force camera version ('rpicam', 'picamera2', 'opencv').
+                                 If None, auto-detect based on available tools.
         """
         self.resolution = resolution
         self.camera_index = camera_index
         self.camera = None
-        self.camera_version = camera_version or CAMERA_VERSION
+        self.temp_frame_file = None
         self.frame_count = 0
         self.is_ssh_mode = SSH_MODE
         
+        # Auto-detect camera version if not specified
+        if camera_version is None:
+            if RPICAM_AVAILABLE:
+                self.camera_version = 'rpicam'
+            elif PICAMERA2_AVAILABLE:
+                self.camera_version = 'picamera2'
+            else:
+                self.camera_version = 'opencv'
+        else:
+            self.camera_version = camera_version
+        
         logger.info(f"Initializing CameraCapture: resolution={resolution}, camera_version={self.camera_version}, ssh_mode={self.is_ssh_mode}")
         
-        # Try to initialize camera based on version
-        if self.camera_version == 3 and PICAMERA2_AVAILABLE:
+        # Initialize camera based on version
+        if self.camera_version == 'rpicam' and RPICAM_AVAILABLE:
+            self._init_rpicam()
+        elif self.camera_version == 'picamera2' and PICAMERA2_AVAILABLE:
             self._init_picamera2()
-        elif self.camera_version == 2 and PICAMERA_AVAILABLE:
-            self._init_picamera()
         else:
             self._init_opencv()
     
@@ -148,6 +155,30 @@ class CameraCapture:
         except Exception as e:
             logger.error(f"picamera2 initialization failed: {e}. Falling back to OpenCV.")
             self.camera_version = None
+            self._init_opencv()
+    
+    def _init_rpicam(self):
+        """Initialize libcamera via rpicam-still (command-line tool)."""
+        try:
+            # Test rpicam-still is accessible
+            result = subprocess.run(['rpicam-still', '--help'], capture_output=True, timeout=5)
+            if result.returncode == 0:
+                # Create temp file for frame storage
+                self.temp_frame_file = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
+                self.temp_frame_file.close()
+                logger.info(f"✓ rpicam-still initialized: {self.resolution}")
+                return
+        except Exception as e:
+            logger.error(f"rpicam-still initialization failed: {e}")
+        
+        # Fallback to picamera2 if available
+        if PICAMERA2_AVAILABLE:
+            logger.info("Falling back to picamera2")
+            self.camera_version = 'picamera2'
+            self._init_picamera2()
+        else:
+            logger.info("Falling back to OpenCV")
+            self.camera_version = 'opencv'
             self._init_opencv()
     
     def _init_picamera(self):
@@ -186,6 +217,8 @@ class CameraCapture:
     
     def is_ready(self) -> bool:
         """Check if camera is initialized and ready to capture."""
+        if self.camera_version == 'rpicam':
+            return self.temp_frame_file is not None
         return self.camera is not None
     
     def capture_frame(self, save_to_disk: bool = False, output_dir: Optional[str] = None) -> Optional[np.ndarray]:
@@ -201,36 +234,62 @@ class CameraCapture:
             
         TASK 1.1.1: Used to verify camera is functional
         """
-        if not self.is_ready():
-            logger.error("Camera not ready for capture")
-            return None
-        
         try:
-            if self.camera_version == 3 and PICAMERA2_AVAILABLE:
-                # picamera2 path: capture_array() returns BGR by default
+            if self.camera_version == 'rpicam' and RPICAM_AVAILABLE:
+                # Capture via rpicam-still to JPEG file
+                cmd = [
+                    'rpicam-still',
+                    '-o', self.temp_frame_file.name,
+                    '--width', str(self.resolution[0]),
+                    '--height', str(self.resolution[1]),
+                    '-t', '100',  # 100ms exposure/timeout
+                    '--nopreview'  # No preview window (headless safe)
+                ]
+                result = subprocess.run(cmd, capture_output=True, timeout=5)
+                
+                if result.returncode == 0:
+                    # Read JPEG from disk into numpy array
+                    frame = cv2.imread(self.temp_frame_file.name, cv2.IMREAD_COLOR)
+                    if frame is not None:
+                        # Verify resolution
+                        h, w = frame.shape[:2]
+                        if (h, w) != (self.resolution[1], self.resolution[0]):
+                            logger.warning(f"Frame resolution: got {(h, w)}, expected {(self.resolution[1], self.resolution[0])}")
+                        self.frame_count += 1
+                        if save_to_disk:
+                            self._save_frame(frame, output_dir)
+                        logger.info(f"✓ Frame captured #{self.frame_count}: shape={frame.shape}, dtype={frame.dtype}")
+                        return frame
+                else:
+                    logger.error(f"rpicam-still capture failed: {result.stderr.decode()}")
+                    return None
+            
+            elif self.camera_version == 'picamera2' and PICAMERA2_AVAILABLE:
+                # Pi Camera v3 via picamera2
+                if not self.is_ready():
+                    logger.error("Camera not ready for capture")
+                    return None
                 frame = self.camera.capture_array()
-            elif self.camera_version == 2 and PICAMERA_AVAILABLE:
-                # picamera path: capture to numpy array via BytesIO
-                import io
-                with io.BytesIO() as output:
-                    self.camera.capture(output, format='bgr', use_video_port=True)
-                    output.seek(0)
-                    data = np.frombuffer(output.getvalue(), dtype=np.uint8)
-                    frame = cv2.imdecode(data, cv2.IMREAD_COLOR)
+                self.frame_count += 1
+                if save_to_disk:
+                    self._save_frame(frame, output_dir)
+                logger.info(f"✓ Frame captured #{self.frame_count}: shape={frame.shape}, dtype={frame.dtype}")
+                return frame
+            
             else:
-                # OpenCV path
+                # OpenCV fallback
+                if not self.is_ready():
+                    logger.error("Camera not ready for capture")
+                    return None
                 ret, frame = self.camera.read()
                 if not ret:
                     logger.error("cv2.VideoCapture.read() failed")
                     return None
-            
-            self.frame_count += 1
-            
-            if save_to_disk:
-                self._save_frame(frame, output_dir)
-            
-            logger.info(f"✓ Frame captured #{self.frame_count}: shape={frame.shape}, dtype={frame.dtype}")
-            return frame
+                self.frame_count += 1
+                if save_to_disk:
+                    self._save_frame(frame, output_dir)
+                logger.info(f"✓ Frame captured #{self.frame_count}: shape={frame.shape}, dtype={frame.dtype}")
+                return frame
         
         except Exception as e:
             logger.error(f"Frame capture failed: {e}")
@@ -310,10 +369,8 @@ class CameraCapture:
         """Release camera resource."""
         if self.camera is not None:
             try:
-                if self.camera_version == 3 and PICAMERA2_AVAILABLE:
+                if self.camera_version == 'picamera2' and PICAMERA2_AVAILABLE:
                     self.camera.stop()
-                elif self.camera_version == 2 and PICAMERA_AVAILABLE:
-                    self.camera.close()
                 else:
                     self.camera.release()
                 logger.info("Camera released")
@@ -321,6 +378,14 @@ class CameraCapture:
                 logger.error(f"Error releasing camera: {e}")
             finally:
                 self.camera = None
+        
+        # Clean up temporary frame file
+        if self.temp_frame_file is not None:
+            try:
+                os.unlink(self.temp_frame_file.name)
+                logger.info(f"Cleaned up temp file: {self.temp_frame_file.name}")
+            except Exception as e:
+                logger.warning(f"Could not delete temp file: {e}")
     
     def __enter__(self):
         """Context manager entry."""
