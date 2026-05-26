@@ -9,11 +9,11 @@
 ## Overall Project Progress
 
 ```text
-Phase 1 — OCR Pipeline            [░░░░░░░░░░░░░░░░░░░░]   0%   Wk 1–2
+Phase 1 — OCR Pipeline            [██░░░░░░░░░░░░░░░░░░]  10%   Wk 1–2
 Phase 2 — Database & Mock API     [██████████████████░░]  90%   Wk 2–3
 Phase 3 — Auth & SMS              [████████████████████]  100%   Wk 3–4
 Phase 4 — Kivy UI & SPI           [███████████████████░]  95%   Wk 4–5
-Phase 5 — Mechanical Prototype    [░░░░░░░░░░░░░░░░░░░░]   0%   Wk 5–7
+Phase 5 — Mechanical Prototype    [█████░░░░░░░░░░░░░░░]  26%   Wk 5–7
 Phase 6 — Enclosure, Test & Docs  [░░░░░░░░░░░░░░░░░░░░]   0%   Wk 8
 ```
 
@@ -48,29 +48,29 @@ Phase 6 — Enclosure, Test & Docs  [░░░░░░░░░░░░░░�
 > **Deliverable:** OCR module achieving >90% accuracy on a sample set of test cards.
 
 ```text
-Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
+Progress  [██░░░░░░░░░░░░░░░░░░]  10%
 ```
 
 ---
 
-### Task 1.1 — Camera Mount and Capture Setup
+### Task 1.1 — Camera Capture Setup (rpicam-still with Phone Images)
 
-> _Get the CSI camera physically positioned at the Conveyor 1 scan station and verify it can capture clean, consistent frames of ID cards passing beneath it._
+> _Verify camera hardware is accessible and capture clean frames. Using phone-captured ID card images for algorithm development while hardware mounting logistics proceed in parallel._
 
-- [ ] **1.1.1** Mount Pi Camera Module at the Conveyor 1 scan station over a fixed card-flat surface. _(1 hr)_
-- [ ] **1.1.2** Write a basic Python capture script using `picamera2` to grab a still frame on command. _(0.5 hr)_
-- [ ] **1.1.3** Test lighting conditions — add a fixed diffuse light source above the scan station if natural light is inconsistent. _(0.5 hr)_
-- [ ] **1.1.4** Confirm captured frames are sharp and the card fills a consistent region of the frame. _(0.5 hr)_
+- [x] **1.1.1** Verify Pi Camera v2 via rpicam-still CLI (2560×1440 QHD capture). _(1 hr)_ ✅ **COMPLETE** — rpicam-still working, 3 frames captured at QHD resolution (~467 KB each JPEG), verified readable with cv2.imread()
+- [ ] **1.1.2** Capture phone images of ID cards (5–10 samples) for preprocessing algorithm development. _(0.5 hr)_
+- [ ] **1.1.3** Organize phone images into `tests/fixtures/ocr_samples/` directory structure. _(0.25 hr)_
+- [ ] **1.1.4** Document image capture guidelines (lighting, positioning, resolution requirements). _(0.25 hr)_
 
-#### Subtotal: ~2.5 hrs\*\*
+#### Subtotal: ~2 hrs\*\*
 
 ---
 
 ### Task 1.2 — OpenCV Image Preprocessing Pipeline
 
-> _Raw camera frames are rarely clean enough for OCR. This pipeline converts and cleans each image so Tesseract has the best possible input: high contrast, straight text, no noise._
+> _Raw phone/camera frames need preprocessing before OCR. This pipeline converts and cleans each image so Tesseract has the best possible input: high contrast, straight text, no noise._
 
-- [ ] **1.2.1** Convert captured frame to grayscale. _(0.5 hr)_
+- [ ] **1.2.1** Convert phone images to grayscale. _(0.5 hr)_
 - [ ] **1.2.2** Apply adaptive thresholding (Gaussian method) to binarise the image and handle uneven lighting. _(1 hr)_
 - [ ] **1.2.3** Implement deskewing — detect card edge angle using Hough lines or minAreaRect and rotate to correct tilt. _(2 hrs)_
 - [ ] **1.2.4** Define and crop a fixed Region of Interest (ROI) around where the registration number is printed on the card layout. _(1 hr)_

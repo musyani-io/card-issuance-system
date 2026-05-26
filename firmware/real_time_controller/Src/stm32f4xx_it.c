@@ -22,6 +22,17 @@
 #include "stm32f4xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+/* External variables from main.c - needed for SPI interrupt handler */
+extern uint8_t spi_rx_buf[3];
+extern uint8_t spi_tx_buf[3];
+extern uint8_t rx_byte_count;
+extern uint8_t spi_frame_ready;
+extern void route_command(uint8_t cmd, uint8_t param);
+
+/* SPI Protocol Defines (from main.c) */
+#define SPI_FRAME_SIZE 3
+#define RESP_NACK  0x01
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -199,5 +210,30 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /* USER CODE BEGIN 1 */
+
+void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
+{
+  if (hspi->Instance == SPI1)
+  {
+    uint8_t checksum = spi_rx_buf[0] ^ spi_rx_buf[1];
+    
+    if (checksum == spi_rx_buf[2])
+    {
+      // Valid command - route it and prepare response
+      route_command(spi_rx_buf[0], spi_rx_buf[1]);
+      spi_frame_ready = 1;
+    }
+    else
+    {
+      // Invalid checksum - fill tx_buf with NACK
+      spi_tx_buf[0] = RESP_NACK;
+      spi_tx_buf[1] = 0xFF;
+      spi_tx_buf[2] = checksum;
+    }
+    
+    // Re-arm for next frame
+    HAL_SPI_TransmitReceive_IT(hspi, spi_tx_buf, spi_rx_buf, SPI_FRAME_SIZE);
+  }
+}
 
 /* USER CODE END 1 */

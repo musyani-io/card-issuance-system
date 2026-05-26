@@ -27,6 +27,27 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 
+#define SPI_FRAME_SIZE 3
+
+// Command Codes
+#define CMD_ROTATE_TO_SLOT    0x10
+#define CMD_EJECT_CARD        0x11
+#define CMD_LATCH_CARD        0x12
+#define CMD_RELEASE_LATCH     0x13
+#define CMD_LOCK_DOOR         0x20
+#define CMD_UNLOCK_DOOR       0x21
+#define CMD_FEED_CARD         0x30
+#define CMD_DIVERT_REJECT     0x31
+#define CMD_GET_SENSOR_STATE  0x40
+#define CMD_HOME_CAROUSEL     0x41
+
+// Response Codes
+#define RESP_ACK              0x00
+#define RESP_NACK             0x01
+#define RESP_BUSY             0x02
+#define RESP_SENSOR_STATE     0x03
+#define RESP_ERROR            0x04
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -48,6 +69,11 @@ TIM_HandleTypeDef htim2;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+
+uint8_t spi_rx_buf[3] = {0};
+uint8_t spi_tx_buf[3] = {RESP_ACK, 0x00, 0x00};  // Pre-load with default ACK
+uint8_t rx_byte_count = 0;
+uint8_t spi_frame_ready = 0;
 
 /* USER CODE END PV */
 
@@ -101,6 +127,9 @@ int main(void)
   MX_TIM1_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
+
+  // Start SPI1 in interrupt mode - listen from Pi
+  HAL_SPI_TransmitReceive_IT(&hspi1, spi_tx_buf, spi_rx_buf, SPI_FRAME_SIZE);
 
   /* USER CODE END 2 */
 
@@ -456,6 +485,23 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+void route_command(uint8_t cmd_byte, uint8_t param_byte)
+{
+  switch (cmd_byte) {
+    case 0x42:
+    	spi_tx_buf[0] = cmd_byte;
+    	spi_tx_buf[1] = param_byte;
+    	spi_tx_buf[2] = cmd_byte ^ param_byte;
+    	break;
+    
+    default: 
+    	spi_tx_buf[0] = RESP_NACK;
+    	spi_tx_buf[1] = cmd_byte;
+    	spi_tx_buf[2] = spi_tx_buf[0] ^ spi_tx_buf[1];
+    	break;
+  }
+}
 
 /* USER CODE END 4 */
 

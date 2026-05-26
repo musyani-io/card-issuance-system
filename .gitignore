@@ -131,6 +131,7 @@ mock_db_api/config.py
 **/secrets.yml
 **/secrets.yaml
 db
+kiosk_brain/tests/fixtures/*
 
 # =============================================================================
 # Python Cache & Compiled Files
@@ -206,7 +207,14 @@ docs/official/.$card_issuance_block.drawio.bkp
 /hardware/Altium/rev_polarity_protection/History
 
 # =============================================================================
+<<<<<<< HEAD
 # Altium / Schematic capture & PCB Designs
 # =============================================================================
 # History files
 *History/
+=======
+# FreeCAD / 3D Design
+# =============================================================================
+# Backup files
+*.FCBak
+>>>>>>> d1cc2a63c3b6c991af5d68596423e0753f81d2bd
