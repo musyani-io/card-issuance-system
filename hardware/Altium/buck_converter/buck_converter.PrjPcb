@@ -69,7 +69,7 @@ GenerateClassCluster=0
 DocumentUniqueId=GEAUZHTS
 
 [Document2]
-DocumentPath=..\..\..\..\altium-library-personal\schematic_library.SchLib
+DocumentPath=buck_converter.BomDoc
 AnnotationEnabled=1
 AnnotateStartValue=1
 AnnotationIndexControlEnabled=0
@@ -86,7 +86,7 @@ GenerateClassCluster=0
 DocumentUniqueId=
 
 [Document3]
-DocumentPath=buck_converter.BomDoc
+DocumentPath=..\..\..\..\altium-library-personal\intergrated_library.LibPkg
 AnnotationEnabled=1
 AnnotateStartValue=1
 AnnotationIndexControlEnabled=0

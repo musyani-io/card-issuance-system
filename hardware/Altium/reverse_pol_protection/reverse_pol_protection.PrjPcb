@@ -69,7 +69,7 @@ GenerateClassCluster=0
 DocumentUniqueId=DAMYNOQT
 
 [Document2]
-DocumentPath=..\..\..\..\altium-library-personal\schematic_library.SchLib
+DocumentPath=reverse_pol_protection.BomDoc
 AnnotationEnabled=1
 AnnotateStartValue=1
 AnnotationIndexControlEnabled=0
@@ -83,10 +83,10 @@ ClassGenCCAutoRoomEnabled=0
 ClassGenNCAutoScope=None
 DItemRevisionGUID=
 GenerateClassCluster=0
-DocumentUniqueId=PASMGJPB
+DocumentUniqueId=
 
 [Document3]
-DocumentPath=reverse_pol_protection.BomDoc
+DocumentPath=..\..\..\..\altium-library-personal\intergrated_library.LibPkg
 AnnotationEnabled=1
 AnnotateStartValue=1
 AnnotationIndexControlEnabled=0
