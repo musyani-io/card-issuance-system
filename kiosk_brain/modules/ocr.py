@@ -29,6 +29,28 @@ def convert_to_grayscale(image: np.ndarray) -> np.ndarray:
     return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
 
+def apply_adaptive_threshold(image: np.ndarray) -> np.ndarray:
+    """Apply Gaussian adaptive thresholding to a grayscale image."""
+
+    if image is None:
+        raise ValueError("image cannot be None")
+
+    grayscale = convert_to_grayscale(image)
+    denoised = cv2.GaussianBlur(grayscale, (5, 5), 0)
+    thresholded = cv2.adaptiveThreshold(
+        denoised,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        51,
+        5,
+    )
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    thresholded = cv2.morphologyEx(thresholded, cv2.MORPH_OPEN, kernel)
+    return thresholded
+
+
 def load_image(image_path: str | Path) -> np.ndarray:
     """Load an image from disk in BGR format."""
 
@@ -76,6 +98,54 @@ def save_grayscale_preview(image_path: str | Path, output_dir: str | Path) -> di
     return {
         "original": original_path,
         "grayscale": grayscale_path,
+        "preview": preview_path,
+        "details": info_path,
+    }
+
+
+def save_threshold_preview(image_path: str | Path, output_dir: str | Path) -> dict[str, Path]:
+    """Save the grayscale and adaptive-threshold images plus a side-by-side preview."""
+
+    source_path = Path(image_path)
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+
+    original = load_image(source_path)
+    grayscale = convert_to_grayscale(original)
+    thresholded = apply_adaptive_threshold(grayscale)
+
+    grayscale_path = destination / "grayscale.jpg"
+    threshold_path = destination / "adaptive_threshold.jpg"
+    preview_path = destination / "adaptive_threshold_preview.jpg"
+    info_path = destination / "threshold_details.txt"
+
+    cv2.imwrite(str(grayscale_path), grayscale)
+    cv2.imwrite(str(threshold_path), thresholded)
+
+    grayscale_bgr = cv2.cvtColor(grayscale, cv2.COLOR_GRAY2BGR)
+    threshold_bgr = cv2.cvtColor(thresholded, cv2.COLOR_GRAY2BGR)
+    preview = cv2.hconcat([grayscale_bgr, threshold_bgr])
+    cv2.imwrite(str(preview_path), preview)
+
+    info_path.write_text(
+        "\n".join(
+            [
+                f"source={source_path.name}",
+                f"grayscale_shape={grayscale.shape}",
+                f"threshold_shape={thresholded.shape}",
+                "stage=1.2.2 gaussian adaptive thresholding",
+                "preprocess=gaussian_blur_5x5",
+                "adaptive_block_size=51",
+                "adaptive_c=5",
+                "postprocess=morph_open_3x3",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    return {
+        "grayscale": grayscale_path,
+        "threshold": threshold_path,
         "preview": preview_path,
         "details": info_path,
     }

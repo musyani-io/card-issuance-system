@@ -18,7 +18,7 @@ Phase 6 — Enclosure, Test & Docs  [░░░░░░░░░░░░░░�
 ```
 
 > **How to update a progress bar:** Replace `░` blocks with `█` blocks proportionally.  
-> e.g. 50% of 20 chars = `[██████████░░░░░░░░░░]`
+> e.g. 50% of 20 chars = `[██████████░░░░░░░░░]`
 
 ---
 
@@ -70,11 +70,12 @@ Progress  [██░░░░░░░░░░░░░░░░░░]  10%
 
 > _Raw phone/camera frames need preprocessing before OCR. This pipeline converts and cleans each image so Tesseract has the best possible input: high contrast, straight text, no noise._
 
-- [x] **1.2.1** Convert phone images to grayscale. _(0.5 hr)_ ✅ **COMPLETE** — visual outputs generated in `kiosk_brain/tests/outputs/<sample-name>/`
-- [ ] **1.2.2** Apply adaptive thresholding (Gaussian method) to binarise the image and handle uneven lighting. _(1 hr)_
-- [ ] **1.2.3** Implement deskewing — detect card edge angle using Hough lines or minAreaRect and rotate to correct tilt. _(2 hrs)_
-- [ ] **1.2.4** Define and crop a fixed Region of Interest (ROI) around where the registration number is printed on the card layout. _(1 hr)_
-- [ ] **1.2.5** Apply mild Gaussian blur followed by sharpening kernel to reduce noise while preserving character edges. _(0.5 hr)_
+- [ ] **1.2.1** Detect the card in the raw phone image by finding the card contour or outer edges. _(1 hr)_
+- [ ] **1.2.2** Apply perspective correction to straighten the detected card and flatten the image for OCR. _(2 hrs)_
+- [x] **1.2.3** Convert phone images to grayscale. _(0.5 hr)_ ✅ **COMPLETE** — visual outputs generated in `kiosk_brain/tests/outputs/<sample-name>/`
+- [x] **1.2.4** Apply adaptive thresholding (Gaussian method) to binarise the image and handle uneven lighting. _(1 hr)_ ✅ **COMPLETE** — visual outputs generated in `kiosk_brain/tests/outputs/<sample-name>/`
+- [ ] **1.2.5** Define and crop a fixed Region of Interest (ROI) around where the registration number is printed on the card layout. _(1 hr)_
+- [ ] **1.2.6** Apply mild Gaussian blur followed by sharpening kernel to reduce noise while preserving character edges. _(0.5 hr)_
 
 #### Subtotal: ~5 hrs\*\*
 
