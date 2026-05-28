@@ -70,7 +70,7 @@ Progress  [██░░░░░░░░░░░░░░░░░░]  10%
 
 > _Raw phone/camera frames need preprocessing before OCR. This pipeline converts and cleans each image so Tesseract has the best possible input: high contrast, straight text, no noise._
 
-- [ ] **1.2.1** Convert phone images to grayscale. _(0.5 hr)_
+- [x] **1.2.1** Convert phone images to grayscale. _(0.5 hr)_ ✅ **COMPLETE** — visual outputs generated in `kiosk_brain/tests/outputs/<sample-name>/`
 - [ ] **1.2.2** Apply adaptive thresholding (Gaussian method) to binarise the image and handle uneven lighting. _(1 hr)_
 - [ ] **1.2.3** Implement deskewing — detect card edge angle using Hough lines or minAreaRect and rotate to correct tilt. _(2 hrs)_
 - [ ] **1.2.4** Define and crop a fixed Region of Interest (ROI) around where the registration number is printed on the card layout. _(1 hr)_
