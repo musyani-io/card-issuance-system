@@ -153,11 +153,11 @@ class AuthTestBase(unittest.TestCase):
         students = [
             {
                 "registration_number": "2022-04-07227",
-                "first_name": "Sabrina",
-                "surname": "Mgagi",
-                "email": "sabrina.mgagi_22@student.udsm.ac.tz",
+                "first_name": "Hashim",
+                "surname": "Uledi",
+                "email": "hashimuledi@udsm.ac.tz",
                 "programme": "BSc. Electronics Engineering",
-                "phone_number": "+255670046640",
+                "phone_number": "+255658775776",
                 "registration_status": "active",
             },
             {
