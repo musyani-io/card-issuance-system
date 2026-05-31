@@ -12,6 +12,10 @@ import math
 
 import cv2
 import numpy as np
+from pathlib import Path
+
+from modules.ocr import convert_to_grayscale, apply_adaptive_threshold
+import config
 
 
 def _order_points(pts: np.ndarray) -> np.ndarray:
@@ -48,18 +52,24 @@ def detect_card_contour(image: np.ndarray) -> tuple[np.ndarray, dict]:
     # Scale-normalization (work on a predictable width to make thresholds stable)
     h, w = gray.shape[:2]
     scale = 1.0
-    target_w = 1000
+    target_w = int(config.CARD_DETECTION.get("target_width", 1000))
     if w > target_w:
         scale = target_w / float(w)
         gray = cv2.resize(gray, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
 
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    edged = cv2.Canny(blurred, 50, 150)
+    # Blur + Canny using config values
+    blur_ksize = tuple(config.CARD_DETECTION.get("blur_ksize", (5, 5)))
+    blurred = cv2.GaussianBlur(gray, blur_ksize, 0)
+
+    c1 = int(config.CARD_DETECTION.get("canny_threshold1", 50))
+    c2 = int(config.CARD_DETECTION.get("canny_threshold2", 150))
+    edged = cv2.Canny(blurred, c1, c2)
 
     # Morphological closing + dilation to join broken edges
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+    mk = tuple(config.CARD_DETECTION.get("morph_kernel", (5, 5)))
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, mk)
     edged = cv2.morphologyEx(edged, cv2.MORPH_CLOSE, kernel)
-    edged = cv2.dilate(edged, kernel, iterations=1)
+    edged = cv2.dilate(edged, kernel, iterations=int(config.CARD_DETECTION.get("dilate_iterations", 1)))
 
     contours_info = cv2.findContours(edged, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     contours = contours_info[0] if len(contours_info) == 2 else contours_info[1]
@@ -68,11 +78,13 @@ def detect_card_contour(image: np.ndarray) -> tuple[np.ndarray, dict]:
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
 
     image_area = gray.shape[0] * gray.shape[1]
-    min_area = max(1000, int(image_area * 0.03))  # at least 3% of image area
-    max_area = int(image_area * 0.9)
+    min_area_abs = int(config.CARD_DETECTION.get("min_area_abs", 1000))
+    min_area_ratio = float(config.CARD_DETECTION.get("min_area_ratio", 0.03))
+    min_area = max(min_area_abs, int(image_area * min_area_ratio))
+    max_area = int(image_area * float(config.CARD_DETECTION.get("max_area_ratio", 0.9)))
 
-    expected_ratio = 88.0 / 55.0
-    aspect_tolerance = 0.25  # 25% tolerance
+    expected_ratio = float(config.CARD_DETECTION.get("expected_aspect_ratio", 88.0 / 55.0))
+    aspect_tolerance = float(config.CARD_DETECTION.get("aspect_ratio_tolerance", 0.25))
 
     used_fallback = False
 
@@ -83,7 +95,8 @@ def detect_card_contour(image: np.ndarray) -> tuple[np.ndarray, dict]:
 
         # perimeter-based polygon approximation
         peri = cv2.arcLength(cnt, True)
-        approx = cv2.approxPolyDP(cnt, 0.02 * peri, True)
+        approx_eps = float(config.CARD_DETECTION.get("approx_epsilon", 0.02))
+        approx = cv2.approxPolyDP(cnt, approx_eps * peri, True)
 
         # compute a stable rectangle from the contour for aspect checking
         rect = cv2.minAreaRect(cnt)
@@ -194,7 +207,7 @@ def get_card_info(corners: np.ndarray) -> dict:
     }
 
 
-def warp_card(image: np.ndarray, corners: np.ndarray, output_size: tuple[int, int] = (880, 550)) -> np.ndarray:
+def warp_card(image: np.ndarray, corners: np.ndarray, output_size: tuple[int, int] | None = None) -> np.ndarray:
     """Apply perspective transform to extract a flattened card image.
 
     `corners` should be in TL, TR, BR, BL order or will be ordered.
@@ -208,6 +221,8 @@ def warp_card(image: np.ndarray, corners: np.ndarray, output_size: tuple[int, in
     rect = _order_points(pts)
     (tl, tr, br, bl) = rect
 
+    if output_size is None:
+        output_size = tuple(config.PERSPECTIVE.get("output_size", (880, 550)))
     dst_w, dst_h = output_size
 
     dst = np.array(
@@ -219,7 +234,7 @@ def warp_card(image: np.ndarray, corners: np.ndarray, output_size: tuple[int, in
     return warped
 
 
-def save_perspective_preview(image_path: str | Path, output_dir: str | Path, output_size: tuple[int, int] = (880, 550)) -> dict[str, Path]:
+def save_perspective_preview(image_path: str | Path, output_dir: str | Path, output_size: tuple[int, int] | None = None) -> dict[str, Path]:
     """Detect card, warp it to `output_size`, and write flattened previews.
 
     Returns paths for 'original', 'flattened', 'preview', and 'details'.
@@ -266,6 +281,91 @@ def save_perspective_preview(image_path: str | Path, output_dir: str | Path, out
 
     except Exception as exc:
         err_path = dest / "perspective_error.txt"
+        err_path.write_text(str(exc), encoding="utf-8")
+        raise
+
+
+def crop_registration_roi_from_flat(flattened: np.ndarray, roi_rel: tuple[float, float, float, float] = None) -> np.ndarray:
+    """Crop a region of interest from a flattened card image.
+
+    roi_rel = (x, y, w, h) in relative fractions of flattened width/height.
+    Returns the cropped ROI image (BGR or grayscale same as input).
+    """
+    if flattened is None:
+        raise ValueError("flattened image cannot be None")
+
+    h, w = flattened.shape[:2]
+    if roi_rel is None:
+        roi_rel = tuple(config.ROI.get("default", (0.55, 0.6, 0.40, 0.20)))
+    rx, ry, rw, rh = roi_rel
+    x = max(0, int(round(rx * w)))
+    y = max(0, int(round(ry * h)))
+    ww = max(1, int(round(rw * w)))
+    hh = max(1, int(round(rh * h)))
+
+    x2 = min(w, x + ww)
+    y2 = min(h, y + hh)
+
+    return flattened[y:y2, x:x2]
+
+
+def save_roi_preview(image_path: str | Path, output_dir: str | Path, roi_rel: tuple[float, float, float, float] = None) -> dict[str, Path]:
+    """Detect, flatten, crop ROI (registration number), and save previews + details."""
+
+    source = Path(image_path)
+    dest = Path(output_dir)
+    dest.mkdir(parents=True, exist_ok=True)
+
+    image = cv2.imread(str(source))
+    if image is None:
+        raise FileNotFoundError(f"could not read image: {source}")
+
+    try:
+        result = detect_card_contour(image)
+        if isinstance(result, tuple):
+            corners, meta = result
+        else:
+            corners = result
+            meta = {}
+
+        warped = warp_card(image, corners, output_size=tuple(config.PERSPECTIVE.get("output_size", (880, 550))))
+        roi = crop_registration_roi_from_flat(warped, roi_rel=roi_rel)
+        # determine which ROI was actually used (None -> config default)
+        used_roi_rel = roi_rel if roi_rel is not None else tuple(config.ROI.get("default", (0.55, 0.6, 0.40, 0.20)))
+
+        gray = convert_to_grayscale(roi)
+        thresh = apply_adaptive_threshold(gray)
+
+        original_path = dest / "original.jpg"
+        flattened_path = dest / "flattened.jpg"
+        roi_path = dest / "roi.jpg"
+        roi_gray_path = dest / "roi_grayscale.jpg"
+        roi_thresh_path = dest / "roi_threshold.jpg"
+        preview_path = dest / "roi_preview.jpg"
+        info_path = dest / "roi_details.txt"
+
+        cv2.imwrite(str(original_path), image)
+        cv2.imwrite(str(flattened_path), warped)
+        cv2.imwrite(str(roi_path), roi)
+        cv2.imwrite(str(roi_gray_path), gray)
+        cv2.imwrite(str(roi_thresh_path), thresh)
+
+        gray_bgr = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+        thresh_bgr = cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
+        preview = cv2.hconcat([gray_bgr, thresh_bgr])
+        cv2.imwrite(str(preview_path), preview)
+
+        lines = [f"source={source.name}", f"flattened_shape={warped.shape}", f"roi_rel={used_roi_rel}", f"roi_shape={roi.shape}", "stage=1.2.5 roi crop and preprocess"]
+        if meta:
+            for k, v in meta.items():
+                lines.append(f"{k}={v}")
+
+        info_path.write_text("\n".join(lines), encoding="utf-8")
+
+        return {"original": original_path, "flattened": flattened_path, "roi": roi_path, "grayscale": roi_gray_path, "threshold": roi_thresh_path, "preview": preview_path, "details": info_path}
+
+    except Exception as exc:
+        err_path = dest / "roi_error.txt"
         err_path.write_text(str(exc), encoding="utf-8")
         raise
 

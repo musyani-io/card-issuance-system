@@ -70,12 +70,14 @@ Progress  [██░░░░░░░░░░░░░░░░░░]  10%
 
 > _Raw phone/camera frames need preprocessing before OCR. This pipeline converts and cleans each image so Tesseract has the best possible input: high contrast, straight text, no noise._
 
-- [ ] **1.2.1** Detect the card in the raw phone image by finding the card contour or outer edges. _(1 hr)_
-- [ ] **1.2.2** Apply perspective correction to straighten the detected card and flatten the image for OCR. _(2 hrs)_
+- [x] **1.2.1** Detect the card in the raw phone image by finding the card contour or outer edges. _(1 hr)_ ✅ **COMPLETE** — visual outputs generated in `kiosk_brain/tests/outputs/<sample-name>/` (detection overlays and details)
+- [x] **1.2.2** Apply perspective correction to straighten the detected card and flatten the image for OCR. _(2 hrs)_ ✅ **COMPLETE** — flattened previews and details generated in `kiosk_brain/tests/outputs/<sample-name>/`
 - [x] **1.2.3** Convert phone images to grayscale. _(0.5 hr)_ ✅ **COMPLETE** — visual outputs generated in `kiosk_brain/tests/outputs/<sample-name>/`
 - [x] **1.2.4** Apply adaptive thresholding (Gaussian method) to binarise the image and handle uneven lighting. _(1 hr)_ ✅ **COMPLETE** — visual outputs generated in `kiosk_brain/tests/outputs/<sample-name>/`
 - [ ] **1.2.5** Define and crop a fixed Region of Interest (ROI) around where the registration number is printed on the card layout. _(1 hr)_
 - [ ] **1.2.6** Apply mild Gaussian blur followed by sharpening kernel to reduce noise while preserving character edges. _(0.5 hr)_
+
+> ⚠️ **Alert:** `generate_task_1_2_3_4_outputs.py` currently reports an error when run against `kiosk_brain/tests/outputs/`. Investigate before treating the combined grayscale + threshold runner as fully stable.
 
 #### Subtotal: ~5 hrs\*\*
 

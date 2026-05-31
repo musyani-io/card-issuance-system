@@ -12,6 +12,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import config
 
 
 def convert_to_grayscale(image: np.ndarray) -> np.ndarray:
@@ -36,17 +37,23 @@ def apply_adaptive_threshold(image: np.ndarray) -> np.ndarray:
         raise ValueError("image cannot be None")
 
     grayscale = convert_to_grayscale(image)
-    denoised = cv2.GaussianBlur(grayscale, (5, 5), 0)
+    gk = tuple(config.OCR_PREPROCESS.get("gaussian_ksize", (5, 5)))
+    denoised = cv2.GaussianBlur(grayscale, gk, 0)
+
+    block = int(config.OCR_PREPROCESS.get("adaptive_block_size", 51))
+    c = int(config.OCR_PREPROCESS.get("adaptive_C", 5))
+
     thresholded = cv2.adaptiveThreshold(
         denoised,
         255,
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
         cv2.THRESH_BINARY,
-        51,
-        5,
+        block,
+        c,
     )
 
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    mk = tuple(config.OCR_PREPROCESS.get("morph_kernel", (3, 3)))
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, mk)
     thresholded = cv2.morphologyEx(thresholded, cv2.MORPH_OPEN, kernel)
     return thresholded
 
@@ -134,10 +141,10 @@ def save_threshold_preview(image_path: str | Path, output_dir: str | Path) -> di
                 f"grayscale_shape={grayscale.shape}",
                 f"threshold_shape={thresholded.shape}",
                 "stage=1.2.2 gaussian adaptive thresholding",
-                "preprocess=gaussian_blur_5x5",
-                "adaptive_block_size=51",
-                "adaptive_c=5",
-                "postprocess=morph_open_3x3",
+                f"preprocess=gaussian_blur_{gk[0]}x{gk[1]}",
+                f"adaptive_block_size={block}",
+                f"adaptive_c={c}",
+                f"postprocess=morph_open_{mk[0]}x{mk[1]}",
             ]
         ),
         encoding="utf-8",
