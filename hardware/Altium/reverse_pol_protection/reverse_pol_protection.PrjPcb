@@ -61,7 +61,7 @@ AnnotateScope=All
 AnnotateOrder=0
 DoLibraryUpdate=1
 DoDatabaseUpdate=1
-ClassGenCCAutoEnabled=1
+ClassGenCCAutoEnabled=0
 ClassGenCCAutoRoomEnabled=0
 ClassGenNCAutoScope=None
 DItemRevisionGUID=
@@ -117,7 +117,11 @@ ClassGenCCAutoRoomEnabled=0
 ClassGenNCAutoScope=None
 DItemRevisionGUID=
 GenerateClassCluster=0
-DocumentUniqueId=NQXUXDDG
+DocumentUniqueId=EVFWECRO
+
+[GeneratedDocument1]
+DocumentPath=Project Outputs for reverse_pol_protection\Design Rule Check - reverse_pol_protection.html
+DItemRevisionGUID=
 
 [Configuration1]
 Name=Sources
