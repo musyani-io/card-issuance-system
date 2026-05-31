@@ -194,6 +194,82 @@ def get_card_info(corners: np.ndarray) -> dict:
     }
 
 
+def warp_card(image: np.ndarray, corners: np.ndarray, output_size: tuple[int, int] = (880, 550)) -> np.ndarray:
+    """Apply perspective transform to extract a flattened card image.
+
+    `corners` should be in TL, TR, BR, BL order or will be ordered.
+    `output_size` is (width, height) in pixels for the destination card image.
+    """
+
+    if image is None:
+        raise ValueError("image cannot be None")
+
+    pts = corners.astype("float32")
+    rect = _order_points(pts)
+    (tl, tr, br, bl) = rect
+
+    dst_w, dst_h = output_size
+
+    dst = np.array(
+        [[0, 0], [dst_w - 1, 0], [dst_w - 1, dst_h - 1], [0, dst_h - 1]], dtype="float32"
+    )
+
+    M = cv2.getPerspectiveTransform(rect, dst)
+    warped = cv2.warpPerspective(image, M, (dst_w, dst_h))
+    return warped
+
+
+def save_perspective_preview(image_path: str | Path, output_dir: str | Path, output_size: tuple[int, int] = (880, 550)) -> dict[str, Path]:
+    """Detect card, warp it to `output_size`, and write flattened previews.
+
+    Returns paths for 'original', 'flattened', 'preview', and 'details'.
+    """
+
+    source = Path(image_path)
+    dest = Path(output_dir)
+    dest.mkdir(parents=True, exist_ok=True)
+
+    image = cv2.imread(str(source))
+    if image is None:
+        raise FileNotFoundError(f"could not read image: {source}")
+
+    try:
+        result = detect_card_contour(image)
+        if isinstance(result, tuple):
+            corners, meta = result
+        else:
+            corners = result
+            meta = {}
+
+        warped = warp_card(image, corners, output_size=output_size)
+
+        original_path = dest / "original.jpg"
+        flattened_path = dest / "flattened.jpg"
+        preview_path = dest / "flattened_preview.jpg"
+        info_path = dest / "perspective_details.txt"
+
+        cv2.imwrite(str(original_path), image)
+        cv2.imwrite(str(flattened_path), warped)
+
+        warped_bgr = warped if warped.ndim == 3 else cv2.cvtColor(warped, cv2.COLOR_GRAY2BGR)
+        preview = cv2.hconcat([cv2.resize(image, (warped_bgr.shape[1], warped_bgr.shape[0])), warped_bgr])
+        cv2.imwrite(str(preview_path), preview)
+
+        lines = [f"source={source.name}", f"original_shape={image.shape}", f"flattened_shape={warped.shape}", "stage=1.2.2 perspective correction"]
+        if meta:
+            for k, v in meta.items():
+                lines.append(f"{k}={v}")
+
+        info_path.write_text("\n".join(lines), encoding="utf-8")
+
+        return {"original": original_path, "flattened": flattened_path, "preview": preview_path, "details": info_path}
+
+    except Exception as exc:
+        err_path = dest / "perspective_error.txt"
+        err_path.write_text(str(exc), encoding="utf-8")
+        raise
+
+
 def save_detection_preview(image_path: str | Path, output_dir: str | Path) -> dict[str, Path]:
     """Load `image_path`, detect card, and write visual outputs to `output_dir`.
 
