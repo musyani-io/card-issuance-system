@@ -8,14 +8,12 @@ to save a visualisation for per-sample inspection during development.
 from __future__ import annotations
 
 from pathlib import Path
-import math
 
 import cv2
 import numpy as np
-from pathlib import Path
 
-from modules.ocr import convert_to_grayscale, apply_adaptive_threshold
 import config
+from modules.ocr import apply_adaptive_threshold, convert_to_grayscale
 
 
 def _order_points(pts: np.ndarray) -> np.ndarray:
@@ -52,24 +50,24 @@ def detect_card_contour(image: np.ndarray) -> tuple[np.ndarray, dict]:
     # Scale-normalization (work on a predictable width to make thresholds stable)
     h, w = gray.shape[:2]
     scale = 1.0
-    target_w = int(config.CARD_DETECTION.get("target_width", 1000))
+    target_w = int(config.CARD_DETECTION["target_width"])
     if w > target_w:
         scale = target_w / float(w)
         gray = cv2.resize(gray, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
 
     # Blur + Canny using config values
-    blur_ksize = tuple(config.CARD_DETECTION.get("blur_ksize", (5, 5)))
+    blur_ksize = tuple(config.CARD_DETECTION["blur_ksize"])
     blurred = cv2.GaussianBlur(gray, blur_ksize, 0)
 
-    c1 = int(config.CARD_DETECTION.get("canny_threshold1", 50))
-    c2 = int(config.CARD_DETECTION.get("canny_threshold2", 150))
+    c1 = int(config.CARD_DETECTION["canny_threshold1"])
+    c2 = int(config.CARD_DETECTION["canny_threshold2"])
     edged = cv2.Canny(blurred, c1, c2)
 
     # Morphological closing + dilation to join broken edges
-    mk = tuple(config.CARD_DETECTION.get("morph_kernel", (5, 5)))
+    mk = tuple(config.CARD_DETECTION["morph_kernel"])
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, mk)
     edged = cv2.morphologyEx(edged, cv2.MORPH_CLOSE, kernel)
-    edged = cv2.dilate(edged, kernel, iterations=int(config.CARD_DETECTION.get("dilate_iterations", 1)))
+    edged = cv2.dilate(edged, kernel, iterations=int(config.CARD_DETECTION["dilate_iterations"]))
 
     contours_info = cv2.findContours(edged, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     contours = contours_info[0] if len(contours_info) == 2 else contours_info[1]
@@ -78,13 +76,13 @@ def detect_card_contour(image: np.ndarray) -> tuple[np.ndarray, dict]:
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
 
     image_area = gray.shape[0] * gray.shape[1]
-    min_area_abs = int(config.CARD_DETECTION.get("min_area_abs", 1000))
-    min_area_ratio = float(config.CARD_DETECTION.get("min_area_ratio", 0.03))
+    min_area_abs = int(config.CARD_DETECTION["min_area_abs"])
+    min_area_ratio = float(config.CARD_DETECTION["min_area_ratio"])
     min_area = max(min_area_abs, int(image_area * min_area_ratio))
-    max_area = int(image_area * float(config.CARD_DETECTION.get("max_area_ratio", 0.9)))
+    max_area = int(image_area * float(config.CARD_DETECTION["max_area_ratio"]))
 
-    expected_ratio = float(config.CARD_DETECTION.get("expected_aspect_ratio", 88.0 / 55.0))
-    aspect_tolerance = float(config.CARD_DETECTION.get("aspect_ratio_tolerance", 0.25))
+    expected_ratio = float(config.CARD_DETECTION["expected_aspect_ratio"])
+    aspect_tolerance = float(config.CARD_DETECTION["aspect_ratio_tolerance"])
 
     used_fallback = False
 
@@ -95,7 +93,7 @@ def detect_card_contour(image: np.ndarray) -> tuple[np.ndarray, dict]:
 
         # perimeter-based polygon approximation
         peri = cv2.arcLength(cnt, True)
-        approx_eps = float(config.CARD_DETECTION.get("approx_epsilon", 0.02))
+        approx_eps = float(config.CARD_DETECTION["approx_epsilon"])
         approx = cv2.approxPolyDP(cnt, approx_eps * peri, True)
 
         # compute a stable rectangle from the contour for aspect checking
@@ -222,7 +220,7 @@ def warp_card(image: np.ndarray, corners: np.ndarray, output_size: tuple[int, in
     (tl, tr, br, bl) = rect
 
     if output_size is None:
-        output_size = tuple(config.PERSPECTIVE.get("output_size", (880, 550)))
+        output_size = tuple(config.PERSPECTIVE["output_size"])
     dst_w, dst_h = output_size
 
     dst = np.array(
@@ -296,7 +294,7 @@ def crop_registration_roi_from_flat(flattened: np.ndarray, roi_rel: tuple[float,
 
     h, w = flattened.shape[:2]
     if roi_rel is None:
-        roi_rel = tuple(config.ROI.get("default", (0.55, 0.6, 0.40, 0.20)))
+        roi_rel = tuple(config.ROI["default"])
     rx, ry, rw, rh = roi_rel
     x = max(0, int(round(rx * w)))
     y = max(0, int(round(ry * h)))
@@ -328,10 +326,10 @@ def save_roi_preview(image_path: str | Path, output_dir: str | Path, roi_rel: tu
             corners = result
             meta = {}
 
-        warped = warp_card(image, corners, output_size=tuple(config.PERSPECTIVE.get("output_size", (880, 550))))
+        warped = warp_card(image, corners, output_size=tuple(config.PERSPECTIVE["output_size"]))
         roi = crop_registration_roi_from_flat(warped, roi_rel=roi_rel)
         # determine which ROI was actually used (None -> config default)
-        used_roi_rel = roi_rel if roi_rel is not None else tuple(config.ROI.get("default", (0.55, 0.6, 0.40, 0.20)))
+        used_roi_rel = roi_rel if roi_rel is not None else tuple(config.ROI["default"])
 
         gray = convert_to_grayscale(roi)
         thresh = apply_adaptive_threshold(gray)

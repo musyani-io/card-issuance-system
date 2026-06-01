@@ -37,11 +37,15 @@ def apply_adaptive_threshold(image: np.ndarray) -> np.ndarray:
         raise ValueError("image cannot be None")
 
     grayscale = convert_to_grayscale(image)
-    gk = tuple(config.OCR_PREPROCESS.get("gaussian_ksize", (5, 5)))
+    gk = tuple(config.OCR_PREPROCESS["gaussian_ksize"])
     denoised = cv2.GaussianBlur(grayscale, gk, 0)
 
-    block = int(config.OCR_PREPROCESS.get("adaptive_block_size", 51))
-    c = int(config.OCR_PREPROCESS.get("adaptive_C", 5))
+    block = int(config.OCR_PREPROCESS["adaptive_block_size"])
+    if block <= 1:
+        block = 3
+    if block % 2 == 0:
+        block += 1
+    c = int(config.OCR_PREPROCESS["adaptive_C"])
 
     thresholded = cv2.adaptiveThreshold(
         denoised,
@@ -52,7 +56,7 @@ def apply_adaptive_threshold(image: np.ndarray) -> np.ndarray:
         c,
     )
 
-    mk = tuple(config.OCR_PREPROCESS.get("morph_kernel", (3, 3)))
+    mk = tuple(config.OCR_PREPROCESS["morph_kernel"])
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, mk)
     thresholded = cv2.morphologyEx(thresholded, cv2.MORPH_OPEN, kernel)
     return thresholded
@@ -120,6 +124,14 @@ def save_threshold_preview(image_path: str | Path, output_dir: str | Path) -> di
     original = load_image(source_path)
     grayscale = convert_to_grayscale(original)
     thresholded = apply_adaptive_threshold(grayscale)
+    gk = tuple(config.OCR_PREPROCESS["gaussian_ksize"])
+    block = int(config.OCR_PREPROCESS["adaptive_block_size"])
+    if block <= 1:
+        block = 3
+    if block % 2 == 0:
+        block += 1
+    c = int(config.OCR_PREPROCESS["adaptive_C"])
+    mk = tuple(config.OCR_PREPROCESS["morph_kernel"])
 
     grayscale_path = destination / "grayscale.jpg"
     threshold_path = destination / "adaptive_threshold.jpg"
