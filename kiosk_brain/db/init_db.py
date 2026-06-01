@@ -63,11 +63,17 @@ ERROR HANDLING:
 
 import sqlite3
 import os
+import sys
 from pathlib import Path
 import logging
 
 
-def initialize_database(db_path="kiosk.db"):
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+
+def initialize_database(db_path=None):
     """
     Initialize SQLite database with complete schema.
 
@@ -105,6 +111,10 @@ def initialize_database(db_path="kiosk.db"):
     """
     current_dir = Path(__file__).parent
     schema_path = current_dir / "schema.sql"
+    if db_path is None:
+        db_path = str(PROJECT_ROOT / "kiosk.db")
+    else:
+        db_path = str(Path(db_path).expanduser())
 
     with open(schema_path, "r") as f:
         schema_sql = f.read()
@@ -119,8 +129,27 @@ def initialize_database(db_path="kiosk.db"):
 
 
 if __name__ == "__main__":
+    import sys
+    from modules.database import clear_database
+    
     try:
-        initialize_database()
-        print("✓ Database initialized successfully!")
+        if len(sys.argv) > 1 and sys.argv[1] == "--reset":
+            # Clear all data, keep schema
+            print("🔄 Clearing database...")
+            result = clear_database()
+            if result.get("success"):
+                print(f"✓ Database cleared successfully!")
+                print(f"  Deleted: {result['deleted_records']}")
+                # Re-initialize schema
+                print("📝 Re-initializing schema...")
+                initialize_database()
+                print("✓ Schema re-initialized!")
+            else:
+                print(f"✗ Clear failed: {result['error']}")
+        else:
+            # Normal initialization
+            initialize_database()
+            print("✓ Database initialized successfully!")
     except Exception as e:
-        print(f"✗ Error initializing database: {e}")
+        print(f"✗ Error: {e}")
+        sys.exit(1)

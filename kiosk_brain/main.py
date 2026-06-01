@@ -311,12 +311,49 @@ class KioskApp(App):
             setattr(self.sm, "current", SCREEN_ERROR)
 
     def handle_reg_submit(self, reg_entry_screen):
+        """
+        Handle registration number entry by reading the local kiosk_db.
+
+        Flow:
+            1. Validate input (not empty)
+            2. Read the student record from kiosk_db
+            3. If success: store student info in session and transition to OTP
+            4. If failure: display error, allow retry
+        """
         if not reg_entry_screen.reg_input.text.strip():
             self.error_screen.error_label.text = "Registration number cannot be empty"
             setattr(self.sm, "current", SCREEN_ERROR)
-        else:
-            setattr(session_manager, "reg_number", reg_entry_screen.reg_input.text)
+            return
+        
+        reg_number = reg_entry_screen.reg_input.text.strip()
+        
+        # Read the student record from the local kiosk_db populated by the Pi
+        from modules.database import get_student_from_db
+
+        result = get_student_from_db(reg_number)
+
+        if result.get("success"):
+            student_data = result.get("data", {})
+            # Ingestion successful: store data in session and proceed to OTP
+            setattr(session_manager, "reg_number", reg_number)
+            setattr(
+                session_manager,
+                "student_name",
+                f"{student_data.get('first_name', '')} {student_data.get('surname', '')}".strip(),
+            )
+            setattr(session_manager, "student_type", student_data.get("registration_status"))
+            session_manager.update_activity()  # Update activity timeout
+            
+            # Clear input field for next use
+            reg_entry_screen.reg_input.text = ""
+            
+            # Transition to OTP entry
             setattr(self.sm, "current", SCREEN_OTP_ENTRY)
+        else:
+            # Ingestion failed: display error and allow retry
+            error_msg = result.get("error", "Unknown error during local lookup")
+            self.error_screen.error_label.text = f"Student not found in kiosk DB:\n{error_msg}"
+            setattr(self.sm, "current", SCREEN_ERROR)
 
     def handle_pin_submit(self, pin_entry_screen):
         """

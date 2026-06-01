@@ -13,6 +13,10 @@ from pathlib import Path
 import cv2
 import numpy as np
 import config
+try:
+    import pytesseract
+except Exception:  # pragma: no cover - optional runtime dependency
+    pytesseract = None
 
 
 def convert_to_grayscale(image: np.ndarray) -> np.ndarray:
@@ -168,3 +172,81 @@ def save_threshold_preview(image_path: str | Path, output_dir: str | Path) -> di
         "preview": preview_path,
         "details": info_path,
     }
+
+
+def apply_pre_ocr_enhancement(image: np.ndarray) -> np.ndarray:
+    """Apply mild blur followed by a sharpening kernel to an image.
+
+    This is Task 1.2.6: reduces small noise while preserving character edges.
+    Reads `PRE_OCR` settings from `config` and returns a BGR or grayscale image
+    with the same number of channels as the input.
+    """
+
+    if image is None:
+        raise ValueError("image cannot be None")
+
+    # preserve input shape/channels
+    orig_ndim = image.ndim
+
+    # Apply small Gaussian blur
+    bk = tuple(config.PRE_OCR["blur_ksize"])
+    blurred = cv2.GaussianBlur(image, bk, 0)
+
+    # Apply sharpening kernel
+    kernel = np.array(config.PRE_OCR["sharpen_kernel"], dtype=np.float32)
+    # filter2D works on multi-channel images as well
+    sharpened = cv2.filter2D(blurred, -1, kernel)
+
+    # Clip to valid uint8 range and cast back
+    sharpened = np.clip(sharpened, 0, 255).astype("uint8")
+
+    # Return image with same dimensionality as input
+    if orig_ndim == 2 and sharpened.ndim == 3:
+        return cv2.cvtColor(sharpened, cv2.COLOR_BGR2GRAY)
+    return sharpened
+
+
+def perform_ocr(image: np.ndarray, *, psm: int | None = None, whitelist: str | None = None) -> dict:
+    """Run Tesseract OCR on `image` and return text and confidence metadata.
+
+    - `image` may be grayscale, BGR, or binarized. The function will call
+      `pytesseract.image_to_data` and compute average confidence where available.
+    - Returns: {"text": str, "mean_confidence": float or None, "raw": str}
+    """
+
+    if pytesseract is None:
+        raise RuntimeError("pytesseract not available in this environment")
+
+    # Ensure image is in a format pytesseract accepts (BGR -> RGB)
+    img = image
+    if img.ndim == 3 and img.shape[2] == 3:
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    config_parts = []
+    if psm is not None:
+        config_parts.append(f"--psm {int(psm)}")
+    if whitelist:
+        # tessedit_char_whitelist expects no spaces
+        wl = whitelist.replace(" ", "")
+        config_parts.append(f"-c tessedit_char_whitelist={wl}")
+
+    config_str = " ".join(config_parts)
+
+    # Get plain text
+    text = pytesseract.image_to_string(img, config=config_str).strip()
+
+    # Get detailed data to compute confidences
+    data = pytesseract.image_to_data(img, config=config_str, output_type=pytesseract.Output.DICT)
+    confs = []
+    for conf in data.get("conf", []):
+        try:
+            c = float(conf)
+        except Exception:
+            continue
+        # Tesseract uses -1 for blanks; skip those
+        if c >= 0:
+            confs.append(c)
+
+    mean_conf = float(sum(confs) / len(confs)) if confs else None
+
+    return {"text": text, "mean_confidence": mean_conf, "raw_data": data}

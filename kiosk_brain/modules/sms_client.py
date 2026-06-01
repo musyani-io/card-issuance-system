@@ -40,6 +40,7 @@ from config import (
     BRIQ_SENDER_ID,
     SMTP_EMAIL,
     APP_PASSWORD,
+    DB_PATH,
 )
 from email.mime.text import MIMEText
 import requests
@@ -65,7 +66,7 @@ def format_phone_number(phone_number):
     return phone_number
 
 
-def send_credentials(reg_num, otp, temp_pin=None, db_path="data/kiosk.db"):
+def send_credentials(reg_num, otp, temp_pin=None, db_path=DB_PATH):
     """
     Send OTP and optional temporary PIN to student via SMS + Email.
 
@@ -115,15 +116,17 @@ def send_credentials(reg_num, otp, temp_pin=None, db_path="data/kiosk.db"):
     # Query student contact info from database
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    cursor.execute(
-        "SELECT first_name, surname, email, phone_number FROM students WHERE registration_number = ?",
-        (reg_num,),
-    )
-    student = cursor.fetchone()
+    try:
+        cursor.execute(
+            "SELECT first_name, surname, email, phone_number FROM students WHERE registration_number = ?",
+            (reg_num,),
+        )
+        student = cursor.fetchone()
+    finally:
+        conn.close()
 
     # Error Case 1: Student not found in database
     if student is None:
-        conn.close()
         return {
             "success": False,
             "error": "Student not found",

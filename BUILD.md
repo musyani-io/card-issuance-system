@@ -87,10 +87,12 @@ Progress  [██░░░░░░░░░░░░░░░░░░]  10%
 
 > _Feed the preprocessed image into Tesseract and configure it to extract just the registration number — a known, short, structured string._
 
-- [ ] **1.3.1** Install and configure Tesseract on the Pi (`sudo apt install tesseract-ocr`). Confirm `pytesseract` bindings work. _(0.5 hr)_
-- [ ] **1.3.2** Run Tesseract with `--psm 7` (single line) or `--psm 8` (single word) mode on the ROI crop. _(0.5 hr)_
-- [ ] **1.3.3** Whitelist only alphanumeric characters relevant to your registration number format to reduce false characters. _(0.5 hr)_
-- [ ] **1.3.4** Retrieve the confidence score from Tesseract output data — this is the threshold gate for reject vs. accept. _(0.5 hr)_
+- [x] **1.3.1** Install and configure Tesseract on the Pi (`sudo apt install tesseract-ocr`). Confirm `pytesseract` bindings work. _(0.5 hr)_ ✅ **COMPLETE** — `tesseract-ocr` installed and `pytesseract` accessible in the development environment
+- [x] **1.3.2** Run Tesseract with `--psm 7` (single line) or `--psm 8` (single word) mode on the ROI crop. _(0.5 hr)_ ✅ **COMPLETE** — generator ran both `psm=7` and `psm=8` variants and wrote outputs to `kiosk_brain/tests/outputs/<sample>/`
+- [x] **1.3.3** Whitelist only alphanumeric characters relevant to your registration number format to reduce false characters. _(0.5 hr)_ ✅ **COMPLETE** — used whitelist `0123456789-` for registration numbers (digits + hyphen)
+- [x] **1.3.4** Retrieve the confidence score from Tesseract output data — this is the threshold gate for reject vs. accept. _(0.5 hr)_ ✅ **COMPLETE** — mean confidences recorded alongside OCR text for each sample
+
+**Validation:** Sample outputs for `card_01` and `card_02` written in `kiosk_brain/tests/outputs/<sample>/` include `ocr_psm7_preocr.txt`, `ocr_psm7_preocr_conf.txt`, and matching `_match.txt` files (see Task 1.4 for pattern validation).
 
 #### Subtotal: ~2 hrs\*\*
 
@@ -100,7 +102,7 @@ Progress  [██░░░░░░░░░░░░░░░░░░]  10%
 
 > _Even high-confidence OCR can produce subtly malformed output. A regex check against the known registration number format is a cheap, reliable second filter._
 
-- [ ] **1.4.1** Write a regex pattern matching your university's registration number format (e.g. `^[A-Z]{2}\d{4}\/\d{4}$` or equivalent). _(0.5 hr)_
+- [x] **1.4.1** Write a regex pattern matching your university's registration number format (e.g. `^[A-Z]{2}\d{4}\/\d{4}$` or equivalent). _(0.5 hr)_ ✅ **COMPLETE** — implemented validation pattern for registration numbers: `^20\d{2}-04-\d{5}$` (year 20XX, fixed `-04-`, five trailing digits). Generator writes `_match.txt` and `_match_text.txt` files per sample.
 - [ ] **1.4.2** Implement decision logic: if confidence ≥ threshold AND regex matches → accept. Otherwise → reject. _(0.5 hr)_
 - [ ] **1.4.3** Implement the physical reject path signal — send a command to the STM32 (stub for now) to actuate the servo flap into the reject bin. _(0.5 hr)_
 

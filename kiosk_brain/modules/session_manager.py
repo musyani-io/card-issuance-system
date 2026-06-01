@@ -93,6 +93,17 @@ class SessionManager:
         self.student_type = (
             None  # "first_year" or "returning" - set by Welcome screen choice
         )
+        self.student_name = None
+        self.slot_index = None
+        self.batch_id = None
+        # Card ingestion tracking (populated by ingest_card())
+        self.student_name = None
+        self.slot_index = None
+        self.batch_id = None
+        # NEW: Card ingestion tracking (populated by ingest_card function)
+        self.student_name = None
+        self.slot_index = None
+        self.batch_id = None
 
     def teardown(self):
         """

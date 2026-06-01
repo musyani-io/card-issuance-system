@@ -331,12 +331,17 @@ def save_roi_preview(image_path: str | Path, output_dir: str | Path, roi_rel: tu
         # determine which ROI was actually used (None -> config default)
         used_roi_rel = roi_rel if roi_rel is not None else tuple(config.ROI["default"])
 
-        gray = convert_to_grayscale(roi)
+        # Apply pre-OCR enhancement (Task 1.2.6): mild blur + sharpening
+        from modules.ocr import apply_pre_ocr_enhancement
+
+        enhanced = apply_pre_ocr_enhancement(roi)
+        gray = convert_to_grayscale(enhanced)
         thresh = apply_adaptive_threshold(gray)
 
         original_path = dest / "original.jpg"
         flattened_path = dest / "flattened.jpg"
         roi_path = dest / "roi.jpg"
+        roi_preocr_path = dest / "roi_preocr.jpg"
         roi_gray_path = dest / "roi_grayscale.jpg"
         roi_thresh_path = dest / "roi_threshold.jpg"
         preview_path = dest / "roi_preview.jpg"
@@ -345,15 +350,27 @@ def save_roi_preview(image_path: str | Path, output_dir: str | Path, roi_rel: tu
         cv2.imwrite(str(original_path), image)
         cv2.imwrite(str(flattened_path), warped)
         cv2.imwrite(str(roi_path), roi)
+        cv2.imwrite(str(roi_preocr_path), enhanced)
         cv2.imwrite(str(roi_gray_path), gray)
         cv2.imwrite(str(roi_thresh_path), thresh)
 
         gray_bgr = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
         thresh_bgr = cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
-        preview = cv2.hconcat([gray_bgr, thresh_bgr])
+        preocr_bgr = enhanced if enhanced.ndim == 3 else cv2.cvtColor(enhanced, cv2.COLOR_GRAY2BGR)
+        preview = cv2.hconcat([preocr_bgr, gray_bgr, thresh_bgr])
         cv2.imwrite(str(preview_path), preview)
 
-        lines = [f"source={source.name}", f"flattened_shape={warped.shape}", f"roi_rel={used_roi_rel}", f"roi_shape={roi.shape}", "stage=1.2.5 roi crop and preprocess"]
+        lines = [
+            f"source={source.name}",
+            f"flattened_shape={warped.shape}",
+            f"roi_rel={used_roi_rel}",
+            f"roi_shape={roi.shape}",
+            "stage=1.2.5 roi crop and preprocess",
+            "post_preocr=applied",
+        ]
+        # include PRE_OCR parameters
+        lines.append(f"preocr_blur={tuple(config.PRE_OCR['blur_ksize'])}")
+        lines.append(f"preocr_sharpen_kernel={config.PRE_OCR['sharpen_kernel']}")
         if meta:
             for k, v in meta.items():
                 lines.append(f"{k}={v}")
