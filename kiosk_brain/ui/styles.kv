@@ -1,182 +1,24 @@
-#:kivy 2.0
-
-<Button>:
-    background_color: 0.15, 0.45, 0.8, 1  # Professional Blue
-    background_normal: ''
-    color: 1, 1, 1, 1  # White text
-    font_size: '18sp'
-    font_bold: True
-    canvas.before:
-        PushMatrix
-        Color: 0.15, 0.45, 0.8, 1
-        RoundedRectangle:
-            size: self.size
-            pos: self.pos
-            radius: [15]
-    canvas:
-        Color: 1, 1, 1, 0.2
-        Line:
-            rectangle: (self.x, self.y, self.width, self.height)
-            width: 0
-
-    on_press:
-        self.canvas.before.clear()
-        root_widget = self.get_root_window()
-        if root_widget:
-            pass
-
-    canvas.after:
-        PushMatrix
-        # Hover effect (subtle shadow on press)
-
-
-<Label>:
-    color: 0.2, 0.2, 0.2, 1  # Dark Gray text
-    font_size: '16sp'
-
-
-#:kivy 2.0
-#: import rgba kivy.utils.get_color_from_hex
+# Dark kiosk theme base.
 
 <Screen>:
     canvas.before:
-        Color: 0.97, 0.97, 0.98, 1  # Light Gray background
+        Color:
+            rgba: 0.04, 0.07, 0.12, 1
         Rectangle:
             size: self.size
             pos: self.pos
 
-
-# Custom Styles for Specific Elements
-CustomButton@Button:
-    background_normal: ''
-    background_color: 0.15, 0.45, 0.8, 1
-    color: 1, 1, 1, 1
+<Button>:
+    background_normal: ""
+    background_color: 0.1, 0.8, 0.9, 1
+    color: 0.02, 0.05, 0.09, 1
     font_bold: True
-    font_size: '18sp'
-    canvas.before:
-        PushMatrix
-        Color: 0.15, 0.45, 0.8, 1
-        RoundedRectangle:
-            size: self.size
-            pos: self.pos
-            radius: [15]
 
+<Label>:
+    color: 0.95, 0.99, 1, 1
 
-PrimaryButton@Button:
-    background_normal: ''
-    background_color: 0.15, 0.45, 0.8, 1
-    color: 1, 1, 1, 1
-    font_bold: True
-    font_size: '20sp'
-    size_hint_y: 0.15
-    canvas.before:
-        PushMatrix
-        Color: 0.15, 0.45, 0.8, 1
-        RoundedRectangle:
-            size: self.size
-            pos: self.pos
-            radius: [20]
-
-
-SecondaryButton@Button:
-    background_normal: ''
-    background_color: 0.85, 0.85, 0.85, 1
-    color: 0.2, 0.2, 0.2, 1
-    font_bold: True
-    font_size: '16sp'
-    canvas.before:
-        PushMatrix
-        Color: 0.85, 0.85, 0.85, 1
-        RoundedRectangle:
-            size: self.size
-            pos: self.pos
-            radius: [15]
-
-
-DangerButton@Button:
-    background_normal: ''
-    background_color: 0.9, 0.2, 0.2, 1
-    color: 1, 1, 1, 1
-    font_bold: True
-    font_size: '18sp'
-    canvas.before:
-        PushMatrix
-        Color: 0.9, 0.2, 0.2, 1
-        RoundedRectangle:
-            size: self.size
-            pos: self.pos
-            radius: [15]
-
-
-TitleLabel@Label:
-    font_size: '32sp'
-    font_bold: True
-    color: 0.15, 0.45, 0.8, 1
-    bold: True
-
-
-SubtitleLabel@Label:
-    font_size: '20sp'
-    color: 0.3, 0.3, 0.3, 1
-    text_size: self.width, None
-    halign: 'center'
-
-
-StyledTextInput@TextInput:
+<TextInput>:
     multiline: False
-    font_size: '18sp'
-    background_color: 1, 1, 1, 1
-    foreground_color: 0.2, 0.2, 0.2, 1
-    hint_text_color_focus: 0.7, 0.7, 0.7, 1
-    hint_text_color: 0.8, 0.8, 0.8, 1
-    cursor_color: 0.15, 0.45, 0.8, 1
-    padding: 15, 15
-    canvas.before:
-        Color: 1, 1, 1, 1
-        RoundedRectangle:
-            size: self.size
-            pos: self.pos
-            radius: [10]
-        Color: 0.15, 0.45, 0.8, 0.3
-        Line:
-            rectangle: (self.x, self.y, self.width, self.height)
-            width: 2
-            radius: [10]
-
-
-NumPadButton@Button:
-    background_normal: ''
-    background_color: 0.2, 0.5, 0.9, 1
-    color: 1, 1, 1, 1
-    font_bold: True
-    font_size: '22sp'
-    canvas.before:
-        PushMatrix
-        Color: 0.2, 0.5, 0.9, 1
-        RoundedRectangle:
-            size: self.size
-            pos: self.pos
-            radius: [12]
-
-
-SuccessLabel@Label:
-    font_size: '28sp'
-    font_bold: True
-    color: 0.2, 0.7, 0.3, 1
-    text_size: self.width, None
-    halign: 'center'
-
-
-ErrorLabel@Label:
-    font_size: '24sp'
-    font_bold: True
-    color: 0.9, 0.2, 0.2, 1
-    text_size: self.width, None
-    halign: 'center'
-
-
-InfoLabel@Label:
-    font_size: '18sp'
-    color: 0.4, 0.4, 0.4, 1
-    text_size: self.width, None
-    halign: 'center'
+    font_size: "18sp"
+    background_color: 0.08, 0.12, 0.18, 1
+    foreground_color: 0.95, 0.99, 1, 1

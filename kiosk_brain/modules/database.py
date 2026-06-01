@@ -147,6 +147,80 @@ def get_student_from_db(reg_number, db_path=None):
             conn.close()
 
 
+def get_card_record_by_registration(reg_number, db_path=None):
+    """
+    Read the most recent card record for a registration number.
+
+    Returns the current card status plus slot/batch metadata so the UI can:
+    - block already-collected cards at registration entry
+    - capture slot/batch information before final status updates
+    """
+    conn = None
+    try:
+        conn = get_db_connection(db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT card_id, registration_number, slot_index, card_status, batch_id,
+                   created_at, updated_at
+            FROM cards
+            WHERE registration_number = ?
+            ORDER BY card_id DESC
+            LIMIT 1
+            """,
+            (reg_number,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return {"success": False, "error": "Card not found"}
+
+        return {
+            "success": True,
+            "data": {
+                "card_id": row["card_id"],
+                "registration_number": row["registration_number"],
+                "slot_index": row["slot_index"],
+                "card_status": row["card_status"],
+                "batch_id": row["batch_id"],
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"],
+            },
+        }
+    finally:
+        if conn:
+            conn.close()
+
+
+def mark_card_collected(reg_number, db_path=None):
+    """
+    Mark the latest card row for a registration number as collected.
+
+    Updates card_status and updated_at so the UI can prevent duplicate collection.
+    """
+    conn = None
+    try:
+        conn = get_db_connection(db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE cards
+            SET card_status = 'collected',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE registration_number = ?
+              AND card_status != 'collected'
+            """,
+            (reg_number,),
+        )
+        conn.commit()
+        return {
+            "success": True,
+            "rows_updated": cursor.rowcount,
+        }
+    finally:
+        if conn:
+            conn.close()
+
+
 def get_next_available_slot(conn=None):
     """
     Find the next available slot (0-3) for card assignment.

@@ -1,315 +1,212 @@
 """
-Styled Widgets Module — Reusable styled UI components for Card Issuance Kiosk
-
-This module provides factory functions and pre-styled widget classes that apply
-consistent styling across all screens. Styles are defined programmatically to ensure
-they work whether or not the KV file is loaded.
-
-BUTTON STYLES:
-- PrimaryButton: Large blue action buttons
-- SecondaryButton: Gray alternative buttons
-- DangerButton: Red error/warning buttons
-- NumPadButton: Numeric keypad buttons
-
-LABEL STYLES:
-- TitleLabel: Large bold blue titles
-- SubtitleLabel: Medium descriptive text
-- SuccessLabel: Green success messages
-- ErrorLabel: Red error messages
-- InfoLabel: Gray informational text
-
-TEXTINPUT STYLES:
-- StyledTextInput: Professional text inputs with blue borders
+Styled widgets for the kiosk UI.
 """
 
+from kivy.graphics import Color, Line, Rectangle, RoundedRectangle
+from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
-from kivy.graphics import Color, Rectangle
+
+from ui.constants import REG_NUMBER_DIGITS, REG_NUMBER_LENGTH
 
 
-def setup_screen_background(screen, bg_color=(0.97, 0.97, 0.98, 1)):
-    """
-    Add a background canvas to a screen.
-
-    Args:
-        screen: The Screen widget to add background to
-        bg_color: RGBA tuple for background color (default light gray)
-    """
-    # Simple background - Kivy handles resizing automatically
+def setup_screen_background(screen, bg_color=(0.04, 0.07, 0.12, 1)):
     with screen.canvas.before:
         Color(*bg_color)
         Rectangle(size=screen.size, pos=screen.pos)
 
 
+def create_glass_card(orientation="vertical", padding=16, spacing=12, **kwargs):
+    card = BoxLayout(
+        orientation=orientation,
+        padding=padding,
+        spacing=spacing,
+        **kwargs,
+    )
+    with card.canvas.before:
+        Color(0.08, 0.13, 0.2, 0.72)
+        card._bg = RoundedRectangle(radius=[22], pos=card.pos, size=card.size)
+        Color(0.25, 0.9, 0.95, 0.25)
+        card._border = Line(rounded_rectangle=[card.x, card.y, card.width, card.height, 22], width=1.2)
+
+    def _update(*_):
+        card._bg.pos = card.pos
+        card._bg.size = card.size
+        card._border.rounded_rectangle = [card.x, card.y, card.width, card.height, 22]
+
+    card.bind(pos=_update, size=_update)
+    return card
+
+
 def create_primary_button(**kwargs):
-    """
-    Create a large blue button for primary actions.
-
-    Args:
-        **kwargs: Additional Button parameters (text, size_hint_y, etc.)
-
-    Returns:
-        Button: Styled primary action button
-    """
     return Button(
         background_normal="",
-        background_color=(0.15, 0.45, 0.8, 1),
-        color=(1, 1, 1, 1),
+        background_color=(0.1, 0.8, 0.9, 1),
+        color=(0.02, 0.05, 0.09, 1),
         bold=True,
         font_size="20sp",
-        **kwargs
+        **kwargs,
     )
 
 
 def create_secondary_button(**kwargs):
-    """
-    Create a gray button for secondary/alternative actions.
-
-    Args:
-        **kwargs: Additional Button parameters (text, size_hint_y, etc.)
-
-    Returns:
-        Button: Styled secondary button
-    """
     return Button(
         background_normal="",
-        background_color=(0.85, 0.85, 0.85, 1),
-        color=(0.2, 0.2, 0.2, 1),
+        background_color=(0.12, 0.18, 0.28, 1),
+        color=(0.9, 0.97, 1, 1),
         bold=True,
-        font_size="16sp",
-        **kwargs
+        font_size="18sp",
+        **kwargs,
     )
 
 
 def create_danger_button(**kwargs):
-    """
-    Create a red button for error/warning/retry actions.
-
-    Args:
-        **kwargs: Additional Button parameters (text, size_hint_y, etc.)
-
-    Returns:
-        Button: Styled danger/warning button
-    """
     return Button(
         background_normal="",
-        background_color=(0.9, 0.2, 0.2, 1),
+        background_color=(0.92, 0.18, 0.22, 1),
         color=(1, 1, 1, 1),
         bold=True,
         font_size="18sp",
-        **kwargs
+        **kwargs,
     )
 
 
 def create_numpad_button(**kwargs):
-    """
-    Create a numeric keypad button (slightly lighter blue).
-
-    Args:
-        **kwargs: Additional Button parameters (text, size_hint_y, etc.)
-
-    Returns:
-        Button: Styled numeric keypad button
-    """
     return Button(
         background_normal="",
-        background_color=(0.2, 0.5, 0.9, 1),
-        color=(1, 1, 1, 1),
+        background_color=(0.12, 0.2, 0.34, 1),
+        color=(0.9, 0.98, 1, 1),
         bold=True,
         font_size="22sp",
-        **kwargs
+        **kwargs,
     )
 
 
 def create_title_label(**kwargs):
-    """
-    Create a large bold blue title label.
-
-    Args:
-        **kwargs: Additional Label parameters (text, size_hint_y, etc.)
-
-    Returns:
-        Label: Styled title label
-    """
     return Label(
-        color=(0.15, 0.45, 0.8, 1),
+        color=(0.95, 0.99, 1, 1),
         font_size="32sp",
         bold=True,
-        text_size=(None, None),
-        **kwargs
+        **kwargs,
     )
 
 
 def create_subtitle_label(**kwargs):
-    """
-    Create a medium descriptive subtitle label.
-
-    Args:
-        **kwargs: Additional Label parameters (text, size_hint_y, etc.)
-
-    Returns:
-        Label: Styled subtitle label
-    """
-    lbl = Label(color=(0.3, 0.3, 0.3, 1), font_size="20sp", **kwargs)
-    lbl.text_size = (lbl.width, None)
+    lbl = Label(
+        color=(0.72, 0.87, 0.92, 1),
+        font_size="20sp",
+        **kwargs,
+    )
     lbl.halign = "center"
+    lbl.valign = "middle"
+    lbl.bind(size=lambda instance, value: setattr(instance, "text_size", value))
     return lbl
 
 
 def create_success_label(**kwargs):
-    """
-    Create a green success message label for confirming successful operations.
-
-    Args:
-        **kwargs: Additional Label parameters (text, size_hint_y, etc.)
-
-    Returns:
-        Label: Styled success label (green text, 28sp bold)
-
-    Used by:
-        - ConfirmationScreen: "Card dispensed successfully"
-        - ErrorScreen with success retry: "Please try again"
-
-    Inline Logic:
-        - Green color (0.2, 0.7, 0.3, 1): RGB(51, 179, 77) = standard UI green
-        - Bold font at 28sp for high visibility (positive reinforcement)
-        - Text centered and wrapped for responsive layout
-    """
     lbl = Label(
-        color=(0.2, 0.7, 0.3, 1),  # Green: success/positive feedback
+        color=(0.18, 0.92, 0.6, 1),
         font_size="28sp",
         bold=True,
-        **kwargs
+        **kwargs,
     )
-    lbl.text_size = (lbl.width, None)  # Enable text wrapping
-    lbl.halign = "center"  # Center horizontally
+    lbl.halign = "center"
+    lbl.valign = "middle"
+    lbl.bind(size=lambda instance, value: setattr(instance, "text_size", value))
     return lbl
 
 
 def create_error_label(**kwargs):
-    """
-    Create a red error message label for displaying error conditions.
-
-    Args:
-        **kwargs: Additional Label parameters (text, size_hint_y, etc.)
-
-    Returns:
-        Label: Styled error label (red text, 24sp bold)
-
-    Used by:
-        - ErrorScreen: "Invalid OTP", "Incorrect PIN", "Try after 30 minutes"
-        - Timeout displays: "Session expired"
-        - Form validation: "PIN must be 4-6 digits"
-
-    Inline Logic:
-        - Red color (0.9, 0.2, 0.2, 1): RGB(230, 51, 51) = warning/error
-        - Bold 24sp for urgent visibility without being overwhelming
-        - Text centered for UI consistency
-    """
     lbl = Label(
-        color=(0.9, 0.2, 0.2, 1),  # Red: error/warning indicator
+        color=(0.98, 0.34, 0.38, 1),
         font_size="24sp",
         bold=True,
-        **kwargs
+        **kwargs,
     )
-    lbl.text_size = (lbl.width, None)  # Enable text wrapping
-    lbl.halign = "center"  # Center horizontally
+    lbl.halign = "center"
+    lbl.valign = "middle"
+    lbl.bind(size=lambda instance, value: setattr(instance, "text_size", value))
     return lbl
 
 
 def create_info_label(**kwargs):
-    """
-    Create a gray informational/instructional label for helper text.
-
-    Args:
-        **kwargs: Additional Label parameters (text, size_hint_y, etc.)
-
-    Returns:
-        Label: Styled info label (gray text, 18sp normal weight)
-
-    Used by:
-        - Welcome screen: "Scan your card or enter registration number"
-        - OTP entry: "Enter the 6-digit code sent to your phone"
-        - PIN entry: "Enter your 4-digit PIN (masked)"
-        - Timeout countdown: "Kiosk returning to idle in 30 seconds"
-
-    Inline Logic:
-        - Gray color (0.4, 0.4, 0.4, 1): RGB(102, 102, 102) = subtle, secondary info
-        - Smaller font size (18sp) differentiates from primary messages
-        - Normal (not bold) for reduced visual weight
-    """
     lbl = Label(
-        color=(0.4, 0.4, 0.4, 1),  # Gray: secondary/informational
+        color=(0.76, 0.86, 0.92, 1),
         font_size="18sp",
-        **kwargs
+        **kwargs,
     )
-    lbl.text_size = (lbl.width, None)  # Enable text wrapping
-    lbl.halign = "center"  # Center horizontally
+    lbl.halign = "center"
+    lbl.valign = "middle"
+    lbl.bind(size=lambda instance, value: setattr(instance, "text_size", value))
     return lbl
 
 
-def create_standard_label(**kwargs):
-    """
-    Create a standard label with default styling for general content.
+class LimitedTextInput(TextInput):
+    def __init__(self, max_length=None, numeric_only=False, **kwargs):
+        self.max_length = max_length
+        self.numeric_only = numeric_only
+        super().__init__(**kwargs)
 
-    Args:
-        **kwargs: Additional Label parameters (text, size_hint_y, etc.)
+    def insert_text(self, substring, from_undo=False):
+        if self.numeric_only:
+            substring = "".join(ch for ch in substring if ch.isdigit())
+        if not substring:
+            return
+        if self.max_length is not None:
+            remaining = self.max_length - len(self.text)
+            if remaining <= 0:
+                return
+            substring = substring[:remaining]
+        super().insert_text(substring, from_undo=from_undo)
 
-    Returns:
-        Label: Standard dark gray label (16sp normal weight)
 
-    Used by:
-        - General text display
-        - Secondary content (not critical like title/error/success)
-        - Status messages with neutral tone
+class RegNumberInput(LimitedTextInput):
+    def __init__(self, **kwargs):
+        self._normalizing = False
+        super().__init__(max_length=REG_NUMBER_LENGTH, numeric_only=True, **kwargs)
+        self.bind(text=self._normalize_text)
 
-    Inline Logic:
-        - Dark gray color (0.2, 0.2, 0.2, 1): RGB(51, 51, 51) = readable, professional
-        - Standard 16sp size for body text readability
-        - Normal weight (not bold) for neutral visual weight
-    """
-    return Label(
-        color=(0.2, 0.2, 0.2, 1),  # Dark gray: neutral, readable
-        font_size="16sp",
-        **kwargs
-    )
+    @staticmethod
+    def _format_digits(digits):
+        parts = []
+        if digits:
+            parts.append(digits[:4])
+        if len(digits) > 4:
+            parts.append(digits[4:6])
+        if len(digits) > 6:
+            parts.append(digits[6:11])
+        return "-".join(parts)
+
+    def _normalize_text(self, instance, value):
+        if self._normalizing:
+            return
+        digits = "".join(ch for ch in value if ch.isdigit())[:REG_NUMBER_DIGITS]
+        formatted = self._format_digits(digits)
+        if value != formatted:
+            self._normalizing = True
+            self.text = formatted
+            self.cursor = (len(self.text), 0)
+            self._normalizing = False
+
+    def insert_text(self, substring, from_undo=False):
+        digits = "".join(ch for ch in substring if ch.isdigit())
+        if not digits:
+            return
+        current_digits = "".join(ch for ch in self.text if ch.isdigit())
+        digits = (current_digits + digits)[:REG_NUMBER_DIGITS]
+        self.text = self._format_digits(digits)
+        self.cursor = (len(self.text), 0)
 
 
 def create_styled_textinput(**kwargs):
-    """
-    Create a styled text input field with professional appearance and blue border.
-
-    Args:
-        **kwargs: Additional TextInput parameters (multiline, input_filter, etc.)
-
-    Returns:
-        TextInput: Styled input field with blue border and light gray background
-
-    Used by:
-        - RegEntryScreen: manual registration number entry field
-        - PIN setup screen: user-chosen PIN entry (masked)
-        - Future staff admin screens: password fields
-
-    Features:
-        - Blue border (0.15, 0.45, 0.8, 1) for visual consistency with buttons
-        - Light gray background for clear text contrast
-        - Responsive sizing (size_hint matches kwargs or defaults)
-
-    Inline Logic:
-        - Canvas decoration: custom border drawn programmatically
-        - Background color set via background_color property
-        - Border width 2px for visibility without overwhelming
-        - Padding: 15px on all sides for internal spacing
-        - Cursor color matches primary blue (0.15, 0.45, 0.8, 1) for consistency
-    """
-    return TextInput(
-        multiline=False,  # Single-line input (no line breaks)
-        font_size="18sp",  # Large font for tablet touchscreen readability
-        background_color=(1, 1, 1, 1),  # White background for contrast
-        foreground_color=(0.2, 0.2, 0.2, 1),  # Dark gray text for readability
-        hint_text_color=(0.8, 0.8, 0.8, 1),  # Light gray placeholder text
-        cursor_color=(0.15, 0.45, 0.8, 1),  # Blue cursor (primary brand color)
-        padding=(15, 15),  # Internal spacing around text
-        **kwargs
+    return LimitedTextInput(
+        multiline=False,
+        font_size="18sp",
+        background_color=(0.08, 0.12, 0.18, 1),
+        foreground_color=(0.95, 0.99, 1, 1),
+        hint_text_color=(0.45, 0.62, 0.72, 1),
+        cursor_color=(0.1, 0.8, 0.9, 1),
+        padding=(15, 15),
+        **kwargs,
     )

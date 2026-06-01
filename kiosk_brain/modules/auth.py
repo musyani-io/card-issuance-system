@@ -164,7 +164,7 @@ def set_pin(reg_number, pin, db_path=DB_PATH):
 
     Args:
         reg_number: Student registration number (primary key in authentication table)
-        pin: User-chosen PIN string to validate and store (must be 4-6 numeric digits)
+        pin: User-chosen PIN string to validate and store (must be exactly 4 numeric digits)
         db_path: Path to SQLite database (default: data/kiosk.db)
 
     Returns:
@@ -179,7 +179,7 @@ def set_pin(reg_number, pin, db_path=DB_PATH):
         - Transitions student from temporary PIN (system-generated) to permanent PIN (user-chosen)
 
     Validation Rules:
-        - PIN length: 4–6 digits (4-digit minimum to prevent trivial PINs)
+        - PIN length: exactly 4 digits
         - PIN format: only numeric characters (digits only, no symbols/letters)
         - Invalid PINs return INVALID error immediately (no database update)
 
@@ -192,12 +192,12 @@ def set_pin(reg_number, pin, db_path=DB_PATH):
         - is_temp_pin flag transition prevents accidental re-entry into PIN setup screen
         - Changes remain visible to student until collection confirmation
     """
-    # Validate PIN format: 4-6 digits, numeric only
-    if not (4 <= len(pin) <= 6) or not pin.isdigit():
+    # Validate PIN format: exactly 4 digits, numeric only
+    if len(pin) != 4 or not pin.isdigit():
         return {
             "success": False,
             "error": "INVALID",
-            "message": "PIN must be 4-6 digits",
+            "message": "PIN must be exactly 4 digits",
         }
 
     # Hash PIN and update database record
@@ -327,7 +327,7 @@ def store_temp_pin_to_db(reg_number, temp_pin, db_path=DB_PATH):
         - Alongside send_credentials() to deliver temp PIN via SMS
 
     Security Notes:
-        - Temporary PIN is system-generated (6! = 720k possibilities, same space as OTP)
+        - Temporary PIN is system-generated 4-digit code (10,000 possibilities)
         - is_temp_pin=TRUE flag ensures student cannot bypass PIN setup on first collection
         - Temporary PIN stored as hash (never plaintext, even in database)
         - Overwritten by permanent PIN on first-year student's first collection
@@ -383,10 +383,18 @@ def verify_otp(reg_number, otp_num, db_path=DB_PATH):
 
     Security Notes:
         - bcrypt.checkpw() is constant-time comparison (immune to timing attacks)
-        - Soft 30-minute lockout prevents brute force (6! = 720k OTPs, recoverable after timeout)
+        - Soft 30-minute lockout prevents brute force against the 6-digit OTP space
         - Hard 24-hour lockout prevents reuse (fresh batch load required)
         - Hashed OTP always stored; plaintext only in RAM during comparison
     """
+    # Validate OTP format first: exactly 6 numeric digits
+    if len(otp_num) != 6 or not otp_num.isdigit():
+        return {
+            "success": False,
+            "error": "INVALID",
+            "message": "OTP must be exactly 6 digits",
+        }
+
     # Fetch hashed OTP, expiry timestamp, lockout status, and failure count from authentication table
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -514,6 +522,14 @@ def verify_pin(reg_number, pin, db_path=DB_PATH):
         - PIN is second factor after OTP (defense in depth)
         - Failed PIN attempts audited to audit_log for suspicious pattern detection
     """
+    # Validate PIN format first: exactly 4 numeric digits
+    if len(pin) != 4 or not pin.isdigit():
+        return {
+            "success": False,
+            "error": "INVALID",
+            "message": "PIN must be exactly 4 digits",
+        }
+
     # Fetch hashed PIN, lockout status, and failure count from authentication table
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
