@@ -39,7 +39,7 @@ The initialize_database() function creates 5 tables with relationships:
 
 DATABASE FILE:
 ==============
-Location: kiosk_brain/kiosk.db (SQLite3 database)
+Location: kiosk_brain/db/kiosk.db (SQLite3 database)
 Initialization: Automatic on app startup if file doesn't exist
 Schema File: db/schema.sql (contains all CREATE TABLE statements)
 Permissions: Read/write for kiosk app process, readable for admin users
@@ -102,7 +102,7 @@ def initialize_database(db_path=None):
 
     Example:
         >>> from db.init_db import initialize_database
-        >>> initialize_database()  # Create kiosk.db in current directory
+        >>> initialize_database()  # Create db/kiosk.db in the db directory
         >>> initialize_database("/data/production.db")  # Use absolute path
 
     Note:
@@ -112,9 +112,11 @@ def initialize_database(db_path=None):
     current_dir = Path(__file__).parent
     schema_path = current_dir / "schema.sql"
     if db_path is None:
-        db_path = str(PROJECT_ROOT / "kiosk.db")
+        db_path = str(current_dir / "kiosk.db")
     else:
         db_path = str(Path(db_path).expanduser())
+
+    Path(db_path).parent.mkdir(parents=True, exist_ok=True)
 
     with open(schema_path, "r") as f:
         schema_sql = f.read()

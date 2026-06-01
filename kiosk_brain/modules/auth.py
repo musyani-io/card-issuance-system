@@ -56,6 +56,7 @@ Function Stubs (Implement in Phase 3):
 """
 
 from modules.sms_client import send_credentials
+from config import DB_PATH
 from datetime import datetime, timedelta, timezone
 import sqlite3
 import bcrypt
@@ -157,7 +158,7 @@ def hash_credential(data):
     )  # Encode string to bytes, apply bcrypt hashing
 
 
-def set_pin(reg_number, pin, db_path="data/kiosk.db"):
+def set_pin(reg_number, pin, db_path=DB_PATH):
     """
     Verify PIN strength, hash, and store permanent PIN to authentication table.
 
@@ -213,7 +214,7 @@ def set_pin(reg_number, pin, db_path="data/kiosk.db"):
     return {"success": True, "error": None, "message": "PIN set successfully"}
 
 
-def enforce_pin_setup(reg_number, db_path="data/kiosk.db"):
+def enforce_pin_setup(reg_number, db_path=DB_PATH):
     """
     Check if student has temporary PIN and requires permanent PIN setup before collection.
 
@@ -264,7 +265,7 @@ def enforce_pin_setup(reg_number, db_path="data/kiosk.db"):
     }
 
 
-def store_otp_to_db(reg_number, otp_num, db_path="data/kiosk.db"):
+def store_otp_to_db(reg_number, otp_num, db_path=DB_PATH):
     """
     Store hashed OTP and 24-hour expiry timestamp to authentication table.
 
@@ -305,7 +306,7 @@ def store_otp_to_db(reg_number, otp_num, db_path="data/kiosk.db"):
     conn.close()
 
 
-def store_temp_pin_to_db(reg_number, temp_pin, db_path="data/kiosk.db"):
+def store_temp_pin_to_db(reg_number, temp_pin, db_path=DB_PATH):
     """
     Store hashed temporary PIN with is_temp_pin=TRUE flag to authentication table.
 
@@ -345,7 +346,7 @@ def store_temp_pin_to_db(reg_number, temp_pin, db_path="data/kiosk.db"):
     conn.close()
 
 
-def verify_otp(reg_number, otp_num, db_path="data/kiosk.db"):
+def verify_otp(reg_number, otp_num, db_path=DB_PATH):
     """
     Verify student OTP against database hash using bcrypt.checkpw() comparison.
 
@@ -473,7 +474,7 @@ def verify_otp(reg_number, otp_num, db_path="data/kiosk.db"):
     return {"success": True, "error": None, "message": "OTP verified successfully"}
 
 
-def verify_pin(reg_number, pin, db_path="data/kiosk.db"):
+def verify_pin(reg_number, pin, db_path=DB_PATH):
     """
     Verify student PIN against database hash using bcrypt.checkpw() comparison.
 
@@ -647,7 +648,7 @@ def dispatch_credentials_with_logging(
     return result
 
 
-def retry_send_credentials(reg_number, otp, temp_pin, db_path="data/kiosk.db"):
+def retry_send_credentials(reg_number, otp, temp_pin, db_path=DB_PATH):
     """
     Retry credential delivery after 10-minute grace period if initial send failed.
 
@@ -709,7 +710,7 @@ def retry_send_credentials(reg_number, otp, temp_pin, db_path="data/kiosk.db"):
 
 
 def log_audit_event(
-    reg_number, event_type, failure_type=None, session_id=None, db_path="data/kiosk.db"
+    reg_number, event_type, failure_type=None, session_id=None, db_path=DB_PATH
 ):
     """
     Log authentication and collection events to audit_log table for compliance and debugging.
@@ -738,7 +739,7 @@ def log_audit_event(
             - None if event_type is success
         session_id: Optional unique session ID to correlate multiple events within one transaction
                    None if not in active session (batch loading context)
-        db_path: Path to SQLite database (default: data/kiosk.db)
+        db_path: Path to SQLite database (default: config.DB_PATH)
 
     Side Effects:
         - Inserts immutable audit_log row with current UTC timestamp
