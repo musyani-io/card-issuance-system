@@ -21,6 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdbool.h>
 
 /* USER CODE END Includes */
 
@@ -47,6 +48,8 @@
 #define RESP_BUSY             0x02
 #define RESP_SENSOR_STATE     0x03
 #define RESP_ERROR            0x04
+
+#define STEPPER_STEPS_PER_REV 200U
 
 /* USER CODE END PTD */
 
@@ -75,6 +78,10 @@ uint8_t spi_tx_buf[3] = {RESP_ACK, 0x00, 0x00};  // Pre-load with default ACK
 uint8_t rx_byte_count = 0;
 uint8_t spi_frame_ready = 0;
 
+static volatile uint32_t stepper_target_steps = 0U;
+static volatile uint32_t stepper_completed_steps = 0U;
+static volatile uint8_t stepper_busy = 0U;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -85,6 +92,13 @@ static void MX_SPI1_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
+HAL_StatusTypeDef stepper_init(void);
+HAL_StatusTypeDef stepper_set_direction(bool clockwise);
+HAL_StatusTypeDef stepper_start_continuous(bool clockwise);
+void stepper_stop(void);
+HAL_StatusTypeDef stepper_rotate_steps(uint32_t steps, bool clockwise);
+HAL_StatusTypeDef stepper_rotate_revolutions(uint32_t revolutions, bool clockwise);
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim);
 
 /* USER CODE END PFP */
 
@@ -130,6 +144,8 @@ int main(void)
 
   // Start SPI1 in interrupt mode - listen from Pi
   HAL_SPI_TransmitReceive_IT(&hspi1, spi_tx_buf, spi_rx_buf, SPI_FRAME_SIZE);
+  stepper_init();
+  stepper_start_continuous(true);
 
   /* USER CODE END 2 */
 
@@ -328,7 +344,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 83;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 99;
+  htim2.Init.Period = 999;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -351,7 +367,7 @@ static void MX_TIM2_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 50;
+  sConfigOC.Pulse = 500;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
@@ -438,11 +454,19 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PA1 PA12 PA15 */
-  GPIO_InitStruct.Pin = GPIO_PIN_1|GPIO_PIN_12|GPIO_PIN_15;
+  /*Configure GPIO pins : PA12 PA15 */
+  GPIO_InitStruct.Pin = GPIO_PIN_12|GPIO_PIN_15;
   GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : DIR_Pin */
+  GPIO_InitStruct.Pin = DIR_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(DIR_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_WritePin(DIR_GPIO_Port, DIR_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : PB0 PB1 PB2 PB10
                            PB12 PB13 PB14 PB15
@@ -485,6 +509,121 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+HAL_StatusTypeDef stepper_init(void)
+{
+  if (stepper_busy != 0U)
+  {
+    return HAL_BUSY;
+  }
+
+  HAL_GPIO_WritePin(DIR_GPIO_Port, DIR_Pin, GPIO_PIN_RESET);
+  HAL_TIM_Base_Stop_IT(&htim2);
+  HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
+  __HAL_TIM_SET_COUNTER(&htim2, 0U);
+  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 0U);
+
+  return HAL_OK;
+}
+
+HAL_StatusTypeDef stepper_set_direction(bool clockwise)
+{
+  HAL_GPIO_WritePin(DIR_GPIO_Port, DIR_Pin, clockwise ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  return HAL_OK;
+}
+
+void stepper_stop(void)
+{
+  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 0U);
+  HAL_TIM_Base_Stop_IT(&htim2);
+  HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
+  __HAL_TIM_SET_COUNTER(&htim2, 0U);
+  HAL_GPIO_WritePin(STEP_GPIO_Port, STEP_Pin, GPIO_PIN_RESET);
+  stepper_target_steps = 0U;
+  stepper_completed_steps = 0U;
+  stepper_busy = 0U;
+}
+
+HAL_StatusTypeDef stepper_start_continuous(bool clockwise)
+{
+  if (stepper_busy != 0U)
+  {
+    return HAL_BUSY;
+  }
+
+  stepper_busy = 1U;
+  stepper_set_direction(clockwise);
+
+  __HAL_TIM_SET_COUNTER(&htim2, 0U);
+  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, htim2.Init.Period / 2U);
+
+  if (HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1) != HAL_OK)
+  {
+    stepper_busy = 0U;
+    return HAL_ERROR;
+  }
+
+  return HAL_OK;
+}
+
+HAL_StatusTypeDef stepper_rotate_steps(uint32_t steps, bool clockwise)
+{
+  if (steps == 0U)
+  {
+    return HAL_OK;
+  }
+
+  if (stepper_busy != 0U)
+  {
+    return HAL_BUSY;
+  }
+
+  stepper_busy = 1U;
+  stepper_target_steps = steps;
+  stepper_completed_steps = 0U;
+
+  stepper_set_direction(clockwise);
+
+  __HAL_TIM_SET_COUNTER(&htim2, 0U);
+  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, htim2.Init.Period / 2U);
+
+  if (HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1) != HAL_OK)
+  {
+    stepper_busy = 0U;
+    return HAL_ERROR;
+  }
+
+  if (HAL_TIM_Base_Start_IT(&htim2) != HAL_OK)
+  {
+    HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
+    stepper_busy = 0U;
+    return HAL_ERROR;
+  }
+
+  while (stepper_busy != 0U)
+  {
+    __WFI();
+  }
+
+  return HAL_OK;
+}
+
+HAL_StatusTypeDef stepper_rotate_revolutions(uint32_t revolutions, bool clockwise)
+{
+  return stepper_rotate_steps(revolutions * STEPPER_STEPS_PER_REV, clockwise);
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  if ((htim->Instance == TIM2) && (stepper_busy != 0U))
+  {
+    stepper_completed_steps++;
+    if (stepper_completed_steps >= stepper_target_steps)
+    {
+      stepper_stop();
+    }
+  }
+}
 
 void route_command(uint8_t cmd_byte, uint8_t param_byte)
 {

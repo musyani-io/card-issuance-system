@@ -28,6 +28,7 @@ extern uint8_t spi_tx_buf[3];
 extern uint8_t rx_byte_count;
 extern uint8_t spi_frame_ready;
 extern void route_command(uint8_t cmd, uint8_t param);
+extern TIM_HandleTypeDef htim2;
 
 /* SPI Protocol Defines (from main.c) */
 #define SPI_FRAME_SIZE 3
@@ -234,6 +235,11 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
     // Re-arm for next frame
     HAL_SPI_TransmitReceive_IT(hspi, spi_tx_buf, spi_rx_buf, SPI_FRAME_SIZE);
   }
+}
+
+void TIM2_IRQHandler(void)
+{
+  HAL_TIM_IRQHandler(&htim2);
 }
 
 /* USER CODE END 1 */

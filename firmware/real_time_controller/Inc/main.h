@@ -31,6 +31,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdbool.h>
 
 /* USER CODE END Includes */
 
@@ -55,6 +56,12 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
+HAL_StatusTypeDef stepper_init(void);
+HAL_StatusTypeDef stepper_set_direction(bool clockwise);
+HAL_StatusTypeDef stepper_start_continuous(bool clockwise);
+void stepper_stop(void);
+HAL_StatusTypeDef stepper_rotate_steps(uint32_t steps, bool clockwise);
+HAL_StatusTypeDef stepper_rotate_revolutions(uint32_t revolutions, bool clockwise);
 
 /* USER CODE END EFP */
 
@@ -65,6 +72,10 @@ void Error_Handler(void);
 #define USART_TX_GPIO_Port GPIOA
 #define USART_RX_Pin GPIO_PIN_3
 #define USART_RX_GPIO_Port GPIOA
+#define STEP_Pin GPIO_PIN_0
+#define STEP_GPIO_Port GPIOA
+#define DIR_Pin GPIO_PIN_1
+#define DIR_GPIO_Port GPIOA
 #define SOLENOID_Pin GPIO_PIN_10
 #define SOLENOID_GPIO_Port GPIOA
 #define HALL_EFFECT_Pin GPIO_PIN_11
