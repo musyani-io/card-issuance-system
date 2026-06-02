@@ -9,11 +9,11 @@
 ## Overall Project Progress
 
 ```text
-Phase 1 — OCR Pipeline            [██░░░░░░░░░░░░░░░░░░]  10%   Wk 1–2
-Phase 2 — Database & Mock API     [██████████████████░░]  90%   Wk 2–3
+Phase 1 — OCR Pipeline            [█████████████░░░░░░░]  65%   Wk 1–2
+Phase 2 — Database & Mock API     [█████████████████░░░]  85%   Wk 2–3
 Phase 3 — Auth & SMS              [████████████████████]  100%   Wk 3–4
-Phase 4 — Kivy UI & SPI           [███████████████████░]  95%   Wk 4–5
-Phase 5 — Mechanical Prototype    [█████░░░░░░░░░░░░░░░]  26%   Wk 5–7
+Phase 4 — Kivy UI & SPI           [██████████████████░░]  90%   Wk 4–5
+Phase 5 — Mechanical Prototype    [██████████░░░░░░░░░░]  50%   Wk 5–7
 Phase 6 — Enclosure, Test & Docs  [░░░░░░░░░░░░░░░░░░░░]   0%   Wk 8
 ```
 
@@ -30,12 +30,12 @@ Phase 6 — Enclosure, Test & Docs  [░░░░░░░░░░░░░░�
 - [x] **Buy 64GB microSD card (Class 10 / UHS-I)** — Pi 5 has no OS without this. Nothing runs until this is done.
 - [x] **Flash Raspberry Pi OS Lite** onto the card using Raspberry Pi Imager.
 - [x] **Boot and configure the Pi 5** — enable SSH, SPI interface, Camera interface, set hostname.
-- [x] **Confirm Pi Camera Module compatibility** — Pi 5 uses a different CSI connector; may need an adapter cable.
+- [x] **Confirm Pi Camera Module compatibility** — Pi camera capture has been verified with `rpicam-still` and OpenCV.
 - [x] **Install base Python packages** — `opencv-python`, `pytesseract`, `kivy`, `bcrypt`, `flask`, `requests`, `africastalking`.
 - [x] **Order remaining hardware** — STM32 Nucleo, NEMA 17 motors, drivers, servos, IR sensors, solenoid, acrylic sheet.
 - [x] **Set up project Git repository** — version control from day one.
 
-**Completion:** 6/7 items complete. Only Pi Camera Module compatibility check remained.
+**Completion:** 7/7 items complete.
 
 ---
 
@@ -48,7 +48,7 @@ Phase 6 — Enclosure, Test & Docs  [░░░░░░░░░░░░░░�
 > **Deliverable:** OCR module achieving >90% accuracy on a sample set of test cards.
 
 ```text
-Progress  [██░░░░░░░░░░░░░░░░░░]  10%
+Progress  [█████████████░░░░░░░]  65%
 ```
 
 ---
@@ -189,8 +189,8 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 
 > _Wire Phase 1 output into Phase 2 logic and confirm the full chain works: OCR reads a reg number → API looks up the student → SQLite stores the record with a slot assignment._
 
-- [ ] **2.4.1** Write `ingest_card(reg_number)` function: calls API client, writes to `students` and `cards` tables atomically, assigns next available slot index. _(1 hr)_
-- [ ] **2.4.2** Implement slot availability check — query `cards` table for slots with status `ready` or `pending` to find next free index. _(0.5 hr)_
+- [x] **2.4.1** Write `ingest_card(reg_number)` function: calls API client, writes to `students` and `cards` tables atomically, assigns next available slot index. _(1 hr)_
+- [x] **2.4.2** Implement slot availability check — query `cards` table for slots with status `ready` or `pending` to find next free index. _(0.5 hr)_
 - [ ] **2.4.3** Test full ingestion of 10 simulated cards — verify all records appear correctly in SQLite with no slot collisions. _(0.5 hr)_
 
 **Status:** ⏳ NOT STARTED (blocked on Phase 1 OCR pipeline)
@@ -208,7 +208,7 @@ Progress  [░░░░░░░░░░░░░░░░░░░░]   0%
 
 ---
 
-**Phase 2 Summary:** Schema (Task 2.1 ✅), Flask API with MySQL migration (Task 2.2 ✅ all 7 subtasks complete), API Client (Task 2.3 ✅ with full documentation), Card Ingestion and Cleanup deferred. **12/12 hrs estimated time allocated; ~10 hrs spent.** Progress: 90% (3.5 of 5 tasks complete). Task 2.2 complete: MySQL backend with auto-generated emails, Flask API tested, Pi client verified unchanged.
+**Phase 2 Summary:** Schema (Task 2.1 ✅), Flask API with MySQL migration (Task 2.2 ✅ all 7 subtasks complete), API Client (Task 2.3 ✅ with full documentation), Card Ingestion and Cleanup deferred. **12/12 hrs estimated time allocated; ~10 hrs spent.** Progress: 85% (3.5 of 5 tasks complete). Task 2.2 complete: MySQL backend with auto-generated emails, Flask API tested, Pi client verified unchanged.
 
 #### Phase 2 Total Estimated Time: ~12 hrs\*\*
 
@@ -326,7 +326,7 @@ Progress  [████████████████████]  100%
 > **Deliverable:** Fully integrated end-to-end system running on the combined Pi + STM32 hardware.
 
 ```text
-Progress  [███████████████████░]  95%
+Progress  [██████████████████░░]  90%
 ```
 
 ---
