@@ -1,419 +1,534 @@
 """
-Kiosk Application Entry Point — Kivy UI Framework Integration
-
-This is the main entry point for the Smart ID Card Distribution Kiosk. It initializes
-the Kivy application, sets up the ScreenManager for UI navigation, and wires all UI
-screen transitions to SessionManager state updates.
-
-**Architecture Overview:**
-==========================
-
-SINGLE INSTANCE PATTERN:
-- One KioskApp instance runs for the entire kiosk lifetime (until poweroff)
-- One ScreenManager manages all 6 UI screens
-- One SessionManager shared globally tracks student session state
-- Timeout timer (Clock.schedule_interval) runs every 1 second
-
-SCREEN MANAGER GRAPH:
-    WELCOME → REG_ENTRY → OTP_ENTRY → PIN_ENTRY → CONFIRMATION → WELCOME
-           ↑                                             ↓
-           └─ ERROR (on lockout, network failure) ──────┘
-
-SESSION LIFECYCLE:
-    1. Student at kiosk (WELCOME screen, no session)
-    2. Student enters reg number (REG_ENTRY screen, session initializes)
-    3. Student enters OTP (OTP_ENTRY screen, session active)
-    4. Student enters PIN (PIN_ENTRY screen, session active)
-    5. Student collects card (CONFIRMATION screen, card dispensed)
-    6. Session teardown (WELCOME screen, session reset)
-
-TIMEOUT ENFORCEMENT:
-    - Clock.schedule_interval() calls _check_timeout() every 1 second
-    - Inactivity > 60 seconds triggers automatic session teardown + return to WELCOME
-    - Prevents card hijacking if student walks away mid-session
-
-**CRITICAL DEVELOPER PATTERN:**
-
-SessionManager MUST be explicitly torn down before leaving a session:
-
-    ✓ CORRECT:
-        confirmation_screen.ok_button.bind(
-            on_press=lambda x: (
-                session_manager.teardown(),        # ← Mandatory cleanup
-                setattr(sm, "current", SCREEN_WELCOME)
-            )
-        )
-
-    ✗ WRONG:
-        confirmation_screen.ok_button.bind(
-            on_press=lambda x: setattr(sm, "current", SCREEN_WELCOME)
-        )  # ← Ghost session!  Previous student's reg_number persists in memory
-
-**Configuration:**
-    - Display: 800x400 pixels (hardcoded via Kivy Config)
-    - Window mode: Fullscreen on Raspberry Pi (/dev/fb0)
-    - Orientation: Landscape (fixed)
+Kiosk application entry point.
 """
 
-from kivy.config import Config
-from ui.screens import *
-from ui.constants import *
-from modules.session_manager import SessionManager
+from threading import Thread
 
-# Configure Kivy display before App initialization
+from kivy.app import App
+from kivy.clock import Clock
+from kivy.config import Config
+from kivy.uix.screenmanager import ScreenManager
+
+from modules.auth import enforce_pin_setup, set_pin, verify_otp, verify_pin
+from modules.database import (
+    get_card_record_by_registration,
+    get_student_from_db,
+    mark_card_collected,
+)
+from modules.session_manager import SessionManager
+from ui.constants import (
+    CONFIRMATION_SCREEN_SECONDS,
+    LOCKOUT_SCREEN_SECONDS,
+    LOOKUP_MAX_TRIES,
+    OTP_LENGTH,
+    OTP_MAX_TRIES,
+    PIN_LENGTH,
+    PIN_MAX_TRIES,
+    SCREEN_CONFIRMATION,
+    SCREEN_ERROR,
+    SCREEN_IDLE,
+    SCREEN_LOCKED,
+    SCREEN_OTP_ENTRY,
+    SCREEN_PIN_ENTRY,
+    SCREEN_PIN_SETUP,
+    SCREEN_REG_ENTRY,
+    SCREEN_WAIT,
+    SESSION_TIMEOUT_SECONDS,
+)
+from ui.screens import (
+    ConfirmationScreen,
+    ErrorScreen,
+    IdleScreen,
+    LockedScreen,
+    OTPEntryScreen,
+    PINEntryScreen,
+    PINSetupScreen,
+    RegEntryScreen,
+    WaitScreen,
+)
+
 Config.set("graphics", "width", "800")
 Config.set("graphics", "height", "400")
 
-from kivy.app import App
-from kivy.uix.screenmanager import ScreenManager
-from kivy.clock import Clock
-from modules.auth import verify_otp, verify_pin, set_pin
 
-# Global session manager instance (shared across all screens)
 session_manager = SessionManager()
 
 
 class KioskApp(App):
-    """
-    Main Kivy application for the Smart ID Card Distribution Kiosk.
-
-    Responsibilities:
-        - Initialize Kivy ScreenManager with all 14 UI screens (9 student + 4 staff + error)
-        - Wire screen transitions to SessionManager state updates
-        - Schedule inactivity timeout checks every 1 second
-        - Handle graceful shutdown (teardown, cleanup)
-
-    Attributes:
-        sm: Kivy ScreenManager instance (self.sm = sm in build())
-
-    Lifecycle:
-        - app.build() called on App().run() startup (creates screens + bindings)
-        - app._check_timeout() called every 1 second via Clock.schedule_interval()
-        - app.on_stop() called on window close or SIGTERM
-
-    **Thread Safety:** All Kivy operations are single-threaded (main thread only)
-    """
-
     def build(self):
-        """
-        Initialize UI screens and wire all transitions to SessionManager.
+        self.sm = ScreenManager()
+        self.session_timeout_seconds = SESSION_TIMEOUT_SECONDS
+        self.confirmation_timeout_seconds = CONFIRMATION_SCREEN_SECONDS
+        self.lockout_screen_seconds = LOCKOUT_SCREEN_SECONDS
+        self.flow_token = 0
+        self.pin_mode = "permanent"
+        self.reg_attempts = 0
+        self.otp_attempts = 0
+        self.pin_attempts = 0
+        self.dispense_in_progress = False
+        self.hardware_enabled = False
+        self.confirmation_event = None
+        self.lockout_event = None
 
-        Returns:
-            sm (ScreenManager): Root widget for Kivy app (displays current screen)
+        self.idle_screen = IdleScreen()
+        self.reg_entry_screen = RegEntryScreen()
+        self.otp_entry_screen = OTPEntryScreen()
+        self.pin_entry_screen = PINEntryScreen()
+        self.pin_setup_screen = PINSetupScreen()
+        self.wait_screen = WaitScreen()
+        self.confirmation_screen = ConfirmationScreen()
+        self.error_screen = ErrorScreen()
+        self.locked_screen = LockedScreen()
 
-        Side Effects:
-            - Creates 14 screen instances (9 student: Idle/Welcome/RegEntry/OTP/PIN/PINSetup/Confirmation/Success/Locked + 4 staff: StaffPIN/PreScan/BatchProgress/BatchSummary + Error)
-            - Adds all screens to ScreenManager
-            - Binds all button callbacks to screen transitions
-            - Schedules _check_timeout() on 1-second interval
-            - Stores sm reference as self.sm (for timeout handler)
+        for screen in (
+            self.idle_screen,
+            self.reg_entry_screen,
+            self.otp_entry_screen,
+            self.pin_entry_screen,
+            self.pin_setup_screen,
+            self.wait_screen,
+            self.confirmation_screen,
+            self.error_screen,
+            self.locked_screen,
+        ):
+            self.sm.add_widget(screen)
 
-        **Screen Transition Graph Wiring:**
-            STUDENT WORKFLOW:
-            idle.collect_button → WELCOME (start session)
-            idle.swipe_down → STAFF_PIN (staff access)
-            welcome.ret_button → OTP_ENTRY (returning student flow)
-            welcome.first_button → REG_ENTRY (first-year student flow)
-            reg_entry.submit_button → OTP_ENTRY (reg number captured)
-            otp_entry.submit_button → PIN_ENTRY (OTP verified)
-            pin_entry.submit_button → CONFIRMATION (PIN verified)
-            pin_setup.submit_button → CONFIRMATION (first-year PIN set)
-            confirmation.ok_button → SUCCESS (card dispensed)
-            success → IDLE (auto-return after 8 seconds)
-            locked → IDLE (auto-return when countdown reaches 0:00)
+        self.idle_screen.collect_button.bind(on_press=self.start_collection)
+        self.reg_entry_screen.submit_button.bind(on_press=self.handle_reg_submit)
+        self.otp_entry_screen.submit_button.bind(on_press=self.handle_otp_submit)
+        self.pin_entry_screen.submit_button.bind(on_press=self.handle_pin_submit)
+        self.pin_setup_screen.submit_button.bind(on_press=self.handle_pin_setup_submit)
+        self.confirmation_screen.finish_button.bind(on_press=self.finish_collection)
+        self.error_screen.retry_button.bind(on_press=self.retry_from_error)
 
-            STAFF WORKFLOW:
-            idle.swipe_down → STAFF_PIN (staff login via 6-digit PIN)
-            staff_pin.submit_button → STAFF_CHECKLIST (pre-scan checks)
-            staff_checklist.start_button → BATCH_PROGRESS (live scan feed)
-            batch_progress.stop_button → BATCH_SUMMARY (final counts)
-            batch_summary.logout_button → IDLE (return to student standby)
+        self.reg_entry_screen.reg_input.bind(text=lambda *_: self.note_activity())
+        self.otp_entry_screen.otp_input.bind(text=lambda *_: self.note_activity())
+        self.pin_entry_screen.pin_input.bind(text=lambda *_: self.note_activity())
+        self.pin_setup_screen.pin_input.bind(text=lambda *_: self.note_activity())
+        self.pin_setup_screen.confirm_input.bind(text=lambda *_: self.note_activity())
 
-        **Timeout Handler Scheduling:**
-            Clock.schedule_interval(lambda dt: self._check_timeout(), 1)
-            - Calls _check_timeout() every 1000ms
-            - Receives dt (delta time since last call) but unused
-        """
-        # Create ScreenManager to hold all 10 screens
-        sm = ScreenManager()
+        self.wait_screen.bind(on_enter=lambda *_: self.begin_dispense())
+        self.confirmation_screen.bind(on_enter=lambda *_: self.schedule_confirmation_timeout())
+        self.locked_screen.bind(on_enter=lambda *_: self.schedule_locked_return())
 
-        # Instantiate all screen objects
-        welcome_screen = WelcomeScreen()
-        otp_entry_screen = OTPEntryScreen()
-        pin_entry_screen = PINEntryScreen()
-        error_screen = ErrorScreen()
-        confirmation_screen = ConfirmationScreen()
-        reg_entry_screen = RegEntryScreen()
-        pin_setup_screen = PINSetupScreen()
-        locked_screen = LockedScreen()
-        success_screen = SuccessScreen()
-        idle_screen = IdleScreen()
-        staff_pin_screen = StaffPINScreen()
-        pre_scan_screen = PreScanChecklistScreen()
-        batch_progress_screen = BatchProgressScreen()
-        batch_summary_screen = BatchSummaryScreen()
+        self.sm.current = SCREEN_IDLE
+        Clock.schedule_interval(self._check_timeout, 1)
+        return self.sm
 
-        # Register all screens with name identifiers
-        sm.add_widget(welcome_screen)
-        sm.add_widget(otp_entry_screen)
-        sm.add_widget(pin_entry_screen)
-        sm.add_widget(error_screen)
-        sm.add_widget(confirmation_screen)
-        sm.add_widget(reg_entry_screen)
-        sm.add_widget(pin_setup_screen)
-        sm.add_widget(locked_screen)
-        sm.add_widget(success_screen)
-        sm.add_widget(idle_screen)
-        sm.add_widget(staff_pin_screen)
-        sm.add_widget(pre_scan_screen)
-        sm.add_widget(batch_progress_screen)
-        sm.add_widget(batch_summary_screen)
+    def note_activity(self):
+        session_manager.update_activity()
 
-        # Wire idle screen button → welcome (start new session)
-        idle_screen.collect_button.bind(
-            on_press=lambda x: setattr(sm, "current", SCREEN_WELCOME)
+    def _reset_flow_state(self):
+        self.reg_attempts = 0
+        self.otp_attempts = 0
+        self.pin_attempts = 0
+        self.pin_mode = "permanent"
+        self.dispense_in_progress = False
+        self._cancel_events()
+        self._clear_inputs()
+
+    def _clear_inputs(self):
+        self.reg_entry_screen.clear_inputs()
+        self.otp_entry_screen.clear_inputs()
+        self.pin_entry_screen.clear_inputs()
+        self.pin_setup_screen.clear_inputs()
+
+    def _secure_dispenser(self):
+        return None
+
+    def _cancel_events(self):
+        if self.confirmation_event is not None:
+            self.confirmation_event.cancel()
+            self.confirmation_event = None
+        if self.lockout_event is not None:
+            self.lockout_event.cancel()
+            self.lockout_event = None
+
+    def _schedule_idle_return(self, delay_seconds, token):
+        def _return_if_current(_dt):
+            if token == self.flow_token:
+                self._go_idle()
+
+        Clock.schedule_once(_return_if_current, delay_seconds)
+
+    def _run_async(self, task_fn, callback_fn):
+        def worker():
+            try:
+                result = task_fn()
+            except Exception as exc:
+                result = {"success": False, "error": str(exc)}
+            Clock.schedule_once(lambda dt, value=result: callback_fn(value), 0)
+
+        Thread(target=worker, daemon=True).start()
+
+    def _set_error(self, message, retry_screen=SCREEN_IDLE, detail=None):
+        self.error_screen.set_error(message, retry_screen=retry_screen)
+        self.error_screen.info_label.text = (
+            detail if detail is not None else "Tap Try Again to return to the previous step."
         )
+        self.sm.current = SCREEN_ERROR
 
-        # Wire welcome screen buttons → next screens
-        welcome_screen.ret_button.bind(
-            on_press=lambda x: (
-                session_manager.update_activity(),  # Initialize session on button press
-                setattr(
-                    session_manager, "student_type", "returning"
-                ),  # Returning student path
-                setattr(sm, "current", SCREEN_OTP_ENTRY),
+    def _set_locked(self, message, detail=None):
+        self.locked_screen.set_message(message, detail)
+        self.sm.current = SCREEN_LOCKED
+
+    def _go_idle(self):
+        self._cancel_events()
+        self.dispense_in_progress = False
+        self._secure_dispenser()
+        session_manager.teardown()
+        self._reset_flow_state()
+        self.sm.current = SCREEN_IDLE
+
+    def _terminate_active_flow(self):
+        self.dispense_in_progress = False
+        self._secure_dispenser()
+        session_manager.teardown()
+        self._clear_inputs()
+        self.reg_attempts = 0
+        self.otp_attempts = 0
+        self.pin_attempts = 0
+        self.pin_mode = "permanent"
+
+    def start_collection(self, *_):
+        self._go_idle()
+        self.flow_token += 1
+        self.note_activity()
+        self.sm.current = SCREEN_REG_ENTRY
+
+    def handle_reg_submit(self, *_):
+        reg_number = self.reg_entry_screen.reg_input.text.strip()
+        if not reg_number:
+            self.reg_attempts += 1
+            if self.reg_attempts >= LOOKUP_MAX_TRIES:
+                self._terminate_active_flow()
+                self._set_locked(
+                    "Registration number not found.",
+                    "Too many failed registration lookups. Returning to idle.",
+                )
+                return
+            self._set_error(
+                f"Registration number is required. Attempt {self.reg_attempts} of {LOOKUP_MAX_TRIES}.",
+                retry_screen=SCREEN_REG_ENTRY,
             )
-        )
-        welcome_screen.first_button.bind(
-            on_press=lambda x: (
-                session_manager.update_activity(),  # Initialize session on button press
-                setattr(
-                    session_manager, "student_type", "first_year"
-                ),  # First-year student path
-                setattr(sm, "current", SCREEN_REG_ENTRY),
-            )
-        )
-
-        # Wire reg entry → OTP entry
-        reg_entry_screen.submit_button.bind(
-            on_press=lambda x: self.handle_reg_submit(reg_entry_screen)
-        )
-
-        # Wire OTP entry → PIN entry (update activity timestamp on transition)
-        # Note: error_screen reference stored for handler to access
-        self.error_screen = error_screen
-        otp_entry_screen.submit_button.bind(
-            on_press=lambda x: (
-                session_manager.update_activity(),  # Reset inactivity timeout
-                self.handle_otp_submit(otp_entry_screen),
-            )
-        )
-
-        # Store screen references for PIN handlers
-        self.pin_entry_screen = pin_entry_screen
-        self.pin_setup_screen = pin_setup_screen
-
-        # Wire PIN entry → verify PIN before routing
-        pin_entry_screen.submit_button.bind(
-            on_press=lambda x: self.handle_pin_submit(pin_entry_screen)
-        )
-
-        # Wire PIN setup (first-year) → verify and store new PIN
-        pin_setup_screen.submit_button.bind(
-            on_press=lambda x: self.handle_pin_setup_submit(pin_setup_screen)
-        )
-
-        # Wire confirmation → success (card dispensed, ready for collection)
-        confirmation_screen.ok_button.bind(
-            on_press=lambda x: setattr(sm, "current", SCREEN_SUCCESS)
-        )
-
-        # Wire success → idle (auto-return after 8 seconds)
-        # Schedule a callback 8000ms (8 seconds) after SuccessScreen appears
-        def schedule_success_return():
-            Clock.schedule_once(
-                lambda dt: (
-                    session_manager.teardown(),  # CRITICAL: cleanup before idle
-                    setattr(sm, "current", SCREEN_IDLE),
-                ),
-                8,  # 8-second delay
-            )
-
-        # Bind to success screen's on_enter event
-        success_screen.bind(on_enter=lambda screen: schedule_success_return())
-
-        # Wire pre-scan checklist → batch progress (Start Scan button)
-        pre_scan_screen.start_button.bind(
-            on_press=lambda x: setattr(sm, "current", SCREEN_BATCH_PROGRESS)
-        )
-
-        # Wire batch progress → batch summary (Stop Scan button)
-        batch_progress_screen.stop_button.bind(
-            on_press=lambda x: setattr(sm, "current", SCREEN_BATCH_SUMMARY)
-        )
-
-        # Wire batch summary → idle (Logout button, return to student standby)
-        batch_summary_screen.logout_button.bind(
-            on_press=lambda x: setattr(sm, "current", SCREEN_IDLE)
-        )
-
-        # Store ScreenManager reference for timeout handler access
-        self.sm = sm
-
-        # Set initial screen to IDLE (kiosk ready for new session)
-        sm.current = SCREEN_IDLE
-
-        # Schedule inactivity timeout check every 1 second
-        Clock.schedule_interval(lambda dt: self._check_timeout(), 1)
-
-        return sm
-
-    def _check_timeout(self):
-        """
-        Check for inactivity timeout and return to welcome screen if exceeded.
-
-        Called by: Clock.schedule_interval() every 1 second
-
-        Timeout Logic:
-            - If last_activity_time > 60 seconds ago → timeout triggered
-            - Call session_manager.teardown() to reset session state
-            - Transition to SCREEN_WELCOME (return to idle)
-            - Next student sees blank welcome screen (no lingering data)
-
-        **Security Critical:**
-            This function prevents card hijacking if student walks away mid-session.
-            Failure to teardown() before returning to WELCOME allows ghost sessions.
-
-        Side Effects:
-            - Calls session_manager.is_timed_out() every 1 second
-            - On timeout: calls session_manager.teardown() and sm.current = WELCOME
-            - Otherwise: no side effects
-        """
-        # Check if inactivity exceeded timeout (60-second grace period)
-        if session_manager.is_timed_out(timeout_seconds=60):
-            # Inactivity timeout triggered
-            session_manager.teardown()  # Reset all session state
-            setattr(self.sm, "current", SCREEN_WELCOME)  # Return to idle screen
-
-    def handle_otp_submit(self, otp_entry_screen):
-        """
-        Verify OTP and route to PIN entry or error screen.
-
-        Args:
-            otp_entry_screen: OTPEntryScreen instance with otp_input field
-        """
-        result = verify_otp(session_manager.reg_number, otp_entry_screen.otp_input.text)
-        if result["success"]:
-            otp_entry_screen.otp_input.text = ""
-            setattr(self.sm, "current", SCREEN_PIN_ENTRY)
-        else:
-            self.error_screen.error_label.text = result["message"]
-            setattr(self.sm, "current", SCREEN_ERROR)
-
-    def handle_reg_submit(self, reg_entry_screen):
-        """
-        Handle registration number entry by reading the local kiosk_db.
-
-        Flow:
-            1. Validate input (not empty)
-            2. Read the student record from kiosk_db
-            3. If success: store student info in session and transition to OTP
-            4. If failure: display error, allow retry
-        """
-        if not reg_entry_screen.reg_input.text.strip():
-            self.error_screen.error_label.text = "Registration number cannot be empty"
-            setattr(self.sm, "current", SCREEN_ERROR)
-            return
-        
-        reg_number = reg_entry_screen.reg_input.text.strip()
-        
-        # Read the student record from the local kiosk_db populated by the Pi
-        from modules.database import get_student_from_db
-
-        result = get_student_from_db(reg_number)
-
-        if result.get("success"):
-            student_data = result.get("data", {})
-            # Ingestion successful: store data in session and proceed to OTP
-            setattr(session_manager, "reg_number", reg_number)
-            setattr(
-                session_manager,
-                "student_name",
-                f"{student_data.get('first_name', '')} {student_data.get('surname', '')}".strip(),
-            )
-            setattr(session_manager, "student_type", student_data.get("registration_status"))
-            session_manager.update_activity()  # Update activity timeout
-            
-            # Clear input field for next use
-            reg_entry_screen.reg_input.text = ""
-            
-            # Transition to OTP entry
-            setattr(self.sm, "current", SCREEN_OTP_ENTRY)
-        else:
-            # Ingestion failed: display error and allow retry
-            error_msg = result.get("error", "Unknown error during local lookup")
-            self.error_screen.error_label.text = f"Student not found in kiosk DB:\n{error_msg}"
-            setattr(self.sm, "current", SCREEN_ERROR)
-
-    def handle_pin_submit(self, pin_entry_screen):
-        """
-        Verify PIN and route to PIN setup (first-year) or confirmation (returning).
-
-        Args:
-            pin_entry_screen: PINEntryScreen instance with pin_input field
-        """
-        if not pin_entry_screen.pin_input.text.strip():
-            self.error_screen.error_label.text = "PIN cannot be empty"
-            setattr(self.sm, "current", SCREEN_ERROR)
             return
 
-        result = verify_pin(session_manager.reg_number, pin_entry_screen.pin_input.text)
-        if result["success"]:
-            pin_entry_screen.pin_input.text = ""
-            session_manager.update_activity()
-            # Route based on student type: first-year goes to PIN setup, returning goes to confirmation
-            if session_manager.student_type == "first_year":
-                setattr(self.sm, "current", SCREEN_PIN_SETUP)
+        if len(reg_number) != 13:
+            self.reg_attempts += 1
+            if self.reg_attempts >= LOOKUP_MAX_TRIES:
+                self._terminate_active_flow()
+                self._set_locked(
+                    "Registration number not found.",
+                    "Too many failed registration lookups. Returning to idle.",
+                )
+                return
+            self._set_error(
+                f"Registration number must be 13 characters. Attempt {self.reg_attempts} of {LOOKUP_MAX_TRIES}.",
+                retry_screen=SCREEN_REG_ENTRY,
+            )
+            return
+
+        card_result = get_card_record_by_registration(reg_number)
+        if card_result.get("success"):
+            card_data = card_result.get("data", {})
+            if card_data.get("card_status") == "collected":
+                token = self.flow_token
+                self._terminate_active_flow()
+                self._set_error(
+                    "Card already collected.",
+                    retry_screen=SCREEN_IDLE,
+                    detail="This card has already been collected. Returning to idle shortly.",
+                )
+                self._schedule_idle_return(10, token)
+                return
+
+        token = self.flow_token
+        self.note_activity()
+
+        def task():
+            return get_student_from_db(reg_number)
+
+        def callback(result):
+            if token != self.flow_token:
+                return
+            if result.get("success"):
+                student = result.get("data", {})
+                session_manager.reg_number = reg_number
+                session_manager.student_name = f"{student.get('first_name', '')} {student.get('surname', '')}".strip()
+                self.reg_attempts = 0
+                self.reg_entry_screen.clear_inputs()
+                self.note_activity()
+                self.sm.current = SCREEN_OTP_ENTRY
             else:
-                setattr(self.sm, "current", SCREEN_CONFIRMATION)
-        else:
-            self.error_screen.error_label.text = result["message"]
-            setattr(self.sm, "current", SCREEN_ERROR)
+                self.reg_attempts += 1
+                if self.reg_attempts >= LOOKUP_MAX_TRIES:
+                    self._terminate_active_flow()
+                    self._set_locked(
+                        "Registration number not found.",
+                        "Too many failed registration lookups. Returning to idle.",
+                    )
+                    return
+                self._set_error(
+                    f"Student not found. Attempt {self.reg_attempts} of {LOOKUP_MAX_TRIES}.",
+                    retry_screen=SCREEN_REG_ENTRY,
+                )
 
-    def handle_pin_setup_submit(self, pin_setup_screen):
-        """
-        Verify PIN strength, set permanent PIN for first-year students.
+        self._run_async(task, callback)
 
-        Args:
-            pin_setup_screen: PINSetupScreen instance with pin_input and confirm_input fields
-        """
-        pin1 = pin_setup_screen.pin_input.text.strip()
-        pin2 = pin_setup_screen.confirm_input.text.strip()
-
-        # Validate: both fields filled
-        if not pin1 or not pin2:
-            self.error_screen.error_label.text = "Both PIN fields required"
-            setattr(self.sm, "current", SCREEN_ERROR)
+    def handle_otp_submit(self, *_):
+        otp = self.otp_entry_screen.otp_input.text.strip()
+        if len(otp) != OTP_LENGTH:
+            self._set_error(
+                f"OTP must be exactly {OTP_LENGTH} digits.",
+                retry_screen=SCREEN_OTP_ENTRY,
+            )
             return
 
-        # Validate: PINs match
-        if pin1 != pin2:
-            self.error_screen.error_label.text = "PINs do not match. Try again."
-            setattr(self.sm, "current", SCREEN_ERROR)
+        token = self.flow_token
+        self.note_activity()
+
+        def task():
+            otp_result = verify_otp(session_manager.reg_number, otp)
+            if not otp_result.get("success"):
+                return {"success": False, "phase": "otp", "result": otp_result}
+            pin_result = enforce_pin_setup(session_manager.reg_number)
+            if not pin_result.get("success"):
+                return {"success": False, "phase": "pin_check", "result": pin_result}
+            return {"success": True, "requires_pin_setup": bool(pin_result.get("requires_pin_setup"))}
+
+        def callback(result):
+            if token != self.flow_token:
+                return
+            if result.get("success"):
+                requires_pin_setup = result.get("requires_pin_setup", False)
+                session_manager.student_type = "first_year" if requires_pin_setup else "returning"
+                self.otp_attempts = 0
+                self.otp_entry_screen.clear_inputs()
+                self.note_activity()
+                if requires_pin_setup:
+                    self.pin_mode = "temp"
+                    self.pin_entry_screen.configure_mode("temp")
+                    self.pin_entry_screen.clear_inputs()
+                    self.sm.current = SCREEN_PIN_ENTRY
+                else:
+                    self.pin_mode = "permanent"
+                    self._load_slot_and_wait()
+                return
+
+            otp_result = result.get("result", {})
+            if result.get("phase") == "pin_check":
+                self._set_error(
+                    otp_result.get("message", "Unable to determine PIN status."),
+                    retry_screen=SCREEN_OTP_ENTRY,
+                )
+                return
+            message = otp_result.get("message", "OTP verification failed")
+            error_code = otp_result.get("error")
+            if error_code == "LOCKED":
+                self._terminate_active_flow()
+                self._set_locked(
+                    "OTP verification locked.",
+                    "Too many failed OTP attempts. Please wait and try again later.",
+                )
+                return
+            self.otp_attempts += 1
+            self._set_error(
+                f"{message} Attempt {self.otp_attempts} of {OTP_MAX_TRIES}.",
+                retry_screen=SCREEN_OTP_ENTRY,
+            )
+
+        self._run_async(task, callback)
+
+    def handle_pin_submit(self, *_):
+        pin = self.pin_entry_screen.pin_input.text.strip()
+        if len(pin) != PIN_LENGTH:
+            self._set_error(
+                f"PIN must be exactly {PIN_LENGTH} digits.",
+                retry_screen=SCREEN_PIN_ENTRY,
+            )
             return
 
-        # Call set_pin() to store permanent PIN and mark is_temp_pin=FALSE
-        result = set_pin(session_manager.reg_number, pin1)
-        if result["success"]:
-            pin_setup_screen.pin_input.text = ""
-            pin_setup_screen.confirm_input.text = ""
+        token = self.flow_token
+        self.note_activity()
+
+        def task():
+            return verify_pin(session_manager.reg_number, pin)
+
+        def callback(result):
+            if token != self.flow_token:
+                return
+            if result.get("success"):
+                self.pin_attempts = 0
+                self.pin_entry_screen.clear_inputs()
+                self.note_activity()
+                if self.pin_mode == "temp":
+                    self.sm.current = SCREEN_PIN_SETUP
+                else:
+                    self._load_slot_and_wait()
+                return
+
+            error_code = result.get("error")
+            message = result.get("message", "PIN verification failed")
+            if error_code == "LOCKED":
+                self._terminate_active_flow()
+                self._set_locked(
+                    "PIN verification locked.",
+                    "Too many failed PIN attempts. Please wait and try again later.",
+                )
+                return
+            self.pin_attempts += 1
+            self._set_error(
+                f"{message} Attempt {self.pin_attempts} of {PIN_MAX_TRIES}.",
+                retry_screen=SCREEN_PIN_ENTRY,
+            )
+
+        self._run_async(task, callback)
+
+    def handle_pin_setup_submit(self, *_):
+        first_pin = self.pin_setup_screen.pin_input.text.strip()
+        confirm_pin = self.pin_setup_screen.confirm_input.text.strip()
+
+        if len(first_pin) != PIN_LENGTH or len(confirm_pin) != PIN_LENGTH:
+            self._set_error(
+                f"PIN setup requires exactly {PIN_LENGTH} digits in both fields.",
+                retry_screen=SCREEN_PIN_SETUP,
+            )
+            return
+
+        if first_pin != confirm_pin:
+            self._set_error(
+                "PINs do not match.",
+                retry_screen=SCREEN_PIN_SETUP,
+            )
+            return
+
+        token = self.flow_token
+        self.note_activity()
+
+        def task():
+            return set_pin(session_manager.reg_number, first_pin)
+
+        def callback(result):
+            if token != self.flow_token:
+                return
+            if result.get("success"):
+                self.pin_setup_screen.clear_inputs()
+                self.note_activity()
+                self._load_slot_and_wait()
+            else:
+                self._set_error(
+                    result.get("message", "Could not set PIN."),
+                    retry_screen=SCREEN_PIN_SETUP,
+                )
+
+        self._run_async(task, callback)
+
+    def _load_slot_and_wait(self):
+        token = self.flow_token
+
+        def task():
+            card_result = get_card_record_by_registration(session_manager.reg_number)
+            if not card_result.get("success"):
+                return {"success": False, "error": card_result.get("error", "No active card slot found")}
+
+            card = card_result.get("data", {})
+            if card.get("card_status") == "collected":
+                return {"success": False, "error": "Card already collected."}
+
+            update_result = mark_card_collected(session_manager.reg_number)
+            if not update_result.get("success") or update_result.get("rows_updated", 0) == 0:
+                return {"success": False, "error": "Unable to update card status."}
+
+            return {
+                "success": True,
+                "slot_index": card.get("slot_index"),
+                "batch_id": card.get("batch_id"),
+            }
+
+        def callback(result):
+            if token != self.flow_token:
+                return
+            if result.get("success"):
+                session_manager.slot_index = result.get("slot_index")
+                session_manager.batch_id = result.get("batch_id")
+                self.wait_screen.set_status("Dispensing card...")
+                self.wait_screen.set_detail(
+                    "Please wait while the kiosk moves your card into position."
+                )
+                self.note_activity()
+                self.sm.current = SCREEN_WAIT
+            else:
+                self._terminate_active_flow()
+                self._set_error(
+                    result.get("error", "Unable to find card slot."),
+                    retry_screen=SCREEN_IDLE,
+                )
+
+        self._run_async(task, callback)
+
+    def begin_dispense(self, *_):
+        if self.dispense_in_progress:
+            return
+        if session_manager.slot_index is None:
+            self._set_error(
+                "No card slot is available for this session.",
+                retry_screen=SCREEN_IDLE,
+            )
+            return
+
+        self.dispense_in_progress = True
+        token = self.flow_token
+        self.wait_screen.set_status("Preparing card dispense...")
+        self.wait_screen.set_detail(
+            "Hardware is not enabled yet, so this step is simulated for now."
+        )
+
+        def _complete_simulation(_dt):
+            if token != self.flow_token:
+                return
+            self.dispense_in_progress = False
             session_manager.update_activity()
-            setattr(self.sm, "current", SCREEN_CONFIRMATION)
-        else:
-            self.error_screen.error_label.text = result["message"]
-            setattr(self.sm, "current", SCREEN_ERROR)
+            self.sm.current = SCREEN_CONFIRMATION
+
+        Clock.schedule_once(_complete_simulation, 1.5)
+
+    def schedule_confirmation_timeout(self):
+        self._cancel_events()
+        self.confirmation_event = Clock.schedule_once(
+            lambda dt: self.finish_collection(), self.confirmation_timeout_seconds
+        )
+
+    def schedule_locked_return(self):
+        self._cancel_events()
+        self.lockout_event = Clock.schedule_once(
+            lambda dt: self._go_idle(), self.lockout_screen_seconds
+        )
+
+    def finish_collection(self, *_):
+        self._cancel_events()
+        self._secure_dispenser()
+        session_manager.teardown()
+        self._reset_flow_state()
+        self.sm.current = SCREEN_IDLE
+
+    def retry_from_error(self, *_):
+        retry_screen = self.error_screen.retry_screen
+        if retry_screen == SCREEN_IDLE:
+            self._go_idle()
+            return
+        self._clear_inputs()
+        self.sm.current = retry_screen
+
+    def _check_timeout(self, *_):
+        if self.sm.current in (SCREEN_IDLE, SCREEN_WAIT):
+            return
+        if session_manager.is_timed_out(self.session_timeout_seconds):
+            self._go_idle()
+
+    def on_stop(self):
+        self._secure_dispenser()
+        session_manager.teardown()
 
 
 if __name__ == "__main__":
-    # Application entry point - start Kivy main loop
     KioskApp().run()

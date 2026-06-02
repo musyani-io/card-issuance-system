@@ -3,7 +3,7 @@ Session Manager — Lifecycle and Timeout Enforcement
 
 This module manages student collection session state across UI screens:
 - Tracks current student registration number, session ID, and authentication progress
-- Enforces 60-second inactivity timeout to return kiosk to idle state
+- Enforces inactivity timeout to return kiosk to idle state
 - Provides atomic teardown() method to reset all session state safely
 
 **CRITICAL PATTERN: Dual-State Session Lifecycle**
@@ -14,10 +14,10 @@ SessionManager uses a two-phase architecture:
 1. **INITIALIZED STATE** (start_time set, last_activity_time not None)
    - Student has entered reg number (RegEntryScreen)
    - Can receive OTP/PIN input without timeout
-   - Activity tracking enforces 60-second inactivity reset
+   - Activity tracking enforces the configured inactivity reset
 
 2. **IDLE STATE** (start_time and last_activity_time both None)
-   - Kiosk displays welcome/instructions
+   - Kiosk displays idle instructions
    - No session active (timeout check returns False)
    - Next screen transition initializes new session
 
@@ -27,7 +27,7 @@ Every screen transition that LEAVES a session must call session_manager.teardown
 
     def on_timeout():
         session_manager.teardown()      # ← ALWAYS clear session before returning to IDLE
-        sm.current = SCREEN_WELCOME
+        sm.current = SCREEN_IDLE
 
 Failure to call teardown() creates a GHOST SESSION where:
 - Previous student's reg_number lingers in memory
@@ -40,7 +40,7 @@ Failure to call teardown() creates a GHOST SESSION where:
     error_screen.retry_button.bind(
         on_press=lambda x: (
             session_manager.teardown(),
-            sm.current = SCREEN_WELCOME
+            sm.current = SCREEN_IDLE
         )
     )
 
@@ -48,13 +48,13 @@ Failure to call teardown() creates a GHOST SESSION where:
     confirmation_screen.ok_button.bind(
         on_press=lambda x: (
             session_manager.teardown(),    # ← Mandatory cleanup
-            sm.current = SCREEN_WELCOME
+            sm.current = SCREEN_IDLE
         )
     )
 
 **Timeout Logic:**
 
-max_idle_allowed = 60 seconds from last_activity_time
+max_idle_allowed = configured inactivity timeout from last_activity_time
 Activity = any UI interaction (button press, text entry)
 """
 
@@ -72,7 +72,7 @@ class SessionManager:
         auth_status: Result of last auth attempt ('SUCCESS', 'INVALID', 'LOCKED', etc.)
         start_time: Unix timestamp when session started (first screen transition)
         last_activity_time: Unix timestamp of last button press / text entry
-        student_type: "first_year" or "returning" - set by Welcome screen button choice
+        student_type: "first_year" or "returning" - derived after OTP verification
 
     **WARNING:** This class is NOT thread-safe. Use only in Kivy main thread.
     """
@@ -90,17 +90,7 @@ class SessionManager:
         self.auth_status = None
         self.start_time = None
         self.last_activity_time = None
-        self.student_type = (
-            None  # "first_year" or "returning" - set by Welcome screen choice
-        )
-        self.student_name = None
-        self.slot_index = None
-        self.batch_id = None
-        # Card ingestion tracking (populated by ingest_card())
-        self.student_name = None
-        self.slot_index = None
-        self.batch_id = None
-        # NEW: Card ingestion tracking (populated by ingest_card function)
+        self.student_type = None
         self.student_name = None
         self.slot_index = None
         self.batch_id = None
@@ -109,7 +99,7 @@ class SessionManager:
         """
         Atomically reset all session state to None (transition to IDLE).
 
-        **CRITICAL:** Must be called before returning to WELCOME screen:
+        **CRITICAL:** Must be called before returning to IDLE screen:
         - After collection confirmation (card dispensed)
         - After timeout triggers (inactivity reset)
         - After collection cancellation (error screen recovery)
@@ -129,6 +119,9 @@ class SessionManager:
         self.start_time = None
         self.last_activity_time = None
         self.student_type = None
+        self.student_name = None
+        self.slot_index = None
+        self.batch_id = None
 
     def update_activity(self):
         """
@@ -149,7 +142,7 @@ class SessionManager:
 
         **If-Then Logic:**
             - IF start_time is None (first touch): initialize both start_time and last_activity_time
-            - ELSE (subsequent touches): update only last_activity_time (reset 60-second countdown)
+            - ELSE (subsequent touches): update only last_activity_time (reset timeout countdown)
         """
         if self.start_time is None:
             # FIRST TOUCH: Initialize session timers
@@ -158,11 +151,11 @@ class SessionManager:
             )  # Mark session birth (when did student start using kiosk)
             self.last_activity_time = (
                 time.time()
-            )  # Reset timeout countdown (60-second grace period starts)
+            )  # Reset timeout countdown
         else:
             # SUBSEQUENT TOUCHES: Only reset timeout countdown, keep session start time
             # This allows us to track total session duration while resetting inactivity counter
-            self.last_activity_time = time.time()  # Reset 60-second countdown
+            self.last_activity_time = time.time()  # Reset timeout countdown
 
     def is_timed_out(self, timeout_seconds=60):
         """
@@ -183,17 +176,16 @@ class SessionManager:
             # Inside _check_timeout():
             if session_manager.is_timed_out(timeout_seconds=60):
                 session_manager.teardown()      # Reset session state
-                self.sm.current = SCREEN_WELCOME  # Return to idle screen
+                self.sm.current = SCREEN_IDLE   # Return to idle screen
 
         **State Transitions Triggered by Timeout:**
-            - OTP entry (90s idle) → teardown, return to welcome (let 90s expire, not 60s)
-            - PIN entry (90s idle) → teardown, return to welcome
+            - OTP entry idle → teardown, return to idle screen
+            - PIN entry idle → teardown, return to idle screen
             - Confirmation (immediate) → no timeout (terminal state)
 
         Security Logic:
             - Prevents card hijacking if student walks away mid-session
-            - 60-second grace period allows input delays, network latency
-            - Longer timeout (90s) on collection flows to account for large batch operations
+            - Timeout duration is configured by the UI flow
         """
         # If no session active, timeout check returns False (not timed out)
         if self.last_activity_time is None:

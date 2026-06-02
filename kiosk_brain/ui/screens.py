@@ -1,744 +1,377 @@
 """
-UI Screens Module — Kivy Screen Classes for Card Issuance Kiosk
-
-This module defines all interactive screens displayed by the Kivy ScreenManager.
-Each screen corresponds to a step in the student card collection workflow.
-
-SCREEN CLASSES:
-===============
-
-WelcomeScreen (SCREEN_WELCOME)
-  - Entry point for all transactions
-  - Buttons: "Returning Student" or "First-Year Student"
-  - No direct input processing; button presses handled by main app
-  - Callback: Sets session context (student_type), transitions to OCR or manual entry
-
-OTPEntryScreen (SCREEN_OTP_ENTRY)
-  - Collects 6-digit OTP from student (sent via SMS + Email)
-  - Input: Numeric keypad with DEL/ENTER functionality
-  - Validation: Handled by main app (verify_otp in auth.py)
-  - Failure handling: Increments failed_attempts counter, lockout after 3 failures
-  - Success: Transitions to PINEntryScreen
-
-PINEntryScreen (SCREEN_PIN_ENTRY)
-  - Collects student's authentication PIN (4-6 digits)
-  - Input: Numeric keypad with DEL/ENTER functionality (password field masked)
-  - Validation: Checked against pin_hash in authentication table
-  - Branch: If is_temp_pin=TRUE → PINSetupScreen; else → ConfirmationScreen
-  - Failure: Increments failed_attempts, lockout after 3 failures
-
-ConfirmationScreen (SCREEN_CONFIRMATION)
-  - Summary before physical card dispensing
-  - Display: Student name, registration number, "Card Dispensed Successfully"
-  - Wait for: GPIO button press to trigger card dispenser relay
-  - Callback: Dispenses physical card, records transaction, transitions to SuccessScreen
-
-ErrorScreen (SCREEN_ERROR)
-  - Generic error display for failed operations
-  - Message: Dynamic error text (OTP expired, PIN incorrect, DB error, etc.)
-  - Button: "Try Again" to return to WelcomeScreen
-  - Timeout: Auto-dismisses after 10 seconds if no button press
-
-RegEntryScreen (SCREEN_REG_ENTRY)
-  - Manual registration number input (fallback when OCR fails or card scanning unavailable)
-  - Format: Text input (accepts any characters for flexible search)
-  - Validation: Looked up in students table via mock API
-  - Success: Retrieves student record, transitions to OTPEntryScreen
-  - Failure: Displays error, returns to WelcomeScreen
-
-HELPER FUNCTIONS:
-=================
-
-create_number_keypad(cols=3, callback=None)
-  - Factory function that creates a 3x4 numeric keypad GridLayout
-  - Returns: GridLayout with buttons 1-9, DEL, 0, ENTER
-  - Event binding: Button presses must be bound to on_keypad_press() method
-  - Button actions:
-    - Digits (1-9, 0): Append to input field
-    - DEL: Remove last character from input field
-    - ENTER: Trigger submit_button action (verifies with main app)
-  - Used by: OTPEntryScreen, PINEntryScreen, and Future screens (PIN setup, staff PIN)
-
-EVENT HANDLING:
-===============
-All keypad button presses are routed through on_keypad_press() method defined in screen class.
-This allows each screen to handle input differently (e.g., masking in PIN field vs visible in OTP field).
+Kivy screens for the kiosk student flow.
 """
 
-from kivy.uix.screenmanager import Screen
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.label import Label
-from kivy.uix.button import Button
-from kivy.uix.textinput import TextInput
 from kivy.uix.gridlayout import GridLayout
-from ui.constants import *
+from kivy.uix.screenmanager import Screen
+
+from ui.constants import (
+    PIN_LENGTH,
+    REG_NUMBER_FORMAT,
+    SCREEN_CONFIRMATION,
+    SCREEN_ERROR,
+    SCREEN_IDLE,
+    SCREEN_LOCKED,
+    SCREEN_OTP_ENTRY,
+    SCREEN_PIN_ENTRY,
+    SCREEN_PIN_SETUP,
+    SCREEN_REG_ENTRY,
+    SCREEN_WAIT,
+    OTP_LENGTH,
+)
 from ui.styled_widgets import (
-    setup_screen_background,
-    create_primary_button,
-    create_secondary_button,
+    RegNumberInput,
     create_danger_button,
-    create_numpad_button,
-    create_title_label,
-    create_subtitle_label,
-    create_success_label,
     create_error_label,
+    create_glass_card,
     create_info_label,
-    create_standard_label,
+    create_numpad_button,
+    create_primary_button,
     create_styled_textinput,
+    create_success_label,
+    create_subtitle_label,
+    create_title_label,
+    setup_screen_background,
 )
 
 
-def create_number_keypad(cols=3, callback=None):
-    """
-    Create a 3x4 numeric keypad GridLayout.
-
-    Args:
-        cols (int): Number of columns. Default: 3 (standard 3x4 layout)
-        callback (callable): Optional callback for button presses (currently unused, handled by screen's on_keypad_press)
-
-    Returns:
-        GridLayout: Configured keypad with buttons 1-9, DEL, 0, ENTER
-
-    Button Layout:
-        [1] [2] [3]
-        [4] [5] [6]
-        [7] [8] [9]
-        [DEL] [0] [ENTER]
-
-    Note:
-        Button event binding must be done by calling code:
-        for button in keypad.children:
-            button.bind(on_press=screen.on_keypad_press)
-    """
-    keypad = GridLayout(cols=cols, spacing=5, size_hint_y=0.4)
-
-    for i in range(1, 10):
-        keypad.add_widget(create_numpad_button(text=str(i)))
-
+def create_number_keypad():
+    keypad = GridLayout(cols=3, spacing=10, size_hint=(1, 1))
+    for value in range(1, 10):
+        keypad.add_widget(create_numpad_button(text=str(value)))
     keypad.add_widget(create_numpad_button(text="DEL"))
     keypad.add_widget(create_numpad_button(text="0"))
     keypad.add_widget(create_numpad_button(text="ENTER"))
-
     return keypad
 
 
-class WelcomeScreen(Screen):
-    """
-    Welcome/Landing Screen — Kiosk entry point.
-
-    Displays two options:
-    - "Returning Student": Student who collected card in previous year
-    - "First-Year Student": Student collecting card for first time
-
-    Purpose:
-        1. Greet students and establish session context
-        2. Differentiate workflow: Returning students use existing PIN, first-years use temp PIN then setup
-        3. Determine which credential delivery strategy to use
-
-    Attributes:
-        name (str): SCREEN_WELCOME - Used by ScreenManager to identify this screen
-        ret_button (Button): "Returning Student" button
-        first_button (Button): "First-Year Student" button
-
-    Event Callbacks (handled by main.py):
-        ret_button.on_press(): Set session.student_type = "returning", transition to OCR/card scan
-        first_button.on_press(): Set session.student_type = "first_year", transition to OCR/card scan
-    """
-
-    def __init__(self, **kw):
-        super().__init__(**kw)
-        self.name = SCREEN_WELCOME
-        setup_screen_background(self)
-        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
-        self.add_widget(layout)
-        title_label = create_title_label(
-            text="Welcome to Card Issuance Kiosk", size_hint_y=0.3
-        )
-        instruction_label = create_subtitle_label(
-            text="Select your option below to get your ID card.", size_hint_y=0.3
-        )
-
-        choice = GridLayout(cols=2, spacing=10)
-        self.ret_button = create_primary_button(
-            text="Returning Student", size_hint_y=0.2
-        )
-        self.first_button = create_primary_button(
-            text="First-Year Student", size_hint_y=0.2
-        )
-
-        layout.add_widget(title_label)
-        layout.add_widget(instruction_label)
-        choice.add_widget(self.ret_button)
-        choice.add_widget(self.first_button)
-        layout.add_widget(choice)
-
-
-class OTPEntryScreen(Screen):
-    """
-    OTP Entry Screen — 6-digit one-time password verification.
-
-    Purpose:
-        Collect and verify one-time password sent to student's phone
-
-    Attributes:
-        name (str): SCREEN_OTP_ENTRY
-        otp_input (TextInput): Displays entered OTP (shows all digits, no masking)
-        submit_button (Button): Triggers OTP verification in main app
-
-    Input Method:
-        Numeric keypad (1-9, 0, DEL, ENTER) - no direct keyboard input allowed
-        DEL: Remove last digit
-        ENTER: Submit for verification
-
-    Validation Flow (in main.py):
-        1. Get OTP hash from authentication table for this reg number
-        2. Verify entered OTP against stored hash using verify_otp()
-        3. On success: Transition to PINEntryScreen
-        4. On failure: Increment failed_attempts, show ErrorScreen, lockout after 3 attempts
-
-    Event Handlers:
-        on_keypad_press(): Routes keypad button events to appropriate action
-    """
-
-    def __init__(self, **kw):
-        super().__init__(**kw)
-        self.name = SCREEN_OTP_ENTRY
-        setup_screen_background(self)
-        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
-        self.add_widget(layout)
-
-        otp_label = create_subtitle_label(
-            text="Enter OTP sent to your phone", size_hint_y=0.3
-        )
-        otp_input = create_styled_textinput(
-            text="", input_filter="int", size_hint_y=0.2
-        )
-        self.otp_input = otp_input
-        self.submit_button = create_primary_button(text="Submit", size_hint_y=0.2)
-        otp_keypad = create_number_keypad(cols=3)
-
-        layout.add_widget(otp_label)
-        layout.add_widget(otp_input)
-        layout.add_widget(self.submit_button)
-        layout.add_widget(otp_keypad)
-
-        for button in otp_keypad.children:
-            button.bind(on_press=self.on_keypad_press)
-
-    def on_keypad_press(self, button):
-        """
-        Handle numeric keypad button presses.
-
-        DEL: Remove last digit from otp_input
-        Digits (0-9): Append to otp_input
-        ENTER: Trigger submit_button (sends OTP to main app for verification)
-        """
-        if button.text == "DEL":
-            if self.otp_input.text:
-                self.otp_input.text = self.otp_input.text[:-1]
-
-            else:
-                self.otp_input.text = ""
-        elif button.text.isdigit():
-            self.otp_input.text += button.text
-        elif button.text == "ENTER":
-            self.submit_button.trigger_action()
-
-
-class PINEntryScreen(Screen):
-    """
-    PIN Entry Screen — Student PIN authentication.
-
-    Purpose:
-        Collect and verify student authentication PIN (4-6 digits)
-
-    Attributes:
-        name (str): SCREEN_PIN_ENTRY
-        pin_input (TextInput): Masked input field (displays * or dots instead of digits)
-        submit_button (Button): Triggers PIN verification in main app
-
-    Input Method:
-        Numeric keypad (1-9, 0, DEL, ENTER) - no direct keyboard input allowed
-        DEL: Remove last digit
-        ENTER: Submit for verification
-
-    PIN Type Logic:
-        If is_temp_pin=TRUE (from authentication table):
-            - This is a first-year student who just verified OTP
-            - Temporary PIN was pre-generated by system
-            - After verification, force PINSetupScreen for permanent PIN creation
-        If is_temp_pin=FALSE:
-            - Student is returning or has already set permanent PIN
-            - Verify against existing pin_hash, proceed to ConfirmationScreen
-
-    Validation Flow (in main.py):
-        1. Get pin_hash and is_temp_pin from authentication table
-        2. Verify entered PIN against pin_hash using verify_pin()
-        3. On success:
-           - If is_temp_pin=TRUE: Transition to PINSetupScreen
-           - If is_temp_pin=FALSE: Transition to ConfirmationScreen
-        4. On failure: Increment failed_attempts, show ErrorScreen, lockout after 3 attempts
-
-    Event Handlers:
-        on_keypad_press(): Routes keypad button events to appropriate action
-    """
-
-    def __init__(self, **kw):
-        super().__init__(**kw)
-        self.name = SCREEN_PIN_ENTRY
-        setup_screen_background(self)
-        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
-        self.add_widget(layout)
-
-        pin_label = create_subtitle_label(
-            text="Enter your 4-6 digit pin", size_hint_y=0.3
-        )
-        pin_input = create_styled_textinput(
-            text="", input_filter="int", password=True, size_hint_y=0.2
-        )
-        self.pin_input = pin_input
-        self.submit_button = create_primary_button(text="Submit", size_hint_y=0.2)
-        pin_keypad = create_number_keypad(cols=3)
-
-        layout.add_widget(pin_label)
-        layout.add_widget(pin_input)
-        layout.add_widget(self.submit_button)
-        layout.add_widget(pin_keypad)
-
-        for button in pin_keypad.children:
-            button.bind(on_press=self.on_keypad_press)
-
-    def on_keypad_press(self, button):
-        """
-        Handle numeric keypad button presses.
-
-        DEL: Remove last digit from pin_input
-        Digits (0-9): Append to pin_input
-        ENTER: Trigger submit_button (sends PIN to main app for verification)
-        """
-        if button.text == "DEL":
-            if self.pin_input.text:
-                self.pin_input.text = self.pin_input.text[:-1]
-
-            else:
-                self.pin_input.text = ""
-        elif button.text.isdigit():
-            self.pin_input.text += button.text
-        elif button.text == "ENTER":
-            self.submit_button.trigger_action()
-
-
-class ConfirmationScreen(Screen):
-    """
-    Confirmation Screen — Final verification before card dispensing.
-
-    Purpose:
-        Display student summary and wait for physical card dispensing
-
-    Attributes:
-        name (str): SCREEN_CONFIRMATION
-        ok_button (Button): Acknowledge button (future use for completing transaction)
-
-    Display Information:
-        - Student name (from students table)
-        - Registration number
-        - "Card Dispensed Successfully" message
-        - "Your ID Card will be dispensed shortly..."
-
-    Hardware Trigger:
-        When this screen displays, main.py should:
-        1. Trigger GPIO pin connected to relay for card separator/dispenser mechanism
-        2. Wait for card to physically dispense (timeout: 30 seconds)
-        3. Record transaction in audit_log table
-        4. Transition to SuccessScreen
-
-    Event Callbacks (in main.py):
-        ok_button.on_press(): Return to WelcomeScreen
-    """
-
-    def __init__(self, **kw):
-        super().__init__(**kw)
-        self.name = SCREEN_CONFIRMATION
-        setup_screen_background(self)
-        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
-        self.add_widget(layout)
-
-        success_label = create_subtitle_label(
-            text="Ready to dispense your card", size_hint_y=0.4
-        )
-        info_label = create_info_label(
-            text="Your ID Card will be dispensed shortly...", size_hint_y=0.3
-        )
-        self.ok_button = create_primary_button(text="OK", size_hint_y=0.2)
-
-        layout.add_widget(success_label)
-        layout.add_widget(info_label)
-        layout.add_widget(self.ok_button)
-
-
-class ErrorScreen(Screen):
-    """
-    Error Screen — Generic error handling display.
-
-    Purpose:
-        Display error messages for any failed operation and allow retry
-
-    Attributes:
-        name (str): SCREEN_ERROR
-        retry_button (Button): "Try Again" to return to WelcomeScreen
-
-    Error Types (examples):
-        - "OTP incorrect" (entered OTP doesn't match hash)
-        - "PIN incorrect" (entered PIN doesn't match hash)
-        - "Account locked" (3 failed attempts on OTP or PIN)
-        - "Student not found" (reg number not in students table)
-        - "Database error" (sqlite3 connection/query error)
-        - "API timeout" (mock API didn't respond in time)
-        - "OCR failed" (couldn't read card image)
-
-    Dynamic Messaging:
-        Main app updates error_label.text with specific error message before transitioning to this screen
-
-    Event Callbacks (in main.py):
-        retry_button.on_press(): Return to WelcomeScreen to start over
-
-    Auto-dismiss:
-        Optional auto-transition after 10 seconds if no button press (helps with flow)
-    """
-
-    def __init__(self, **kw):
-        super().__init__(**kw)
-        self.name = SCREEN_ERROR
-        setup_screen_background(self)
-        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
-        self.add_widget(layout)
-
-        error_label = create_error_label(text="Authentication failed", size_hint_y=0.4)
-        info_label = create_info_label(
-            text="Please try again or contact support", size_hint_y=0.3
-        )
-        self.retry_button = create_danger_button(text="Try Again", size_hint_y=0.2)
-
-        layout.add_widget(error_label)
-        layout.add_widget(info_label)
-        layout.add_widget(self.retry_button)
-
-
-class RegEntryScreen(Screen):
-    """
-    Registration Entry Screen — Manual registration number input.
-
-    Purpose:
-        Fallback when OCR (card scanning) fails or is not available
-        Allow students to manually type their registration number
-
-    Attributes:
-        name (str): SCREEN_REG_ENTRY
-        reg_input (TextInput): Text input field for registration number
-        submit_button (Button): Triggers student lookup in main app
-
-    Input Method:
-        Free-form text input (accepts any characters for flexible searching)
-        Example formats: "2022-04-09050", "202204090 50", "0209050", etc.
-
-    Lookup Flow (in main.py):
-        1. Get user input from reg_input.text
-        2. Query mock API with registration number
-        3. Mock API returns student record if found (name, email, year, etc.)
-        4. On success: Store student record in session, transition to OTPEntryScreen
-        5. On failure: Display error, allow retry or return to WelcomeScreen
-
-    Database Query:
-        Mock API endpoint: POST /api/student/lookup
-        Payload: {"registration_number": "2022-04-09050"}
-        Response: {"success": true, "student": {"name": "John Doe", "email": "....", ...}}
-
-    Event Callbacks (in main.py):
-        submit_button.on_press(): Trigger student lookup
-    """
-
-    def __init__(self, **kw):
-        super().__init__(**kw)
-        self.name = SCREEN_REG_ENTRY
-        setup_screen_background(self)
-        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
-        self.add_widget(layout)
-
-        reg_label = create_subtitle_label(
-            text="Enter your registration number", size_hint_y=0.3
-        )
-        self.reg_input = create_styled_textinput(text="", size_hint_y=0.2)
-        self.submit_button = create_primary_button(text="Submit", size_hint_y=0.2)
-
-        layout.add_widget(reg_label)
-        layout.add_widget(self.reg_input)
-        layout.add_widget(self.submit_button)
+def create_entry_split_shell():
+    layout = BoxLayout(orientation="horizontal", padding=12, spacing=12)
+    left = create_glass_card(padding=14, spacing=10, size_hint_x=0.4)
+    right = create_glass_card(padding=14, spacing=10, size_hint_x=0.6)
+    layout.add_widget(left)
+    layout.add_widget(right)
+    return layout, left, right
 
 
 class IdleScreen(Screen):
-    def __init__(self, **kw):
-        super().__init__(**kw)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.name = SCREEN_IDLE
         setup_screen_background(self)
-        self.touch_down_y = 0
-        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
+
+        layout = BoxLayout(orientation="vertical", padding=18, spacing=14)
         self.add_widget(layout)
 
-        message = create_title_label(text="Collect My\nID Card", size_hint_y=0.5)
+        card = create_glass_card(padding=18, spacing=14)
+        layout.add_widget(card)
+        card.add_widget(create_title_label(text="Smart ID Card\nCollection"))
+        card.add_widget(
+            create_info_label(text="Tap to start your collection journey.")
+        )
+
         self.collect_button = create_primary_button(
-            text="Collect My Card", size_hint_y=0.3
+            text="Start Collection", size_hint_y=0.22
         )
-
-        layout.add_widget(message)
-        layout.add_widget(self.collect_button)
-
-    def on_touch_down(self, touch):
-        self.touch_down_y = touch.y
-        return super().on_touch_down(touch)
-
-    def on_touch_up(self, touch):
-        swipe_threshold = 50
-        if touch.y < self.touch_down_y - swipe_threshold:
-            from kivy.app import App
-
-            App.get_running_app().sm.current = SCREEN_STAFF_PIN
-        return super().on_touch_up(touch)
+        card.add_widget(self.collect_button)
 
 
-class SuccessScreen(Screen):
-    def __init__(self, **kw):
-        super().__init__(**kw)
-        self.name = SCREEN_SUCCESS
+class RegEntryScreen(Screen):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.name = SCREEN_REG_ENTRY
         setup_screen_background(self)
-        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
+
+        layout, left, right = create_entry_split_shell()
         self.add_widget(layout)
 
-        success_message = create_success_label(
-            text="Card dispensed Succesfully!\n\nPlease collect your card",
-            size_hint_y=0.5,
-        )
-        info_message = create_info_label(
-            text="Thank you for using the kiosk", size_hint_y=0.3
+        left.add_widget(create_title_label(text="Enter Registration Number"))
+        left.add_widget(create_subtitle_label(text=f"Format: {REG_NUMBER_FORMAT}"))
+        left.add_widget(
+            create_info_label(text="Digits are auto-formatted as you type.")
         )
 
-        layout.add_widget(success_message)
-        layout.add_widget(info_message)
-
-
-class LockedScreen(Screen):
-    def __init__(self, **kw):
-        super().__init__(**kw)
-        self.name = SCREEN_LOCKED
-        setup_screen_background(self)
-        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
-        self.add_widget(layout)
-
-        lockout_message = create_error_label(
-            text="Registration number temporarily locked", size_hint_y=0.3
+        self.reg_input = RegNumberInput(
+            hint_text="2022-04-09050",
+            size_hint_y=0.18,
         )
-        info_message = create_info_label(
-            text="Too many failed attempts.\nPlease wait before trying again",
-            size_hint_y=0.3,
-        )
-        self.timer_label = create_subtitle_label(
-            text="Time remaining: 30:00", size_hint_y=0.3
-        )
+        left.add_widget(self.reg_input)
 
-        layout.add_widget(lockout_message)
-        layout.add_widget(info_message)
-        layout.add_widget(self.timer_label)
+        self.submit_button = create_primary_button(text="Continue", size_hint_y=0.18)
+        left.add_widget(self.submit_button)
 
+        self.keypad = create_number_keypad()
+        right.add_widget(self.keypad)
 
-class PINSetupScreen(Screen):
-    def __init__(self, **kw):
-        super().__init__(**kw)
-        self.name = SCREEN_PIN_SETUP
-        setup_screen_background(self)
-        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
-        self.add_widget(layout)
-
-        pin_label = create_subtitle_label(
-            text="Enter new 4-6 digit PIN", size_hint_y=0.3
-        )
-        self.pin_input = create_styled_textinput(
-            text="", input_filter="int", password=True, size_hint_y=0.3
-        )
-        confirm_label = create_subtitle_label(
-            text="Confirm your new PIN", size_hint_y=0.3
-        )
-        self.confirm_input = create_styled_textinput(
-            text="", input_filter="int", size_hint_y=0.3
-        )
-        self.submit_button = create_primary_button(text="Set PIN", size_hint_y=0.2)
-
-        layout.add_widget(pin_label)
-        layout.add_widget(self.pin_input)
-        layout.add_widget(confirm_label)
-        layout.add_widget(self.confirm_input)
-        layout.add_widget(self.submit_button)
-
-
-class StaffPINScreen(Screen):
-    def __init__(self, **kw):
-        super().__init__(**kw)
-        self.name = SCREEN_STAFF_PIN
-        setup_screen_background(self)
-        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
-        self.add_widget(layout)
-
-        title = create_title_label(text="Staff PIN entry", size_hint_y=0.2)
-        self.pin_input = create_styled_textinput(
-            text="", input_filter="int", password=True, size_hint_y=0.3
-        )
-        keypad = create_number_keypad(cols=3)
-        self.submit_button = create_primary_button(text="Unlock", size_hint_y=0.2)
-
-        layout.add_widget(title)
-        layout.add_widget(self.pin_input)
-        layout.add_widget(keypad)
-        layout.add_widget(self.submit_button)
-
-        for button in keypad.children:
+        for button in self.keypad.children:
             button.bind(on_press=self.on_keypad_press)
 
     def on_keypad_press(self, button):
-        """
-        Handle numeric keypad button presses.
+        if button.text == "DEL":
+            if self.reg_input.text:
+                self.reg_input.text = self.reg_input.text[:-1]
+        elif button.text == "ENTER":
+            self.submit_button.trigger_action()
+        else:
+            self.reg_input.insert_text(button.text)
 
-        DEL: Remove last digit from pin_input
-        Digits (0-9): Append to pin_input
-        ENTER: Trigger submit_button (sends PIN to main app for verification)
-        """
+    def clear_inputs(self):
+        self.reg_input.text = ""
+
+
+class OTPEntryScreen(Screen):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.name = SCREEN_OTP_ENTRY
+        setup_screen_background(self)
+
+        layout, left, right = create_entry_split_shell()
+        self.add_widget(layout)
+
+        self.title_label = create_title_label(text="Enter OTP")
+        self.info_label = create_subtitle_label(
+            text="Enter the 6-digit OTP sent to your phone."
+        )
+        left.add_widget(self.title_label)
+        left.add_widget(self.info_label)
+
+        self.otp_input = create_styled_textinput(
+            text="",
+            numeric_only=True,
+            max_length=OTP_LENGTH,
+            size_hint_y=0.18,
+        )
+        self.submit_button = create_primary_button(
+            text="Verify OTP", size_hint_y=0.18
+        )
+        left.add_widget(self.otp_input)
+        left.add_widget(self.submit_button)
+
+        self.keypad = create_number_keypad()
+        right.add_widget(self.keypad)
+
+        for button in self.keypad.children:
+            button.bind(on_press=self.on_keypad_press)
+
+    def on_keypad_press(self, button):
+        if button.text == "DEL":
+            if self.otp_input.text:
+                self.otp_input.text = self.otp_input.text[:-1]
+        elif button.text == "ENTER":
+            self.submit_button.trigger_action()
+        elif len(self.otp_input.text) < OTP_LENGTH:
+            self.otp_input.insert_text(button.text)
+
+    def clear_inputs(self):
+        self.otp_input.text = ""
+
+
+class PINEntryScreen(Screen):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.name = SCREEN_PIN_ENTRY
+        setup_screen_background(self)
+
+        layout, left, right = create_entry_split_shell()
+        self.add_widget(layout)
+
+        self.title_label = create_title_label(text="Enter PIN")
+        self.info_label = create_subtitle_label(text="Enter your 4-digit PIN.")
+        left.add_widget(self.title_label)
+        left.add_widget(self.info_label)
+
+        self.pin_input = create_styled_textinput(
+            text="",
+            numeric_only=True,
+            max_length=PIN_LENGTH,
+            password=True,
+            size_hint_y=0.18,
+        )
+        self.submit_button = create_primary_button(
+            text="Verify PIN", size_hint_y=0.18
+        )
+        left.add_widget(self.pin_input)
+        left.add_widget(self.submit_button)
+
+        self.keypad = create_number_keypad()
+        right.add_widget(self.keypad)
+
+        for button in self.keypad.children:
+            button.bind(on_press=self.on_keypad_press)
+
+    def configure_mode(self, mode):
+        if mode == "temp":
+            self.title_label.text = "Enter Temporary PIN"
+            self.info_label.text = "Enter the 4-digit temporary PIN."
+            self.submit_button.text = "Verify Temp PIN"
+        else:
+            self.title_label.text = "Enter PIN"
+            self.info_label.text = "Enter your 4-digit PIN."
+            self.submit_button.text = "Verify PIN"
+
+    def on_keypad_press(self, button):
         if button.text == "DEL":
             if self.pin_input.text:
                 self.pin_input.text = self.pin_input.text[:-1]
-
-            else:
-                self.pin_input.text = ""
-        elif button.text.isdigit():
-            self.pin_input.text += button.text
         elif button.text == "ENTER":
             self.submit_button.trigger_action()
+        elif len(self.pin_input.text) < PIN_LENGTH:
+            self.pin_input.insert_text(button.text)
+
+    def clear_inputs(self):
+        self.pin_input.text = ""
 
 
-class PreScanChecklistScreen(Screen):
-    def __init__(self, **kw):
-        super().__init__(**kw)
-        self.name = SCREEN_STAFF_CHECKLIST
+class PINSetupScreen(Screen):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.name = SCREEN_PIN_SETUP
         setup_screen_background(self)
-        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
+
+        layout = BoxLayout(orientation="vertical", padding=18, spacing=12)
         self.add_widget(layout)
 
-        title = create_title_label(text="Pre-Scan Checklist", size_hint_y=0.15)
-        layout.add_widget(title)
+        card = create_glass_card(padding=18, spacing=12)
+        layout.add_widget(card)
 
-        self.checklist_items = [
-            {
-                "name": "Door Lock Status",
-                "label": create_info_label(text="🔴 Door Lock", size_hint_y=0.2),
-            },
-            {
-                "name": "Database Connected",
-                "label": create_info_label(text="🔴 Database", size_hint_y=0.2),
-            },
-            {
-                "name": "Available Slots",
-                "label": create_info_label(text="🔴 Slots Available", size_hint_y=0.2),
-            },
-            {
-                "name": "No Active Session",
-                "label": create_info_label(
-                    text="🔴 No Active Session", size_hint_y=0.2
-                ),
-            },
-        ]
-        for item in self.checklist_items:
-            layout.add_widget(item["label"])
-
-        self.start_button = create_primary_button(
-            text="Start Scan", size_hint_y=0.2, disabled=True
+        card.add_widget(create_title_label(text="Set Permanent PIN"))
+        card.add_widget(
+            create_info_label(text="Choose a new 4-digit PIN and confirm it.")
         )
-        layout.add_widget(self.start_button)
 
-    def update_checklist(self, checks):
-        for i, item in enumerate(self.checklist_items):
-            status = "✓ " if checks[i] else "✗ "
-            item["label"].text = ("🟢 " if checks[i] else "🔴 ") + item["name"]
-        all_pass = all(checks)
-        self.start_button.disabled = not all_pass
+        self.pin_input = create_styled_textinput(
+            text="",
+            numeric_only=True,
+            max_length=PIN_LENGTH,
+            password=True,
+            hint_text="New PIN",
+            size_hint_y=0.14,
+        )
+        self.confirm_input = create_styled_textinput(
+            text="",
+            numeric_only=True,
+            max_length=PIN_LENGTH,
+            password=True,
+            hint_text="Confirm PIN",
+            size_hint_y=0.14,
+        )
+        self.submit_button = create_primary_button(text="Set PIN", size_hint_y=0.16)
+
+        card.add_widget(self.pin_input)
+        card.add_widget(self.confirm_input)
+        card.add_widget(self.submit_button)
+
+    def clear_inputs(self):
+        self.pin_input.text = ""
+        self.confirm_input.text = ""
 
 
-class BatchProgressScreen(Screen):
-    def __init__(self, **kw):
-        super().__init__(**kw)
-        self.name = SCREEN_BATCH_PROGRESS
+class WaitScreen(Screen):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.name = SCREEN_WAIT
         setup_screen_background(self)
-        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
+
+        layout = BoxLayout(orientation="vertical", padding=18, spacing=12)
         self.add_widget(layout)
 
-        title = create_title_label(text="Batch Progress", size_hint_y=0.15)
-        layout.add_widget(title)
+        card = create_glass_card(padding=18, spacing=12)
+        layout.add_widget(card)
 
-        self.current_card_label = create_info_label(text="Card: --", size_hint_y=0.15)
-        self.ocr_result_label = create_info_label(text="OCR: --", size_hint_y=0.15)
-        self.decision_label = create_info_label(text="Decision: --", size_hint_y=0.15)
-        layout.add_widget(self.current_card_label)
-        layout.add_widget(self.ocr_result_label)
-        layout.add_widget(self.decision_label)
-
-        self.counts_label = create_info_label(
-            text="Stored: 0 | Rejected: 0 | Failed: 0", size_hint_y=0.15
+        card.add_widget(create_title_label(text="Dispensing Card"))
+        self.status_label = create_success_label(
+            text="Please wait while the kiosk prepares your card."
         )
-        layout.add_widget(self.counts_label)
-
-        self.progress_label = create_subtitle_label(
-            text="Progress: 0/0", size_hint_y=0.1
+        self.detail_label = create_info_label(
+            text="Keep clear of the dispenser until the next screen appears."
         )
-        layout.add_widget(self.progress_label)
+        card.add_widget(self.status_label)
+        card.add_widget(self.detail_label)
 
-        self.stop_button = create_danger_button(text="Stop Scan", size_hint_y=0.15)
-        layout.add_widget(self.stop_button)
+    def set_status(self, text):
+        self.status_label.text = text
 
-    def update_progress(
-        self, card_num, ocr_text, decision, stored, rejected, failed, total
-    ):
-        self.current_card_label.text = f"Card: {card_num}"
-        self.ocr_result_label.text = f"OCR: {ocr_text}"
-        self.decision_label.text = f"Decision: {decision}"
-        self.counts_label.text = (
-            f"Stored: {stored} | Rejected: {rejected} | Failed: {failed}"
-        )
-        self.progress_label.text = f"Progress: {card_num}/{total}"
+    def set_detail(self, text):
+        self.detail_label.text = text
 
 
-class BatchSummaryScreen(Screen):
-    def __init__(self, **kw):
-        super().__init__(**kw)
-        self.name = SCREEN_BATCH_SUMMARY
+class ConfirmationScreen(Screen):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.name = SCREEN_CONFIRMATION
         setup_screen_background(self)
-        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
+
+        layout = BoxLayout(orientation="vertical", padding=18, spacing=12)
         self.add_widget(layout)
 
-        title = create_title_label(text="Batch Summary", size_hint_y=0.1)
-        layout.add_widget(title)
+        card = create_glass_card(padding=18, spacing=12)
+        layout.add_widget(card)
 
-        self.summary_label = create_info_label(text="", size_hint_y=0.7)
-        layout.add_widget(self.summary_label)
+        card.add_widget(
+            create_success_label(text="Card dispensed successfully.")
+        )
+        self.detail_label = create_info_label(
+            text="Please collect your card and tap Finish."
+        )
+        card.add_widget(self.detail_label)
 
-        self.logout_button = create_secondary_button(text="Logout", size_hint_y=0.15)
-        layout.add_widget(self.logout_button)
+        self.finish_button = create_primary_button(text="Finish", size_hint_y=0.16)
+        card.add_widget(self.finish_button)
 
-    def set_summary(
-        self, scanned, stored, inactive_held, rejected, sms_sent, sms_failed
-    ):
-        summary_text = f"""Batch Complete
-        
-Scanned: {scanned}
-Stored: {stored}
-Inactive/Held: {inactive_held}
-Rejected: {rejected}
+    def set_detail(self, text):
+        self.detail_label.text = text
 
-SMS Status:
-Sent: {sms_sent}
-Failed: {sms_failed}"""
-        self.summary_label.text = summary_text
+
+class ErrorScreen(Screen):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.name = SCREEN_ERROR
+        setup_screen_background(self)
+
+        layout = BoxLayout(orientation="vertical", padding=18, spacing=12)
+        self.add_widget(layout)
+
+        card = create_glass_card(padding=18, spacing=12)
+        layout.add_widget(card)
+
+        self.error_label = create_error_label(text="Something went wrong.")
+        self.info_label = create_info_label(
+            text="Tap Try Again to return to the previous step."
+        )
+        self.retry_button = create_danger_button(text="Try Again", size_hint_y=0.16)
+
+        card.add_widget(self.error_label)
+        card.add_widget(self.info_label)
+        card.add_widget(self.retry_button)
+
+        self.retry_screen = SCREEN_IDLE
+
+    def set_error(self, message, retry_screen=SCREEN_IDLE):
+        self.error_label.text = message
+        self.retry_screen = retry_screen
+
+
+class LockedScreen(Screen):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.name = SCREEN_LOCKED
+        setup_screen_background(self)
+
+        layout = BoxLayout(orientation="vertical", padding=18, spacing=12)
+        self.add_widget(layout)
+
+        card = create_glass_card(padding=18, spacing=12)
+        layout.add_widget(card)
+
+        self.locked_label = create_error_label(text="Too many failed attempts.")
+        self.info_label = create_info_label(
+            text="Please wait for the lockout to clear and then try again."
+        )
+        card.add_widget(self.locked_label)
+        card.add_widget(self.info_label)
+
+    def set_message(self, message, detail=None):
+        self.locked_label.text = message
+        if detail is not None:
+            self.info_label.text = detail
