@@ -132,7 +132,7 @@ mock_db_api/config.py
 **/secrets.yaml
 db
 kiosk_brain/tests/fixtures/*
-kiosk_brain/tests/*
+kiosk_brain/tests/outputs/*
 
 # =============================================================================
 # Python Cache & Compiled Files
