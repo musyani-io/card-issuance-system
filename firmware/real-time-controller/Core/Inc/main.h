@@ -31,7 +31,6 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <stdbool.h>
 
 /* USER CODE END Includes */
 
@@ -56,12 +55,6 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-HAL_StatusTypeDef stepper_init(void);
-HAL_StatusTypeDef stepper_set_direction(bool clockwise);
-HAL_StatusTypeDef stepper_start_continuous(bool clockwise);
-void stepper_stop(void);
-HAL_StatusTypeDef stepper_rotate_steps(uint32_t steps, bool clockwise);
-HAL_StatusTypeDef stepper_rotate_revolutions(uint32_t revolutions, bool clockwise);
 
 /* USER CODE END EFP */
 
@@ -72,28 +65,14 @@ HAL_StatusTypeDef stepper_rotate_revolutions(uint32_t revolutions, bool clockwis
 #define USART_TX_GPIO_Port GPIOA
 #define USART_RX_Pin GPIO_PIN_3
 #define USART_RX_GPIO_Port GPIOA
-#define STEP_Pin GPIO_PIN_0
-#define STEP_GPIO_Port GPIOA
-#define DIR_Pin GPIO_PIN_1
-#define DIR_GPIO_Port GPIOA
-#define SOLENOID_Pin GPIO_PIN_10
-#define SOLENOID_GPIO_Port GPIOA
-#define HALL_EFFECT_Pin GPIO_PIN_11
-#define HALL_EFFECT_GPIO_Port GPIOA
+#define LD2_Pin GPIO_PIN_5
+#define LD2_GPIO_Port GPIOA
 #define TMS_Pin GPIO_PIN_13
 #define TMS_GPIO_Port GPIOA
 #define TCK_Pin GPIO_PIN_14
 #define TCK_GPIO_Port GPIOA
 #define SWO_Pin GPIO_PIN_3
 #define SWO_GPIO_Port GPIOB
-#define IR1_Pin GPIO_PIN_4
-#define IR1_GPIO_Port GPIOB
-#define IR2_Pin GPIO_PIN_5
-#define IR2_GPIO_Port GPIOB
-#define IR3_Pin GPIO_PIN_6
-#define IR3_GPIO_Port GPIOB
-#define IR4_Pin GPIO_PIN_7
-#define IR4_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

@@ -21,35 +21,11 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <stdbool.h>
 
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
-#define SPI_FRAME_SIZE 3
-
-// Command Codes
-#define CMD_ROTATE_TO_SLOT    0x10
-#define CMD_EJECT_CARD        0x11
-#define CMD_LATCH_CARD        0x12
-#define CMD_RELEASE_LATCH     0x13
-#define CMD_LOCK_DOOR         0x20
-#define CMD_UNLOCK_DOOR       0x21
-#define CMD_FEED_CARD         0x30
-#define CMD_DIVERT_REJECT     0x31
-#define CMD_GET_SENSOR_STATE  0x40
-#define CMD_HOME_CAROUSEL     0x41
-
-// Response Codes
-#define RESP_ACK              0x00
-#define RESP_NACK             0x01
-#define RESP_BUSY             0x02
-#define RESP_SENSOR_STATE     0x03
-#define RESP_ERROR            0x04
-
-#define STEPPER_STEPS_PER_REV 200U
 
 /* USER CODE END PTD */
 
@@ -64,41 +40,20 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-SPI_HandleTypeDef hspi1;
-
 TIM_HandleTypeDef htim1;
-TIM_HandleTypeDef htim2;
 
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-
-uint8_t spi_rx_buf[3] = {0};
-uint8_t spi_tx_buf[3] = {RESP_ACK, 0x00, 0x00};  // Pre-load with default ACK
-uint8_t rx_byte_count = 0;
-uint8_t spi_frame_ready = 0;
-
-static volatile uint32_t stepper_target_steps = 0U;
-static volatile uint32_t stepper_completed_steps = 0U;
-static volatile uint8_t stepper_busy = 0U;
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_USART2_UART_Init(void);
-static void MX_SPI1_Init(void);
 static void MX_TIM1_Init(void);
-static void MX_TIM2_Init(void);
+static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
-HAL_StatusTypeDef stepper_init(void);
-HAL_StatusTypeDef stepper_set_direction(bool clockwise);
-HAL_StatusTypeDef stepper_start_continuous(bool clockwise);
-void stepper_stop(void);
-HAL_StatusTypeDef stepper_rotate_steps(uint32_t steps, bool clockwise);
-HAL_StatusTypeDef stepper_rotate_revolutions(uint32_t revolutions, bool clockwise);
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim);
 
 /* USER CODE END PFP */
 
@@ -136,16 +91,9 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_USART2_UART_Init();
-  MX_SPI1_Init();
   MX_TIM1_Init();
-  MX_TIM2_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-
-  // Start SPI1 in interrupt mode - listen from Pi
-  HAL_SPI_TransmitReceive_IT(&hspi1, spi_tx_buf, spi_rx_buf, SPI_FRAME_SIZE);
-  stepper_init();
-  stepper_start_continuous(true);
 
   /* USER CODE END 2 */
 
@@ -207,43 +155,6 @@ void SystemClock_Config(void)
 }
 
 /**
-  * @brief SPI1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_SPI1_Init(void)
-{
-
-  /* USER CODE BEGIN SPI1_Init 0 */
-
-  /* USER CODE END SPI1_Init 0 */
-
-  /* USER CODE BEGIN SPI1_Init 1 */
-
-  /* USER CODE END SPI1_Init 1 */
-  /* SPI1 parameter configuration*/
-  hspi1.Instance = SPI1;
-  hspi1.Init.Mode = SPI_MODE_SLAVE;
-  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
-  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi1.Init.NSS = SPI_NSS_HARD_INPUT;
-  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
-  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-  hspi1.Init.CRCPolynomial = 10;
-  if (HAL_SPI_Init(&hspi1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN SPI1_Init 2 */
-
-  /* USER CODE END SPI1_Init 2 */
-
-}
-
-/**
   * @brief TIM1 Initialization Function
   * @param None
   * @retval None
@@ -264,9 +175,9 @@ static void MX_TIM1_Init(void)
 
   /* USER CODE END TIM1_Init 1 */
   htim1.Instance = TIM1;
-  htim1.Init.Prescaler = 839;
+  htim1.Init.Prescaler = 83;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 1999;
+  htim1.Init.Period = 19999;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -290,17 +201,13 @@ static void MX_TIM1_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 150;
+  sConfigOC.Pulse = 0;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
   sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
   if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
   {
     Error_Handler();
   }
@@ -319,65 +226,6 @@ static void MX_TIM1_Init(void)
 
   /* USER CODE END TIM1_Init 2 */
   HAL_TIM_MspPostInit(&htim1);
-
-}
-
-/**
-  * @brief TIM2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM2_Init(void)
-{
-
-  /* USER CODE BEGIN TIM2_Init 0 */
-
-  /* USER CODE END TIM2_Init 0 */
-
-  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-  TIM_OC_InitTypeDef sConfigOC = {0};
-
-  /* USER CODE BEGIN TIM2_Init 1 */
-
-  /* USER CODE END TIM2_Init 1 */
-  htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 83;
-  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 999;
-  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 500;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM2_Init 2 */
-
-  /* USER CODE END TIM2_Init 2 */
-  HAL_TIM_MspPostInit(&htim2);
 
 }
 
@@ -434,7 +282,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(SOLENOID_GPIO_Port, SOLENOID_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -454,42 +302,34 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PA12 PA15 */
-  GPIO_InitStruct.Pin = GPIO_PIN_12|GPIO_PIN_15;
+  /*Configure GPIO pins : PA0 PA1 PA4 PA6
+                           PA7 PA9 PA10 PA11
+                           PA12 PA15 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_4|GPIO_PIN_6
+                          |GPIO_PIN_7|GPIO_PIN_9|GPIO_PIN_10|GPIO_PIN_11
+                          |GPIO_PIN_12|GPIO_PIN_15;
   GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : DIR_Pin */
-  GPIO_InitStruct.Pin = DIR_Pin;
+  /*Configure GPIO pin : LD2_Pin */
+  GPIO_InitStruct.Pin = LD2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(DIR_GPIO_Port, &GPIO_InitStruct);
-  HAL_GPIO_WritePin(DIR_GPIO_Port, DIR_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PB0 PB1 PB2 PB10
                            PB12 PB13 PB14 PB15
+                           PB4 PB5 PB6 PB7
                            PB8 PB9 */
   GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_10
                           |GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15
+                          |GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7
                           |GPIO_PIN_8|GPIO_PIN_9;
   GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : SOLENOID_Pin */
-  GPIO_InitStruct.Pin = SOLENOID_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(SOLENOID_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : HALL_EFFECT_Pin */
-  GPIO_InitStruct.Pin = HALL_EFFECT_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(HALL_EFFECT_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PD2 */
   GPIO_InitStruct.Pin = GPIO_PIN_2;
@@ -497,150 +337,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : IR1_Pin IR2_Pin IR3_Pin IR4_Pin */
-  GPIO_InitStruct.Pin = IR1_Pin|IR2_Pin|IR3_Pin|IR4_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
   /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
-
-HAL_StatusTypeDef stepper_init(void)
-{
-  if (stepper_busy != 0U)
-  {
-    return HAL_BUSY;
-  }
-
-  HAL_GPIO_WritePin(DIR_GPIO_Port, DIR_Pin, GPIO_PIN_RESET);
-  HAL_TIM_Base_Stop_IT(&htim2);
-  HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
-  __HAL_TIM_SET_COUNTER(&htim2, 0U);
-  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 0U);
-
-  return HAL_OK;
-}
-
-HAL_StatusTypeDef stepper_set_direction(bool clockwise)
-{
-  HAL_GPIO_WritePin(DIR_GPIO_Port, DIR_Pin, clockwise ? GPIO_PIN_SET : GPIO_PIN_RESET);
-  return HAL_OK;
-}
-
-void stepper_stop(void)
-{
-  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 0U);
-  HAL_TIM_Base_Stop_IT(&htim2);
-  HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
-  __HAL_TIM_SET_COUNTER(&htim2, 0U);
-  HAL_GPIO_WritePin(STEP_GPIO_Port, STEP_Pin, GPIO_PIN_RESET);
-  stepper_target_steps = 0U;
-  stepper_completed_steps = 0U;
-  stepper_busy = 0U;
-}
-
-HAL_StatusTypeDef stepper_start_continuous(bool clockwise)
-{
-  if (stepper_busy != 0U)
-  {
-    return HAL_BUSY;
-  }
-
-  stepper_busy = 1U;
-  stepper_set_direction(clockwise);
-
-  __HAL_TIM_SET_COUNTER(&htim2, 0U);
-  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, htim2.Init.Period / 2U);
-
-  if (HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1) != HAL_OK)
-  {
-    stepper_busy = 0U;
-    return HAL_ERROR;
-  }
-
-  return HAL_OK;
-}
-
-HAL_StatusTypeDef stepper_rotate_steps(uint32_t steps, bool clockwise)
-{
-  if (steps == 0U)
-  {
-    return HAL_OK;
-  }
-
-  if (stepper_busy != 0U)
-  {
-    return HAL_BUSY;
-  }
-
-  stepper_busy = 1U;
-  stepper_target_steps = steps;
-  stepper_completed_steps = 0U;
-
-  stepper_set_direction(clockwise);
-
-  __HAL_TIM_SET_COUNTER(&htim2, 0U);
-  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, htim2.Init.Period / 2U);
-
-  if (HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1) != HAL_OK)
-  {
-    stepper_busy = 0U;
-    return HAL_ERROR;
-  }
-
-  if (HAL_TIM_Base_Start_IT(&htim2) != HAL_OK)
-  {
-    HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
-    stepper_busy = 0U;
-    return HAL_ERROR;
-  }
-
-  while (stepper_busy != 0U)
-  {
-    __WFI();
-  }
-
-  return HAL_OK;
-}
-
-HAL_StatusTypeDef stepper_rotate_revolutions(uint32_t revolutions, bool clockwise)
-{
-  return stepper_rotate_steps(revolutions * STEPPER_STEPS_PER_REV, clockwise);
-}
-
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-  if ((htim->Instance == TIM2) && (stepper_busy != 0U))
-  {
-    stepper_completed_steps++;
-    if (stepper_completed_steps >= stepper_target_steps)
-    {
-      stepper_stop();
-    }
-  }
-}
-
-void route_command(uint8_t cmd_byte, uint8_t param_byte)
-{
-  switch (cmd_byte) {
-    case 0x42:
-    	spi_tx_buf[0] = cmd_byte;
-    	spi_tx_buf[1] = param_byte;
-    	spi_tx_buf[2] = cmd_byte ^ param_byte;
-    	break;
-    
-    default: 
-    	spi_tx_buf[0] = RESP_NACK;
-    	spi_tx_buf[1] = cmd_byte;
-    	spi_tx_buf[2] = spi_tx_buf[0] ^ spi_tx_buf[1];
-    	break;
-  }
-}
 
 /* USER CODE END 4 */
 
