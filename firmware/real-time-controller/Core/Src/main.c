@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "servo.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -94,6 +95,7 @@ int main(void)
   MX_TIM1_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+  CardServo_Init();
 
   /* USER CODE END 2 */
 
@@ -102,7 +104,20 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
+    while(1)
+{
+    __HAL_TIM_SET_COMPARE(&htim1,
+                          TIM_CHANNEL_1,
+                          1000);
 
+    HAL_Delay(3000);
+
+    __HAL_TIM_SET_COMPARE(&htim1,
+                          TIM_CHANNEL_1,
+                          2000);
+
+    HAL_Delay(3000);
+}
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
