@@ -130,7 +130,7 @@ mock_db_api/config.py
 .secrets
 **/secrets.yml
 **/secrets.yaml
-db
+*.db
 kiosk_brain/tests/fixtures/*
 kiosk_brain/tests/outputs/*
 
