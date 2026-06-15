@@ -28,7 +28,9 @@ def create_glass_card(orientation="vertical", padding=16, spacing=12, **kwargs):
         Color(0.08, 0.13, 0.2, 0.72)
         card._bg = RoundedRectangle(radius=[22], pos=card.pos, size=card.size)
         Color(0.25, 0.9, 0.95, 0.25)
-        card._border = Line(rounded_rectangle=[card.x, card.y, card.width, card.height, 22], width=1.2)
+        card._border = Line(
+            rounded_rectangle=[card.x, card.y, card.width, card.height, 22], width=1.2
+        )
 
     def _update(*_):
         card._bg.pos = card.pos

@@ -7,7 +7,6 @@ import argparse
 from pathlib import Path
 import sys
 
-
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 if str(PROJECT_ROOT) not in sys.path:

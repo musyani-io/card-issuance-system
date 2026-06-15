@@ -53,7 +53,9 @@ def detect_card_contour(image: np.ndarray) -> tuple[np.ndarray, dict]:
     target_w = int(config.CARD_DETECTION["target_width"])
     if w > target_w:
         scale = target_w / float(w)
-        gray = cv2.resize(gray, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+        gray = cv2.resize(
+            gray, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA
+        )
 
     # Blur + Canny using config values
     blur_ksize = tuple(config.CARD_DETECTION["blur_ksize"])
@@ -67,7 +69,9 @@ def detect_card_contour(image: np.ndarray) -> tuple[np.ndarray, dict]:
     mk = tuple(config.CARD_DETECTION["morph_kernel"])
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, mk)
     edged = cv2.morphologyEx(edged, cv2.MORPH_CLOSE, kernel)
-    edged = cv2.dilate(edged, kernel, iterations=int(config.CARD_DETECTION["dilate_iterations"]))
+    edged = cv2.dilate(
+        edged, kernel, iterations=int(config.CARD_DETECTION["dilate_iterations"])
+    )
 
     contours_info = cv2.findContours(edged, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     contours = contours_info[0] if len(contours_info) == 2 else contours_info[1]
@@ -175,7 +179,15 @@ def draw_detection_overlay(image: np.ndarray, corners: np.ndarray) -> np.ndarray
 
     for i, (x, y) in enumerate(pts):
         cv2.circle(vis, (int(x), int(y)), 8, (0, 0, 255), -1)
-        cv2.putText(vis, str(i + 1), (int(x) + 8, int(y) - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
+        cv2.putText(
+            vis,
+            str(i + 1),
+            (int(x) + 8, int(y) - 8),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.8,
+            (255, 0, 0),
+            2,
+        )
 
     return vis
 
@@ -205,7 +217,9 @@ def get_card_info(corners: np.ndarray) -> dict:
     }
 
 
-def warp_card(image: np.ndarray, corners: np.ndarray, output_size: tuple[int, int] | None = None) -> np.ndarray:
+def warp_card(
+    image: np.ndarray, corners: np.ndarray, output_size: tuple[int, int] | None = None
+) -> np.ndarray:
     """Apply perspective transform to extract a flattened card image.
 
     `corners` should be in TL, TR, BR, BL order or will be ordered.
@@ -217,14 +231,15 @@ def warp_card(image: np.ndarray, corners: np.ndarray, output_size: tuple[int, in
 
     pts = corners.astype("float32")
     rect = _order_points(pts)
-    (tl, tr, br, bl) = rect
+    tl, tr, br, bl = rect
 
     if output_size is None:
         output_size = tuple(config.PERSPECTIVE["output_size"])
     dst_w, dst_h = output_size
 
     dst = np.array(
-        [[0, 0], [dst_w - 1, 0], [dst_w - 1, dst_h - 1], [0, dst_h - 1]], dtype="float32"
+        [[0, 0], [dst_w - 1, 0], [dst_w - 1, dst_h - 1], [0, dst_h - 1]],
+        dtype="float32",
     )
 
     M = cv2.getPerspectiveTransform(rect, dst)
@@ -232,7 +247,11 @@ def warp_card(image: np.ndarray, corners: np.ndarray, output_size: tuple[int, in
     return warped
 
 
-def save_perspective_preview(image_path: str | Path, output_dir: str | Path, output_size: tuple[int, int] | None = None) -> dict[str, Path]:
+def save_perspective_preview(
+    image_path: str | Path,
+    output_dir: str | Path,
+    output_size: tuple[int, int] | None = None,
+) -> dict[str, Path]:
     """Detect card, warp it to `output_size`, and write flattened previews.
 
     Returns paths for 'original', 'flattened', 'preview', and 'details'.
@@ -264,18 +283,32 @@ def save_perspective_preview(image_path: str | Path, output_dir: str | Path, out
         cv2.imwrite(str(original_path), image)
         cv2.imwrite(str(flattened_path), warped)
 
-        warped_bgr = warped if warped.ndim == 3 else cv2.cvtColor(warped, cv2.COLOR_GRAY2BGR)
-        preview = cv2.hconcat([cv2.resize(image, (warped_bgr.shape[1], warped_bgr.shape[0])), warped_bgr])
+        warped_bgr = (
+            warped if warped.ndim == 3 else cv2.cvtColor(warped, cv2.COLOR_GRAY2BGR)
+        )
+        preview = cv2.hconcat(
+            [cv2.resize(image, (warped_bgr.shape[1], warped_bgr.shape[0])), warped_bgr]
+        )
         cv2.imwrite(str(preview_path), preview)
 
-        lines = [f"source={source.name}", f"original_shape={image.shape}", f"flattened_shape={warped.shape}", "stage=1.2.2 perspective correction"]
+        lines = [
+            f"source={source.name}",
+            f"original_shape={image.shape}",
+            f"flattened_shape={warped.shape}",
+            "stage=1.2.2 perspective correction",
+        ]
         if meta:
             for k, v in meta.items():
                 lines.append(f"{k}={v}")
 
         info_path.write_text("\n".join(lines), encoding="utf-8")
 
-        return {"original": original_path, "flattened": flattened_path, "preview": preview_path, "details": info_path}
+        return {
+            "original": original_path,
+            "flattened": flattened_path,
+            "preview": preview_path,
+            "details": info_path,
+        }
 
     except Exception as exc:
         err_path = dest / "perspective_error.txt"
@@ -283,7 +316,9 @@ def save_perspective_preview(image_path: str | Path, output_dir: str | Path, out
         raise
 
 
-def crop_registration_roi_from_flat(flattened: np.ndarray, roi_rel: tuple[float, float, float, float] = None) -> np.ndarray:
+def crop_registration_roi_from_flat(
+    flattened: np.ndarray, roi_rel: tuple[float, float, float, float] = None
+) -> np.ndarray:
     """Crop a region of interest from a flattened card image.
 
     roi_rel = (x, y, w, h) in relative fractions of flattened width/height.
@@ -307,7 +342,11 @@ def crop_registration_roi_from_flat(flattened: np.ndarray, roi_rel: tuple[float,
     return flattened[y:y2, x:x2]
 
 
-def save_roi_preview(image_path: str | Path, output_dir: str | Path, roi_rel: tuple[float, float, float, float] = None) -> dict[str, Path]:
+def save_roi_preview(
+    image_path: str | Path,
+    output_dir: str | Path,
+    roi_rel: tuple[float, float, float, float] = None,
+) -> dict[str, Path]:
     """Detect, flatten, crop ROI (registration number), and save previews + details."""
 
     source = Path(image_path)
@@ -326,7 +365,9 @@ def save_roi_preview(image_path: str | Path, output_dir: str | Path, roi_rel: tu
             corners = result
             meta = {}
 
-        warped = warp_card(image, corners, output_size=tuple(config.PERSPECTIVE["output_size"]))
+        warped = warp_card(
+            image, corners, output_size=tuple(config.PERSPECTIVE["output_size"])
+        )
         roi = crop_registration_roi_from_flat(warped, roi_rel=roi_rel)
         # determine which ROI was actually used (None -> config default)
         used_roi_rel = roi_rel if roi_rel is not None else tuple(config.ROI["default"])
@@ -356,7 +397,11 @@ def save_roi_preview(image_path: str | Path, output_dir: str | Path, roi_rel: tu
 
         gray_bgr = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
         thresh_bgr = cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
-        preocr_bgr = enhanced if enhanced.ndim == 3 else cv2.cvtColor(enhanced, cv2.COLOR_GRAY2BGR)
+        preocr_bgr = (
+            enhanced
+            if enhanced.ndim == 3
+            else cv2.cvtColor(enhanced, cv2.COLOR_GRAY2BGR)
+        )
         preview = cv2.hconcat([preocr_bgr, gray_bgr, thresh_bgr])
         cv2.imwrite(str(preview_path), preview)
 
@@ -377,7 +422,15 @@ def save_roi_preview(image_path: str | Path, output_dir: str | Path, roi_rel: tu
 
         info_path.write_text("\n".join(lines), encoding="utf-8")
 
-        return {"original": original_path, "flattened": flattened_path, "roi": roi_path, "grayscale": roi_gray_path, "threshold": roi_thresh_path, "preview": preview_path, "details": info_path}
+        return {
+            "original": original_path,
+            "flattened": flattened_path,
+            "roi": roi_path,
+            "grayscale": roi_gray_path,
+            "threshold": roi_thresh_path,
+            "preview": preview_path,
+            "details": info_path,
+        }
 
     except Exception as exc:
         err_path = dest / "roi_error.txt"
@@ -385,7 +438,9 @@ def save_roi_preview(image_path: str | Path, output_dir: str | Path, roi_rel: tu
         raise
 
 
-def save_detection_preview(image_path: str | Path, output_dir: str | Path) -> dict[str, Path]:
+def save_detection_preview(
+    image_path: str | Path, output_dir: str | Path
+) -> dict[str, Path]:
     """Load `image_path`, detect card, and write visual outputs to `output_dir`.
 
     Returns paths for 'original', 'detection', and 'details'.
@@ -431,9 +486,15 @@ def save_detection_preview(image_path: str | Path, output_dir: str | Path) -> di
             lines.append(f"image_area={meta.get('image_area')}")
         info_path.write_text("\n".join(lines), encoding="utf-8")
 
-        return {"original": original_path, "detection": detection_path, "details": info_path}
+        return {
+            "original": original_path,
+            "detection": detection_path,
+            "details": info_path,
+        }
 
-    except Exception as exc:  # keep simple for development; caller can inspect details file
+    except (
+        Exception
+    ) as exc:  # keep simple for development; caller can inspect details file
         err_path = dest / "detection_error.txt"
         err_path.write_text(str(exc), encoding="utf-8")
         raise

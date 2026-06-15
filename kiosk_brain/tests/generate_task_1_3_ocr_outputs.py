@@ -24,7 +24,9 @@ from modules.ocr import perform_ocr
 def iter_sample_images(samples_dir: Path) -> list[Path]:
     allowed_suffixes = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
     return sorted(
-        path for path in samples_dir.iterdir() if path.is_file() and path.suffix.lower() in allowed_suffixes
+        path
+        for path in samples_dir.iterdir()
+        if path.is_file() and path.suffix.lower() in allowed_suffixes
     )
 
 
@@ -32,7 +34,9 @@ def build_output_root(project_root: Path) -> Path:
     return project_root / "tests" / "outputs"
 
 
-def run_for_method(sample_path: Path, outputs_dir: Path, psm: int, whitelist: str | None):
+def run_for_method(
+    sample_path: Path, outputs_dir: Path, psm: int, whitelist: str | None
+):
     sample_out = outputs_dir / sample_path.stem
     sample_out.mkdir(parents=True, exist_ok=True)
     # Ensure ROI artifacts exist
@@ -47,6 +51,7 @@ def run_for_method(sample_path: Path, outputs_dir: Path, psm: int, whitelist: st
         targets.append((roi_preocr, "preocr"))
 
     import re
+
     pattern = re.compile(r"^20\d{2}-04-\d{5}$")
 
     for img_path, tag in targets:
@@ -59,20 +64,28 @@ def run_for_method(sample_path: Path, outputs_dir: Path, psm: int, whitelist: st
         try:
             res = perform_ocr(im_np, psm=psm, whitelist=whitelist)
         except Exception as exc:
-            (sample_out / f"ocr_psm{psm}_{tag}_error.txt").write_text(str(exc), encoding="utf-8")
+            (sample_out / f"ocr_psm{psm}_{tag}_error.txt").write_text(
+                str(exc), encoding="utf-8"
+            )
             continue
 
         text = res.get("text", "")
         conf = res.get("mean_confidence")
 
         (sample_out / f"ocr_psm{psm}_{tag}.txt").write_text(text, encoding="utf-8")
-        (sample_out / f"ocr_psm{psm}_{tag}_conf.txt").write_text(str(conf), encoding="utf-8")
+        (sample_out / f"ocr_psm{psm}_{tag}_conf.txt").write_text(
+            str(conf), encoding="utf-8"
+        )
 
         # Regex validation for pattern 20XX-04-XXXXX (digits + hyphens)
         matched = bool(pattern.search(text))
-        (sample_out / f"ocr_psm{psm}_{tag}_match.txt").write_text(str(matched), encoding="utf-8")
+        (sample_out / f"ocr_psm{psm}_{tag}_match.txt").write_text(
+            str(matched), encoding="utf-8"
+        )
         if matched:
-            (sample_out / f"ocr_psm{psm}_{tag}_match_text.txt").write_text(pattern.search(text).group(0), encoding="utf-8")
+            (sample_out / f"ocr_psm{psm}_{tag}_match_text.txt").write_text(
+                pattern.search(text).group(0), encoding="utf-8"
+            )
 
 
 def main() -> int:

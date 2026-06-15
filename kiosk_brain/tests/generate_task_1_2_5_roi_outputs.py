@@ -7,7 +7,6 @@ import argparse
 from pathlib import Path
 import sys
 
-
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 if str(PROJECT_ROOT) not in sys.path:
@@ -19,7 +18,9 @@ from modules.card_detector import save_roi_preview
 def iter_sample_images(samples_dir: Path) -> list[Path]:
     allowed_suffixes = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
     return sorted(
-        path for path in samples_dir.iterdir() if path.is_file() and path.suffix.lower() in allowed_suffixes
+        path
+        for path in samples_dir.iterdir()
+        if path.is_file() and path.suffix.lower() in allowed_suffixes
     )
 
 
@@ -28,7 +29,9 @@ def build_output_root(project_root: Path) -> Path:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Create ROI-cropped visual outputs for Task 1.2.5.")
+    parser = argparse.ArgumentParser(
+        description="Create ROI-cropped visual outputs for Task 1.2.5."
+    )
     parser.add_argument(
         "--samples-dir",
         type=Path,

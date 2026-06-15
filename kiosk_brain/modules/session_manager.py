@@ -149,9 +149,7 @@ class SessionManager:
             self.start_time = (
                 time.time()
             )  # Mark session birth (when did student start using kiosk)
-            self.last_activity_time = (
-                time.time()
-            )  # Reset timeout countdown
+            self.last_activity_time = time.time()  # Reset timeout countdown
         else:
             # SUBSEQUENT TOUCHES: Only reset timeout countdown, keep session start time
             # This allows us to track total session duration while resetting inactivity counter

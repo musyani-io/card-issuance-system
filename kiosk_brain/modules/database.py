@@ -88,7 +88,7 @@ def get_db_connection(db_path=None):
     """
     if db_path is None:
         db_path = DB_PATH
-    
+
     try:
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row  # Enable column access by name
@@ -231,7 +231,7 @@ def get_next_available_slot(conn=None):
         - Return None if all 4 slots are occupied (batch full)
 
     Args:
-        conn (sqlite3.Connection): Optional connection object. 
+        conn (sqlite3.Connection): Optional connection object.
                                   If None, opens new connection (less efficient in transactions).
 
     Returns:
@@ -249,7 +249,7 @@ def get_next_available_slot(conn=None):
     if conn is None:
         conn = get_db_connection()
         close_conn = True
-    
+
     try:
         cursor = conn.cursor()
         # Fetch all occupied slots (cards not yet collected)
@@ -257,13 +257,13 @@ def get_next_available_slot(conn=None):
             "SELECT slot_index FROM cards WHERE card_status != 'collected' ORDER BY slot_index"
         )
         occupied_slots = set(row[0] for row in cursor.fetchall())
-        
+
         # Find first unoccupied slot
         for slot in TOTAL_SLOTS:
             if slot not in occupied_slots:
                 logger.info(f"Next available slot: {slot}")
                 return slot
-        
+
         # All slots occupied
         logger.warning("Batch full: all 4 slots assigned")
         return None
@@ -291,15 +291,15 @@ def check_student_has_pin(reg_number, conn=None):
     if conn is None:
         conn = get_db_connection()
         close_conn = True
-    
+
     try:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT pin_hash FROM authentication WHERE registration_number = ?",
-            (reg_number,)
+            (reg_number,),
         )
         row = cursor.fetchone()
-        
+
         if row and row[0]:  # pin_hash exists and not NULL
             logger.info(f"Student {reg_number}: returning student (PIN exists)")
             return True, row[0]
@@ -375,37 +375,35 @@ def ingest_card(reg_number):
         # ===== STEP 1: Fetch student from university API =====
         logger.info(f"[{reg_number}] Step 1: Fetching student from university API...")
         api_result = get_student(reg_number)
-        
+
         if not api_result.get("success"):
             error_msg = api_result.get("error", "Student not found")
             logger.error(f"[{reg_number}] API lookup failed: {error_msg}")
-            return {
-                "success": False,
-                "error": error_msg,
-                "step": "api_lookup"
-            }
-        
+            return {"success": False, "error": error_msg, "step": "api_lookup"}
+
         student_data = api_result.get("data", {})
-        student_name = f"{student_data.get('first_name', '')} {student_data.get('surname', '')}"
+        student_name = (
+            f"{student_data.get('first_name', '')} {student_data.get('surname', '')}"
+        )
         email = student_data.get("email")
         phone_number = student_data.get("phone_number")
         programme = student_data.get("programme", "Unknown")
         registration_status = student_data.get("registration_status", "active")
-        
+
         logger.info(f"[{reg_number}] ✓ Student found: {student_name}")
-        
+
         # ===== STEP 2: Generate OTP =====
         logger.info(f"[{reg_number}] Step 2: Generating OTP...")
         otp = generate_otp()
         otp_hash = hash_credential(otp)
         otp_expiry = datetime.now() + timedelta(hours=OTP_EXPIRY_HOURS)
         logger.info(f"[{reg_number}] ✓ OTP generated: {otp} (expires: {otp_expiry})")
-        
+
         # ===== STEP 3: Check if student has existing PIN =====
         conn = get_db_connection()
         logger.info(f"[{reg_number}] Step 3: Checking for existing PIN...")
         has_pin, existing_pin_hash = check_student_has_pin(reg_number, conn)
-        
+
         if has_pin:
             # Returning student: use existing PIN
             student_type = "returning"
@@ -419,13 +417,15 @@ def ingest_card(reg_number):
             temp_pin = generate_temp_pin()
             temp_pin_hash = hash_credential(temp_pin)
             is_temp_pin = True
-            logger.info(f"[{reg_number}] ✓ First-year student: temporary PIN generated {temp_pin}")
-        
+            logger.info(
+                f"[{reg_number}] ✓ First-year student: temporary PIN generated {temp_pin}"
+            )
+
         # ===== STEP 4: Begin transaction for student record only =====
         logger.info(f"[{reg_number}] Step 4: Beginning student transaction...")
         cursor = conn.cursor()
         conn.execute("BEGIN TRANSACTION")
-        
+
         # ===== STEP 5: Insert/update student record =====
         try:
             cursor.execute(
@@ -484,23 +484,27 @@ def ingest_card(reg_number):
             return {
                 "success": False,
                 "error": "Batch full, all 4 slots assigned",
-                "step": "slot_assignment"
+                "step": "slot_assignment",
             }
         logger.info(f"[{reg_number}] ✓ Slot assigned: {slot_index}")
 
         # ===== STEP 8: Generate batch ID and session ID =====
         batch_id = datetime.now().strftime("Batch_%Y%m%d_%H%M%S")
         session_id = str(uuid.uuid4())
-        logger.info(f"[{reg_number}] Generated batch_id={batch_id}, session_id={session_id}")
+        logger.info(
+            f"[{reg_number}] Generated batch_id={batch_id}, session_id={session_id}"
+        )
 
         # ===== STEP 9: Begin transaction for auth/card logging =====
-        logger.info(f"[{reg_number}] Step 9: Beginning authentication/card transaction...")
+        logger.info(
+            f"[{reg_number}] Step 9: Beginning authentication/card transaction..."
+        )
         conn.execute("BEGIN TRANSACTION")
 
         # ===== STEP 10: Insert/update authentication record =====
         cursor.execute(
             "SELECT auth_id FROM authentication WHERE registration_number = ?",
-            (reg_number,)
+            (reg_number,),
         )
         auth_exists = cursor.fetchone() is not None
 
@@ -511,9 +515,11 @@ def ingest_card(reg_number):
                        failed_otp_attempts = 0, lockout_expiry = NULL,
                        updated_at = datetime('now')
                    WHERE registration_number = ?""",
-                (otp_hash, otp_expiry.isoformat(), reg_number)
+                (otp_hash, otp_expiry.isoformat(), reg_number),
             )
-            logger.info(f"[{reg_number}] ✓ Updated authentication record (OTP refreshed)")
+            logger.info(
+                f"[{reg_number}] ✓ Updated authentication record (OTP refreshed)"
+            )
         else:
             cursor.execute(
                 """INSERT INTO authentication 
@@ -530,7 +536,7 @@ def ingest_card(reg_number):
                     0,
                     0,
                     None,
-                )
+                ),
             )
             logger.info(f"[{reg_number}] ✓ Inserted authentication record")
 
@@ -539,7 +545,7 @@ def ingest_card(reg_number):
             """INSERT INTO cards 
                (registration_number, slot_index, card_status, batch_id, created_at, updated_at)
                VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))""",
-            (reg_number, slot_index, "pending", batch_id)
+            (reg_number, slot_index, "pending", batch_id),
         )
         logger.info(f"[{reg_number}] ✓ Created card record (slot {slot_index})")
 
@@ -548,23 +554,23 @@ def ingest_card(reg_number):
             """INSERT INTO audit_log 
                (event_time, registration_number, event_type, failure_type, session_id)
                VALUES (datetime('now'), ?, ?, ?, ?)""",
-            (reg_number, "otp_sent", None, session_id)
+            (reg_number, "otp_sent", None, session_id),
         )
         logger.info(f"[{reg_number}] ✓ Logged audit event: otp_sent")
 
         # ===== STEP 13: Commit transaction =====
         conn.commit()
         logger.info(f"[{reg_number}] ✓ Transaction committed")
-        
+
         return {
             "success": True,
             "slot_index": slot_index,
             "student_name": student_name,
             "batch_id": batch_id,
             "student_type": student_type,
-            "credentials_sent": credentials_sent
+            "credentials_sent": credentials_sent,
         }
-    
+
     except Exception as e:
         if conn:
             try:
@@ -573,12 +579,8 @@ def ingest_card(reg_number):
             except:
                 pass
         logger.error(f"[{reg_number}] Ingestion failed: {e}")
-        return {
-            "success": False,
-            "error": str(e),
-            "step": "database"
-        }
-    
+        return {"success": False, "error": str(e), "step": "database"}
+
     finally:
         if conn:
             conn.close()
@@ -587,15 +589,15 @@ def ingest_card(reg_number):
 def clear_database(db_path=None):
     """
     Delete all records from students, cards, authentication, audit_log, batches tables.
-    
+
     Keeps schema intact. Useful for test cycles.
-    
+
     Args:
         db_path (str): Path to database. Defaults to config.DB_PATH.
-    
+
     Returns:
         dict: {'success': True, 'deleted_records': {'students': N, 'cards': N, ...}}
-    
+
     Called by:
         - db/init_db.py with --reset CLI flag
         - Manual test setup scripts
@@ -604,50 +606,44 @@ def clear_database(db_path=None):
     try:
         if db_path is None:
             db_path = DB_PATH
-        
+
         conn = get_db_connection(db_path)
         cursor = conn.cursor()
-        
+
         # Delete all records (preserve foreign key relationships by order)
         deleted = {}
-        
+
         # Delete audit log (no FK constraint)
         cursor.execute("DELETE FROM audit_log")
         deleted["audit_log"] = cursor.rowcount
-        
+
         # Delete authentication (FK to students, but allow deletion)
         cursor.execute("DELETE FROM authentication")
         deleted["authentication"] = cursor.rowcount
-        
+
         # Delete cards (FK to students)
         cursor.execute("DELETE FROM cards")
         deleted["cards"] = cursor.rowcount
-        
+
         # Delete students (PK, referenced by FK)
         cursor.execute("DELETE FROM students")
         deleted["students"] = cursor.rowcount
-        
+
         # Delete batches (referenced by cards, but already deleted cards)
         cursor.execute("DELETE FROM batches")
         deleted["batches"] = cursor.rowcount
-        
+
         conn.commit()
         logger.info(f"Database cleared: {deleted}")
-        
-        return {
-            "success": True,
-            "deleted_records": deleted
-        }
-    
+
+        return {"success": True, "deleted_records": deleted}
+
     except Exception as e:
         if conn:
             conn.rollback()
         logger.error(f"Database clear failed: {e}")
-        return {
-            "success": False,
-            "error": str(e)
-        }
-    
+        return {"success": False, "error": str(e)}
+
     finally:
         if conn:
             conn.close()

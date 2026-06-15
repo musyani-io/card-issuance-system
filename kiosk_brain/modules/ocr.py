@@ -13,6 +13,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import config
+
 try:
     import pytesseract
 except Exception:  # pragma: no cover - optional runtime dependency
@@ -76,7 +77,9 @@ def load_image(image_path: str | Path) -> np.ndarray:
     return image
 
 
-def save_grayscale_preview(image_path: str | Path, output_dir: str | Path) -> dict[str, Path]:
+def save_grayscale_preview(
+    image_path: str | Path, output_dir: str | Path
+) -> dict[str, Path]:
     """Save the original image, grayscale image, and a side-by-side preview."""
 
     source_path = Path(image_path)
@@ -118,7 +121,9 @@ def save_grayscale_preview(image_path: str | Path, output_dir: str | Path) -> di
     }
 
 
-def save_threshold_preview(image_path: str | Path, output_dir: str | Path) -> dict[str, Path]:
+def save_threshold_preview(
+    image_path: str | Path, output_dir: str | Path
+) -> dict[str, Path]:
     """Save the grayscale and adaptive-threshold images plus a side-by-side preview."""
 
     source_path = Path(image_path)
@@ -206,7 +211,9 @@ def apply_pre_ocr_enhancement(image: np.ndarray) -> np.ndarray:
     return sharpened
 
 
-def perform_ocr(image: np.ndarray, *, psm: int | None = None, whitelist: str | None = None) -> dict:
+def perform_ocr(
+    image: np.ndarray, *, psm: int | None = None, whitelist: str | None = None
+) -> dict:
     """Run Tesseract OCR on `image` and return text and confidence metadata.
 
     - `image` may be grayscale, BGR, or binarized. The function will call
@@ -236,7 +243,9 @@ def perform_ocr(image: np.ndarray, *, psm: int | None = None, whitelist: str | N
     text = pytesseract.image_to_string(img, config=config_str).strip()
 
     # Get detailed data to compute confidences
-    data = pytesseract.image_to_data(img, config=config_str, output_type=pytesseract.Output.DICT)
+    data = pytesseract.image_to_data(
+        img, config=config_str, output_type=pytesseract.Output.DICT
+    )
     confs = []
     for conf in data.get("conf", []):
         try:

@@ -108,7 +108,9 @@ class KioskApp(App):
         self.pin_setup_screen.confirm_input.bind(text=lambda *_: self.note_activity())
 
         self.wait_screen.bind(on_enter=lambda *_: self.begin_dispense())
-        self.confirmation_screen.bind(on_enter=lambda *_: self.schedule_confirmation_timeout())
+        self.confirmation_screen.bind(
+            on_enter=lambda *_: self.schedule_confirmation_timeout()
+        )
         self.locked_screen.bind(on_enter=lambda *_: self.schedule_locked_return())
 
         self.sm.current = SCREEN_IDLE
@@ -164,7 +166,9 @@ class KioskApp(App):
     def _set_error(self, message, retry_screen=SCREEN_IDLE, detail=None):
         self.error_screen.set_error(message, retry_screen=retry_screen)
         self.error_screen.info_label.text = (
-            detail if detail is not None else "Tap Try Again to return to the previous step."
+            detail
+            if detail is not None
+            else "Tap Try Again to return to the previous step."
         )
         self.sm.current = SCREEN_ERROR
 
@@ -294,14 +298,19 @@ class KioskApp(App):
             pin_result = enforce_pin_setup(session_manager.reg_number)
             if not pin_result.get("success"):
                 return {"success": False, "phase": "pin_check", "result": pin_result}
-            return {"success": True, "requires_pin_setup": bool(pin_result.get("requires_pin_setup"))}
+            return {
+                "success": True,
+                "requires_pin_setup": bool(pin_result.get("requires_pin_setup")),
+            }
 
         def callback(result):
             if token != self.flow_token:
                 return
             if result.get("success"):
                 requires_pin_setup = result.get("requires_pin_setup", False)
-                session_manager.student_type = "first_year" if requires_pin_setup else "returning"
+                session_manager.student_type = (
+                    "first_year" if requires_pin_setup else "returning"
+                )
                 self.otp_attempts = 0
                 self.otp_entry_screen.clear_inputs()
                 self.note_activity()
@@ -429,14 +438,20 @@ class KioskApp(App):
         def task():
             card_result = get_card_record_by_registration(session_manager.reg_number)
             if not card_result.get("success"):
-                return {"success": False, "error": card_result.get("error", "No active card slot found")}
+                return {
+                    "success": False,
+                    "error": card_result.get("error", "No active card slot found"),
+                }
 
             card = card_result.get("data", {})
             if card.get("card_status") == "collected":
                 return {"success": False, "error": "Card already collected."}
 
             update_result = mark_card_collected(session_manager.reg_number)
-            if not update_result.get("success") or update_result.get("rows_updated", 0) == 0:
+            if (
+                not update_result.get("success")
+                or update_result.get("rows_updated", 0) == 0
+            ):
                 return {"success": False, "error": "Unable to update card status."}
 
             return {

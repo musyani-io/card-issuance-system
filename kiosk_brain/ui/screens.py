@@ -67,9 +67,7 @@ class IdleScreen(Screen):
         card = create_glass_card(padding=18, spacing=14)
         layout.add_widget(card)
         card.add_widget(create_title_label(text="Smart ID Card\nCollection"))
-        card.add_widget(
-            create_info_label(text="Tap to start your collection journey.")
-        )
+        card.add_widget(create_info_label(text="Tap to start your collection journey."))
 
         self.collect_button = create_primary_button(
             text="Start Collection", size_hint_y=0.22
@@ -142,9 +140,7 @@ class OTPEntryScreen(Screen):
             max_length=OTP_LENGTH,
             size_hint_y=0.18,
         )
-        self.submit_button = create_primary_button(
-            text="Verify OTP", size_hint_y=0.18
-        )
+        self.submit_button = create_primary_button(text="Verify OTP", size_hint_y=0.18)
         left.add_widget(self.otp_input)
         left.add_widget(self.submit_button)
 
@@ -188,9 +184,7 @@ class PINEntryScreen(Screen):
             password=True,
             size_hint_y=0.18,
         )
-        self.submit_button = create_primary_button(
-            text="Verify PIN", size_hint_y=0.18
-        )
+        self.submit_button = create_primary_button(text="Verify PIN", size_hint_y=0.18)
         left.add_widget(self.pin_input)
         left.add_widget(self.submit_button)
 
@@ -308,9 +302,7 @@ class ConfirmationScreen(Screen):
         card = create_glass_card(padding=18, spacing=12)
         layout.add_widget(card)
 
-        card.add_widget(
-            create_success_label(text="Card dispensed successfully.")
-        )
+        card.add_widget(create_success_label(text="Card dispensed successfully."))
         self.detail_label = create_info_label(
             text="Please collect your card and tap Finish."
         )
