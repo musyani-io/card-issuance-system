@@ -1,22 +1,35 @@
 #include <Arduino.h>
+#include <Servo.h>
 
+// Library definition
+Servo servo1;
+
+// PIN definition
+#define SERVO1_PIN 2
+
+// Function checks
+void servoCheck(Servo servo_t);
 
 void setup() {
+
+  // Serial monitor
   Serial.begin(115200);
-  Serial.println("Mega ON!")
+  Serial.println("Low-level control initiating.....")
 
-  digitalWrite(LED_BUILTIN, 0);
+  // Motor initialization
+  servo1.attach(SERVO1_PIN);
+  servoCheck(servo1);
 
-  delay(2000);
+  delay(1000);
 }
 
-void loop() {
+void loop() {}
 
-  digitalWrite(LED_BUILTIN, 1)
-  Serial.println("LED ON!")
-  delay(1000)
-  digitalWrite(LED_BUILTIN, 0)
-  Serial.println("LED OFF")
-  delay(1000);
+void servoCheck(Servo servo_t) {
+
+  servo_t.write(90);
+  delay(250);
+  servo_t.write(0);
+  delay(250);
 
 }
