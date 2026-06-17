@@ -131,6 +131,7 @@ mock_db_api/config.py
 **/secrets.yml
 **/secrets.yaml
 *.db
+*captures
 kiosk_brain/tests/fixtures/*
 kiosk_brain/tests/outputs/*
 
