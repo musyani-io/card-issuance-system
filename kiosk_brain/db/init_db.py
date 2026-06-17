@@ -67,7 +67,6 @@ import sys
 from pathlib import Path
 import logging
 
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -133,7 +132,7 @@ def initialize_database(db_path=None):
 if __name__ == "__main__":
     import sys
     from modules.database import clear_database
-    
+
     try:
         if len(sys.argv) > 1 and sys.argv[1] == "--reset":
             # Clear all data, keep schema
