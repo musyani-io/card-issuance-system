@@ -1,18 +1,35 @@
 #include <Arduino.h>
+#include <Servo.h>
 
-// put function declarations here:
-int myFunction(int, int);
+// Object definitions
+Servo servo1;
+
+// Variable definition
+#define SERVO1 2
+#define SERVO2 3
+
+// Functions
+void checkServo(Servo servo);
 
 void setup() {
-  // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+
+  // Serial initialization
+  Serial.begin(115200);
+  delayMicroseconds(10);
+
+  // Servo motor
+  servo1.attach(SERVO1);
+  checkServo(servo1);
+
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
-}
+void loop() {}
 
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+void toOriginal(Servo servo) {
+  // To 0 degrees angle
+
+  servo.write(0);
+  Serial.println("To original!");
+  delayMicroseconds(50);
+
 }
