@@ -8,8 +8,12 @@ Servo servo1;
 #define SERVO1 2
 #define SERVO2 3
 
+// Constants
+const int L_SERVO = 600;
+const int R_SERVO = 2400;
+const int C_SERVO = 1600;
+
 // Functions
-void checkServo(Servo servo);
 
 void setup() {
 
@@ -19,17 +23,8 @@ void setup() {
 
   // Servo motor
   servo1.attach(SERVO1);
-  checkServo(servo1);
+  servo1.writeMicroseconds(C_SERVO); // to center
 
 }
 
 void loop() {}
-
-void toOriginal(Servo servo) {
-  // To 0 degrees angle
-
-  servo.write(0);
-  Serial.println("To original!");
-  delayMicroseconds(50);
-
-}
