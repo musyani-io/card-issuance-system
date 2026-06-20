@@ -111,6 +111,8 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
+.pio
+.vscode
 
 kiosk_brain/venv/
 kiosk_brain/config.py

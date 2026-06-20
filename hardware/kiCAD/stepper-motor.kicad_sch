@@ -534,7 +534,7 @@
     (uuid f3c805ac-5e94-42d1-817d-a30c2ed11c0e)
   )
 
-  (text "1 --> Common GND (MCU & PSU)\n2 --> 12V from PSU\n3 --> 5V from MCU\n4, 5 and 6 --> D22, D23 and D24 respectively."
+  (text "1 --> Common GND (MCU & PSU)\n2 --> 12V from PSU\n3 --> 5V from MCU\n6, 5 and 4 --> D22, D23 and D24 respectively."
     (at 120.015 45.085 0)
     (effects (font (size 1.27 1.27)) (justify left bottom))
     (uuid fb71b794-f8be-4e45-92c0-7d479b276a57)
