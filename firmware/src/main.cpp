@@ -5,19 +5,19 @@
 Servo servo1;
 
 // Variable definition
-#define PWR 13
 #define SERVO1 2
-#define SERVO2 3
-#define DIR_PIN 22
-#define STEP_PIN 23
-#define ENABLE_PIN 24
+#define DIR_PIN 22 // Green wire
+#define STEP_PIN 24 // Purple wire
+#define ENABLE_PIN 23 // Blue wire
 
 // Constants
 const int L_SERVO = 600;
 const int R_SERVO = 2400;
 const int C_SERVO = 1600;
+const int STEPS_PER_REV = 200;
 
 // Functions
+void rotateSteps(int steps);
 
 void setup() {
 
@@ -25,9 +25,10 @@ void setup() {
   Serial.begin(115200);
   delayMicroseconds(10);
 
-  // Alternate power
-  pinMode(PWR, OUTPUT);
-  digitalWrite(PWR, HIGH);
+  // Pin definition
+  pinMode(DIR_PIN, OUTPUT);
+  pinMode(STEP_PIN, OUTPUT);
+  pinMode(ENABLE_PIN, OUTPUT);
 
   // Servo motor
   servo1.attach(SERVO1);
@@ -35,25 +36,24 @@ void setup() {
   delayMicroseconds(50);
 
   // Stepper motor
-  pinMode(ENABLE_PIN, OUTPUT);
-  pinMode(STEP_PIN, OUTPUT);
-  pinMode(DIR_PIN, OUTPUT);
-
   digitalWrite(ENABLE_PIN, LOW);
-  digitalWrite(STEP_PIN, LOW);
-  digitalWrite(DIR_PIN, LOW);
-  delayMicroseconds(50);
-  Serial.println("Stepper stop!");
+  rotateSteps(STEPS_PER_REV);
+  Serial.println("Stepper holds!");
 
-  for (int i = 0; i < 200; i++) {
+}
+
+void loop() {}
+
+void rotateSteps(int steps) {
+  delayMicroseconds(10);
+
+  for (int i = 0; i < steps; i++) {
+
     digitalWrite(STEP_PIN, HIGH);
     delayMicroseconds(1000);
     digitalWrite(STEP_PIN, LOW);
     delayMicroseconds(1000);
 
-    Serial.println("1 step...");
+    Serial.print("+1");
   }
-
 }
-
-void loop() {}
