@@ -35,8 +35,7 @@ void setup() {
   servo1.writeMicroseconds(C_SERVO); // to center
   delayMicroseconds(50);
 
-  // Stepper motor
-  digitalWrite(ENABLE_PIN, LOW);
+  // Stepper motorS
   rotateSteps(STEPS_PER_REV);
   Serial.println("Stepper holds!");
 
@@ -45,15 +44,17 @@ void setup() {
 void loop() {}
 
 void rotateSteps(int steps) {
-  delayMicroseconds(10);
+  digitalWrite(ENABLE_PIN, LOW);
+  digitalWrite(DIR_PIN, HIGH);
+  delayMicroseconds(20);
 
   for (int i = 0; i < steps; i++) {
 
     digitalWrite(STEP_PIN, HIGH);
-    delayMicroseconds(1000);
+    delayMicroseconds(5000);
     digitalWrite(STEP_PIN, LOW);
-    delayMicroseconds(1000);
+    delayMicroseconds(5000);
 
-    Serial.print("+1");
+    Serial.println(i);
   }
 }
