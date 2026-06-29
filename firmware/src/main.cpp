@@ -7,7 +7,8 @@ Servo servo1;
 
 
 // Variable definition
-#define SERVO1 2
+#define HALL_PIN 2
+#define SERVO1 25
 #define DIR_PIN 22
 #define STEP_PIN 24 
 #define ENABLE_PIN 23
@@ -27,7 +28,9 @@ volatile bool newData = false;
 // Commands 
 
 // Functions
+bool checkOrigin();
 void rotateSteps(int steps);
+bool rotateToOrigin();
 ISR(SPI_STC_vect) {
   recievedByte = SPDR;
   newData = true;
@@ -45,6 +48,7 @@ void setup() {
   pinMode(ENABLE_PIN, OUTPUT);
   pinMode(MISO_PIN, OUTPUT);
   pinMode(SS_PIN, INPUT);
+  pinMode(HALL_PIN, INPUT_PULLUP);
 
   // Servo motor
   servo1.attach(SERVO1);
@@ -60,12 +64,15 @@ void setup() {
 }
 
 void loop() {
+
   if (newData) {
     newData = false;
 
     Serial.print("Recieved from Pi: ");
     Serial.println((char)recievedByte);
   }
+
+  Serial.println(rotateToOrigin());
 }
 
 void rotateSteps(int steps) {
@@ -82,4 +89,25 @@ void rotateSteps(int steps) {
 
     Serial.println(i);
   }
+}
+
+bool rotateToOrigin() {
+  digitalWrite(ENABLE_PIN, LOW);
+  digitalWrite(DIR_PIN, LOW);
+  delayMicroseconds(20);
+
+  while (!checkOrigin()) {
+    digitalWrite(13, HIGH);
+  }
+
+  digitalWrite(13, LOW);
+  return true;
+}
+
+bool checkOrigin() {
+
+  delayMicroseconds(10);
+  int magnet = digitalRead(HALL_PIN);
+  return !magnet;
+
 }
