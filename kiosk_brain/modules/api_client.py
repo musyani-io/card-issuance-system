@@ -34,6 +34,26 @@ API_KEY = UNIVERSITY_API_KEY
 BASE_URL = UNIVERSITY_API_BASE_URL
 
 
+def normalize_student_payload(payload):
+    """
+    Convert API responses into the internal kiosk schema.
+
+    The mock API may return either older field names (`last_name`, `phone`,
+    `status`) or the kiosk-native names (`surname`, `phone_number`,
+    `registration_status`). This keeps the ingest path stable.
+    """
+    normalized = dict(payload)
+    if "registration_number" not in normalized:
+        normalized["registration_number"] = normalized.get("reg_number")
+    if "surname" not in normalized:
+        normalized["surname"] = normalized.get("last_name")
+    if "phone_number" not in normalized:
+        normalized["phone_number"] = normalized.get("phone")
+    if "registration_status" not in normalized:
+        normalized["registration_status"] = normalized.get("status")
+    return normalized
+
+
 def get_student(reg_number):
     """
     Fetch student data from university API by registration number.
@@ -91,7 +111,7 @@ def get_student(reg_number):
         # Handle HTTP response codes from mock-db-api
         if response.status_code == 200:
             # Success: Student found, return complete record
-            return {"success": True, "data": response.json()}
+            return {"success": True, "data": normalize_student_payload(response.json())}
         elif response.status_code == 404:
             # Not found: OCR'd registration number doesn't exist in university database
             # Card will be stored as 'missing_student' status in carousel

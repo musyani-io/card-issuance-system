@@ -146,6 +146,8 @@ def get_student_from_db(reg_number, db_path=None):
         if conn:
             conn.close()
 
+def get_card_slot(reg_number, dp_path=None):
+    "Get the slot of the card number"
 
 def get_card_record_by_registration(reg_number, db_path=None):
     """

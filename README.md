@@ -17,11 +17,11 @@ A distributed embedded system for autonomous ID card issuance in university envi
 **Raspberry Pi 5 (Application Controller)**
 
 - Python 3.11 runtime with Kivy 2.3.1 touch UI framework
-- 7" DSI touchscreen interface (800×400 resolution, landscape-only)
+- 5" DSI touchscreen interface (800×400 resolution, landscape-only)
 - OCR pipeline (OpenCV + Tesseract 5) for batch card scanning
 - SQLite database with immutable audit logs
 - SPI master (1 MHz, 3-byte frames) to STM32 for motor/sensor control
-- HTTPS API client for university database (mDNS discovery: `university-db.local`)
+- HTTPS API client for university database (mDNS discovery: `ubuntu.local`)
 - SMS dispatch via BRIQ Solutions REST API (Tanzania)
 
 **STM32 Nucleo-F401RE (Hardware Control)**
@@ -41,96 +41,139 @@ A distributed embedded system for autonomous ID card issuance in university envi
 - **Card Dispensing**: SG90 servo pushes card from carousel front gate to ejection point
 - **Security**: 12V solenoid lock on staff access door; energized-to-lock design (fails secure on power loss)
 
-## Development Phases
-
-| Phase | Duration  | Focus                                                                                                                        | Status |
-| ----- | --------- | ---------------------------------------------------------------------------------------------------------------------------- | ------ |
-| **1** | Weeks 1–2 | OCR pipeline (OpenCV preprocessing, Tesseract validation, regex matching) — *using phone images for rapid development*        | ▯ 10%  |
-| **2** | Weeks 2–3 | Database schema (SQLite), mock university API (Flask, mDNS discovery)                                                        | ▰ 90%  |
-| **3** | Weeks 3–4 | Authentication (bcrypt hashing, 6-digit OTP generation, 4–6 digit PIN lockout logic), SMS integration (BRIQ Solutions)       | ▰ 100% |
-| **4** | Weeks 4–5 | Kivy touch UI (ScreenManager, SessionManager state machine), SPI protocol definition and Pi-side client                      | ▰ 95%  |
-| **5** | Weeks 5–7 | STM32 HAL firmware, mechanical prototype (acrylic or 3D-printed carousel), sensor integration, end-to-end system integration | ▯ 0%   |
-| **6** | Week 8    | Enclosure, integration testing, documentation                                                                                | ▯ 0%   |
-
 ## Directory Structure
 
-```
+```bash
 card-issuance-system/
 ├── README.md                      # This file
-├── BUILD.md                       # Project phases & current progress tracking
-├── docs/                          # Architecture diagrams & documentation
-│   ├── kiosk_architecture.html    # State machine flow diagrams (HTML interactive)
-│   ├── carousel_3d_v2.html        # 3D carousel design visualization
-│   └── business/official/         # Business requirements & formal specs
-├── kiosk_brain/                   # Raspberry Pi 5 Python application (main system)
-│   ├── main.py                    # Kivy app entry point, ScreenManager init
-│   ├── config.py                  # Environment variables, API keys, timeouts
-│   ├── requirements.txt           # Python 3.11 dependencies
-│   ├── README.md                  # Subsystem architecture & module overview
-│   ├── SPI_PROTOCOL.md            # 3-byte SPI frame format specification
-│   ├── modules/                   # Core business logic packages
-│   │   ├── main.py / __init__.py
-│   │   ├── api_client.py          # HTTPS university DB client (mDNS discovery)
-│   │   ├── auth.py                # OTP/PIN generation, bcrypt validation
-│   │   ├── database.py            # SQLite schema, transactions, queries
-│   │   ├── ocr.py                 # OpenCV preprocessing, Tesseract integration
-│   │   ├── session_manager.py     # Per-session state lifecycle
-│   │   ├── sms_client.py          # BRIQ SMS API wrapper
-│   │   └── spi_master.py          # SPI frame encoding, checksum, dispatch
-│   ├── ui/                        # Kivy GUI screens and styling
-│   │   ├── screens.py             # Screen subclasses (WELCOME, OTP, PIN, CONFIRM, etc.)
-│   │   ├── styled_widgets.py      # Custom Kivy widgets (buttons, text inputs)
-│   │   ├── styles.kv              # Kivy DSL: layouts, event bindings
-│   │   └── constants.py           # UI constants (colors, timeouts, screen names)
-│   ├── tests/                     # Unit & integration tests
-│   │   ├── test_auth.py           # Bcrypt, OTP generation, lockout logic
-│   │   ├── test_ocr.py            # Image preprocessing, Tesseract mocking
-│   │   └── test_spi.py            # SPI frame encoding, checksum validation
-│   └── db/                        # Database schema & initialization
-│       ├── schema.sql             # SQLite DDL (students, cards, auth, audit_log, batches)
-│       ├── init_db.py             # Database initialization script
-│       └── DATABASE_DESIGN.md     # Schema design rationale and constraints
-├── mock_db_api/                   # Flask mock university API (development only)
-│   ├── app.py                     # Flask entry point, /students/{reg_number} endpoint
-│   ├── README.md                  # Mock API usage instructions
-│   └── requirements.txt           # Flask, SSL, mDNS dependencies
-├── firmware/                      # STM32 Nucleo-F401RE embedded C code
-│   ├── BUILD.md                   # Firmware build and flashing instructions
-│   ├── pin_assignment.txt         # STM32 GPIO mapping (motors, sensors, SPI)
-│   └── real_time_controller/      # STM32CubeIDE project
-│       ├── real_time_controller.ioc  # CubeMX hardware configuration
-│       ├── STM32F401RETX_FLASH.ld    # Linker script
-│       ├── Inc/
-│       │   ├── main.h
-│       │   ├── stm32f4xx_hal_conf.h
-│       │   └── stm32f4xx_it.h
-│       ├── Src/
-│       │   ├── main.c             # Firmware entry point, SPI ISR loop
-│       │   ├── system_stm32f4xx.c
-│       │   └── syscalls.c
-│       ├── Startup/
-│       │   └── startup_stm32f401retx.s  # ARM Cortex-M4 bootstrap
-│       ├── Drivers/               # CMSIS-CORE, STM32F4 HAL
-│       └── datasheets/            # Component datasheets (A4988, motors, sensors)
-└── hardware/                      # Hardware design & schematics
-    ├── README.md                  # Power distribution, motor control architecture
-    ├── BUILD.md                   # Hardware assembly & testing instructions
-    ├── kiCAD/                     # KiCAD PCB design (development)
+├── BUILD.md                       # Build instructions and current project status
+├── docs/                          # Architecture diagrams and project documents
+│   ├── carousel_3d_v2.html
+│   ├── kiosk_architecture.html
+│   ├── business/
+│   │   └── business-plan.docx
+│   ├── official/
+│   │   ├── card_issuance_block.drawio
+│   │   ├── concept-note.docx
+│   │   ├── end-semester-one report.docx
+│   │   ├── mid-semester-two report.docx
+│   │   ├── mid-semester-two.pptx
+│   │   └── mid-semeter-one report.docx
+│   └── primary/
+│       └── smart_kiosk_proposal_v2.docx
+├── kiosk_brain/                   # Raspberry Pi 5 Python application
+│   ├── main.py
+│   ├── config.example.py
+│   ├── requirements.txt
+│   ├── PHASE1_README.md
+│   ├── SPI_PROTOCOL.md
+│   ├── modules/
+│   │   ├── README.md
+│   │   ├── __init__.py
+│   │   ├── api_client.py
+│   │   ├── auth.py
+│   │   ├── card_detector.py
+│   │   ├── database.py
+│   │   ├── ocr.py
+│   │   ├── phone_camera.py
+│   │   ├── session_manager.py
+│   │   ├── sms_client.py
+│   │   └── spi_master.py
+│   ├── tests/
+│   │   ├── all_test.py
+│   │   ├── generate_task_1_2_1_detection_outputs.py
+│   │   ├── generate_task_1_2_1_outputs.py
+│   │   ├── generate_task_1_2_2_outputs.py
+│   │   ├── generate_task_1_2_2_perspective_outputs.py
+│   │   ├── generate_task_1_2_3_4_outputs.py
+│   │   ├── generate_task_1_2_5_roi_outputs.py
+│   │   ├── generate_task_1_3_ocr_outputs.py
+│   │   ├── test_auth.py
+│   │   ├── test_ingest.py
+│   │   └── test_spi.py
+│   ├── ui/
+│   │   ├── __init__.py
+│   │   ├── constants.py
+│   │   ├── screens.py
+│   │   ├── styled_widgets.py
+│   │   └── styles.kv
+│   └── db/
+│       ├── DATABASE_DESIGN.md
+│       ├── init_db.py
+│       └── schema.sql
+├── mock_db_api/
+│   ├── README.md
+│   ├── app.py
+│   └── requirements.txt
+├── firmware/
+│   ├── BUILD.md
+│   ├── pin_assignment.txt
+│   ├── datasheets/
+│   │   ├── um1724-stm32-nucleo64-boards-mb1136-stmicroelectronics-1.pdf
+│   │   └── um1725.pdf
+│   └── real-time-controller/
+│       ├── Core/
+│       │   ├── Inc/
+│       │   │   ├── main.h
+│       │   │   ├── servo.h
+│       │   │   ├── stm32f4xx_hal_conf.h
+│       │   │   └── stm32f4xx_it.h
+│       │   ├── Src/
+│       │   │   ├── main.c
+│       │   │   ├── servo.c
+│       │   │   ├── stm32f4xx_hal_msp.c
+│       │   │   ├── stm32f4xx_it.c
+│       │   │   ├── syscalls.c
+│       │   │   ├── sysmem.c
+│       │   │   └── system_stm32f4xx.c
+│       │   └── Startup/
+│       │       └── startup_stm32f401retx.s
+│       ├── STM32F401RETX_FLASH.ld
+│       ├── STM32F401RETX_RAM.ld
+│       ├── real-time-controller Debug.launch
+│       └── real-time-controller.ioc
+└── hardware/
+    ├── README.md
+    ├── Altium/
+    │   ├── buck_converter/
+    │   └── reverse_pol_protection/
+    ├── FreeCAD/
+    │   ├── Design/
+    │   └── Exports/
+    ├── kiCAD/
+    │   ├── buck_converter.kicad_pcb
+    │   ├── buck_converter.kicad_pro
+    │   ├── buck_converter.kicad_sch
+    │   ├── rev_polarity_prot.kicad_pcb
     │   ├── rev_polarity_prot.kicad_pro
     │   ├── rev_polarity_prot.kicad_sch
-    │   └── rev_polarity_prot.kicad_pcb
-    ├── Altium/                    # Altium Designer schematics (learning/reference)
-    │   └── rev_polarity_protection/
-    ├── simulations/               # SPICE simulations (Proteus)
-    │   └── rev_polarity_protection.pdsprj
-    └── datasheets/                # Component reference documents (motors, drivers, PSU)
+    │   ├── servo-motor.kicad_pcb
+    │   ├── servo-motor.kicad_pro
+    │   ├── servo-motor.kicad_sch
+    │   ├── hall-sensor.kicad_pro
+    │   ├── stepper-motor.kicad_pro
+    │   └── stepper-motor.kicad_sch
+    ├── simulations/
+    │   ├── buck_converter_12_5_V.pdsprj
+    │   ├── rev_polarity_protection.pdsprj
+    │   └── rev_polarity_protection.PDF
+    └── datasheets/
+        ├── 1N4728A_SER.pdf
+        ├── 1n5822.pdf
+        ├── MBRB1045-D.PDF
+        ├── XL4015.pdf
+        ├── carbon-film-resistor-datasheet.pdf
+        ├── infineon-irf4905-datasheet-en.pdf
+        ├── infineon-irfz44n-datasheet-en.pdf
+        ├── smd-capacitors.pdf
+        └── terminal-block.pdf
 ```
 
 ## Architecture Details
 
 ### Network Communication
 
-**Pi ↔ University Database**: HTTPS + mDNS (development mode auto-discovers `university-db.local`)
+**Pi ↔ University Database**: HTTPS + mDNS (development mode auto-discovers `ubuntu.local`)
 
 - Endpoint: `GET /students/{reg_number}` with Bearer token authentication
 - Timeout: 5 seconds with 3× exponential backoff retry
@@ -140,7 +183,7 @@ card-issuance-system/
 **Pi ↔ SMS Gateway**: HTTPS POST to BRIQ Solutions (Tanzania)
 
 - Endpoint: `POST /v1/message/send-instant`
-- Authentication: API key + sender ID in `config.py`
+- Authentication: API key + sender ID in `config.example.py`
 - Retry queue: Failed sends stored in SQLite, background retry every 15 min
 - Supports both OTP and custom PIN messages
 
@@ -222,7 +265,7 @@ All inputs use internal pull-ups; firmware polls every 10ms or uses GPIO edge in
 ### Bill of Materials (Key Components)
 
 - **Compute**: Raspberry Pi 5 (4GB), STM32 Nucleo-F401RE
-- **Display**: Official 7" DSI touchscreen (800×480, now 800×400 landscape-only)
+- **Display**: Official 5" DSI touchscreen (800×480, now 800×400 landscape-only)
 - **Cameras**: Pi Camera Module v2 (CSI for batch scan), USB 720p webcam (expired card slot)
 - **Motors & Actuation**:
   - NEMA 17 stepper motors (×2): Carousel, Conveyor 1
@@ -334,12 +377,12 @@ cd ..
 
 ### Configuration
 
-Edit `config.py` with production values:
+Edit `config.example.py` with production values:
 
 - `BRIQ_API_KEY`: BRIQ Solutions API key (from account dashboard)
 - `BRIQ_SENDER_ID`: SMS sender name (max 11 chars)
 - `BRIQ_BASE_URL`: BRIQ endpoint (usually `https://karibu.briq.tz`)
-- `API_BASE_URL`: University database endpoint (e.g., `http://university-db.local:5000`)
+- `API_BASE_URL`: University database endpoint (e.g., `http://ubuntu.local:5000`)
 - `API_TIMEOUT_SEC`: Network timeout (default 5 sec)
 - `OTP_EXPIRY_HOURS`: OTP validity window (default 24 hours)
 - `PIN_LOCKOUT_HOURS`: Hard lockout duration (default 24 hours)
@@ -378,7 +421,7 @@ sudo systemctl status kiosk.service
 ### STM32 Firmware Development
 
 - **IDE**: STM32CubeIDE (Linux-native)
-- **Project**: Located in `firmware/real_time_controller/`
+- **Project**: Located in `firmware/real-time-controller/`
 - **Configuration**:
   - SPI1 in slave mode (PA4=CS, PA5=CLK, PA6=MISO, PA7=MOSI)
   - TIM2, TIM3 for stepper PWM (1–10 kHz configurable frequency)
@@ -409,7 +452,7 @@ The mock API simulates the real university student database for testing. See `mo
 cd mock_db_api
 pip install -r requirements.txt
 python app.py
-# Runs on https://localhost:5000, advertised as university-db.local (via mDNS)
+# Runs on https://localhost:5000, advertised as ubuntu.local (via mDNS)
 ```
 
 ## Performance Targets
@@ -456,7 +499,7 @@ python app.py
 ## Additional Resources
 
 - **Architecture Diagrams**: See `docs/kiosk_architecture.html` (Kiosk flow state machines, hardware interconnect)
-- **Build Instructions**: See `BUILD.md` (phase-by-phase task breakdown and current progress)
+- **Build Instructions**: See `BUILD.md` (current build instructions and project status)
 - **Hardware Design**: See `hardware/README.md` (power distribution, motor control implementation)
 - **Firmware Design**: See `firmware/BUILD.md` (STM32 configuration, pin assignments)
 - **SPI Protocol**: See `kiosk_brain/SPI_PROTOCOL.md` (3-byte frame format, command/response codes)

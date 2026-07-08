@@ -81,11 +81,10 @@ Database schema expected: card_issuance database with students table
 
 from flask import Flask, jsonify, request
 from mysql.connector import connect, Error
-from config import DB_HOST, DB_PASSWORD, DB_USER
-import subprocess
+
+from config import API_KEY, DB_HOST, DB_NAME, DB_PASSWORD, DB_PORT, DB_USER
 
 app = Flask(__name__)
-API_KEY = "test-key-12345"
 
 
 def get_db_connection():
@@ -99,8 +98,37 @@ def get_db_connection():
         mysql.connector.Error: If connection fails
     """
     return connect(
-        host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database="card_issuance"
+        host=DB_HOST,
+        port=DB_PORT,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
     )
+
+
+def normalize_student_record(student):
+    """
+    Normalize database rows to the API contract used by kiosk_brain.
+
+    The project has historically used both `surname` and `last_name`, plus
+    `phone_number` and `phone`. This helper keeps the API response stable even
+    if the underlying database schema changes slightly.
+    """
+    if not student:
+        return student
+
+    normalized = dict(student)
+
+    if "registration_number" not in normalized:
+        normalized["registration_number"] = normalized.get("reg_number")
+    if "surname" not in normalized:
+        normalized["surname"] = normalized.get("last_name")
+    if "phone_number" not in normalized:
+        normalized["phone_number"] = normalized.get("phone")
+    if "registration_status" not in normalized:
+        normalized["registration_status"] = normalized.get("status")
+
+    return normalized
 
 
 def require_api_key(f):
@@ -148,13 +176,23 @@ def get_student(reg_number):
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM students WHERE reg_number = %s", (reg_number,))
-        student = cursor.fetchone()
+        student = None
+        try:
+            cursor.execute(
+                "SELECT * FROM students WHERE reg_number = %s", (reg_number,)
+            )
+            student = cursor.fetchone()
+        except Error:
+            cursor.execute(
+                "SELECT * FROM students WHERE registration_number = %s",
+                (reg_number,),
+            )
+            student = cursor.fetchone()
         cursor.close()
         conn.close()
 
         if student:
-            return jsonify(student), 200
+            return jsonify(normalize_student_record(student)), 200
         return jsonify({"error": "Student not found"}), 404
     except Error as e:
         return jsonify({"error": str(e)}), 500
