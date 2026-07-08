@@ -1,23 +1,46 @@
-"""
-OCR preprocessing helpers for the kiosk-brain project.
+"""OCR preprocessing helpers and runnable OCR pipeline for the kiosk-brain project.
 
-This module starts with the Phase 1.2 preprocessing pipeline. For Task 1.2.1,
-it converts phone or camera captures into grayscale images so the next OCR
-stages can work with a cleaner input.
+This module provides the image cleanup and Tesseract helpers used by the card
+detection pipeline. When run directly, it first captures a fresh image, then
+processes the latest file from the captures folder and prints the extracted
+registration number.
 """
 
 from __future__ import annotations
 
+import re
+import subprocess
+import sys
+from datetime import datetime
 from pathlib import Path
 
 import cv2
 import numpy as np
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 import config
 
 try:
     import pytesseract
 except Exception:  # pragma: no cover - optional runtime dependency
     pytesseract = None
+
+
+REG_NUMBER_PATTERNS = (
+    re.compile(r"\b\d{4}-\d{2}-\d{5}\b"),
+    re.compile(r"\bT/UDSM/\d{4}/\d{4}\b", re.IGNORECASE),
+)
+
+
+def _format_compact_registration_number(digits: str) -> str | None:
+    """Format a compact 11-digit registration number into XXXX-XX-XXXXX."""
+
+    if len(digits) == 11:
+        return f"{digits[:4]}-{digits[4:6]}-{digits[6:]}"
+    return None
 
 
 def convert_to_grayscale(image: np.ndarray) -> np.ndarray:
@@ -257,5 +280,113 @@ def perform_ocr(
             confs.append(c)
 
     mean_conf = float(sum(confs) / len(confs)) if confs else None
-
     return {"text": text, "mean_confidence": mean_conf, "raw_data": data}
+
+
+def _run_capture_script() -> Path:
+    script_path = PROJECT_ROOT / "modules" / "capture_image.py"
+    subprocess.run([sys.executable, str(script_path)], check=True, cwd=PROJECT_ROOT)
+
+    capture_dir = Path(config.CAPTURE_DIR)
+    if not capture_dir.exists():
+        raise FileNotFoundError(f"capture directory does not exist: {capture_dir}")
+
+    return capture_dir
+
+
+def _latest_capture_image(capture_dir: Path) -> Path:
+    candidates = [
+        path
+        for path in capture_dir.iterdir()
+        if path.is_file() and path.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp"}
+    ]
+    if not candidates:
+        raise FileNotFoundError(f"no captured images found in {capture_dir}")
+
+    return max(candidates, key=lambda path: (path.stat().st_mtime, path.name))
+
+
+def extract_registration_number(text: str) -> str | None:
+    """Extract a likely registration number from OCR text."""
+
+    if not text:
+        return None
+
+    normalized = text.upper().replace(" ", "")
+    for pattern in REG_NUMBER_PATTERNS:
+        match = pattern.search(normalized)
+        if match:
+            return match.group(0)
+
+    compact_digits = re.sub(r"\D", "", normalized)
+    formatted = _format_compact_registration_number(compact_digits)
+    if formatted:
+        return formatted
+
+    return None
+
+
+def run_ocr_pipeline() -> str:
+    """Capture a fresh image, process the latest capture, and return reg number."""
+
+    capture_dir = _run_capture_script()
+    latest_image = _latest_capture_image(capture_dir)
+
+    from modules.card_detector import save_roi_preview
+
+    pipeline_output_dir = Path(config.PROCESS_OUTPUT_DIR) / latest_image.stem
+    pipeline_output_dir.mkdir(parents=True, exist_ok=True)
+
+    roi_outputs = save_roi_preview(latest_image, pipeline_output_dir)
+
+    ocr_inputs = [
+        roi_outputs.get("roi"),
+        roi_outputs.get("roi_preocr"),
+        roi_outputs.get("threshold"),
+        roi_outputs.get("grayscale"),
+    ]
+    ocr_inputs = [path for path in ocr_inputs if path is not None and path.exists()]
+
+    if not ocr_inputs:
+        raise FileNotFoundError("no OCR input images were produced by the ROI pipeline")
+
+    whitelist = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/-"
+    last_text = ""
+    last_confidence = None
+
+    for candidate_path in ocr_inputs:
+        image = cv2.imread(str(candidate_path))
+        if image is None:
+            continue
+
+        for psm in (7, 8):
+            result = perform_ocr(image, psm=psm, whitelist=whitelist)
+            text = result.get("text", "")
+            registration_number = extract_registration_number(text)
+            if registration_number:
+                print(f"latest capture: {latest_image}")
+                print(f"ocr input: {candidate_path.name}")
+                print(f"registration number: {registration_number}")
+                return registration_number
+
+            last_text = text
+            last_confidence = result.get("mean_confidence")
+
+    raise RuntimeError(
+        "could not extract a registration number from the latest capture "
+        f"{latest_image}. Last OCR text={last_text!r}, confidence={last_confidence}"
+    )
+
+
+def main() -> int:
+    try:
+        run_ocr_pipeline()
+    except Exception as exc:
+        print(f"ocr pipeline failed: {exc}", file=sys.stderr)
+        return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -91,3 +91,24 @@ PRE_OCR = {
         [0, -1, 0],
     ],  # Sharpens text edges before OCR.
 }
+
+CAPTURE_DEVICE = "/dev/video2"  # USB webcam device exposed by the phone.
+CAPTURE_DEVICE_CANDIDATES = [
+    "/dev/video4",
+    "/dev/video3",
+    "/dev/video2",
+    "/dev/video1",
+    "/dev/video0",
+]  # Search order for camera device nodes.
+CAPTURE_DIR = Path(__file__).resolve().parent / "captures"
+CAPTURE_OUTPUT_PREFIX = "capture"
+CAPTURE_IMAGE_EXTENSION = ".jpg"
+
+# Phone-specific paths to keep device-dependent values out of the script.
+PHONE_CAMERA_LABEL = "Pixel 7"
+PHONE_MEDIA_PATH = "/sdcard/DCIM/Camera"
+
+CAPTURE_WIDTH = 1280
+CAPTURE_HEIGHT = 720
+CAPTURE_FPS = 30
+CAPTURE_WARMUP_FRAMES = 3

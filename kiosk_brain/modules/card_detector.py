@@ -426,6 +426,7 @@ def save_roi_preview(
             "original": original_path,
             "flattened": flattened_path,
             "roi": roi_path,
+            "roi_preocr": roi_preocr_path,
             "grayscale": roi_gray_path,
             "threshold": roi_thresh_path,
             "preview": preview_path,

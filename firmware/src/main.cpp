@@ -32,13 +32,11 @@ void setup() {
 
   // Motors
   servo2.attach(SERVO2);
-  servo2.writeSeconds(PULSE_BAL);
+  servo2.writeMicroseconds(PULSE_BAL);
 
 }
 
-void loop() {
-
-}
+void loop() {}
 
 // FUNCTIONS
 void servoTo45(Servo servo) {
