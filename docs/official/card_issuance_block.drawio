@@ -4,7 +4,7 @@
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="GvGBzjtlAZ09NPVF7C73-2" parent="1" style="whiteSpace=wrap;html=1;rounded=1;align=center;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" value="&lt;div align=&quot;center&quot;&gt;High-level controller&lt;br&gt;&lt;div&gt;(Raspberry Pi 5 - 4GGB)&lt;/div&gt;&lt;/div&gt;" vertex="1">
+        <mxCell id="GvGBzjtlAZ09NPVF7C73-2" parent="1" style="whiteSpace=wrap;html=1;rounded=1;align=center;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" value="&lt;div align=&quot;center&quot;&gt;High-level controller&lt;br&gt;&lt;div&gt;(Raspberry Pi 5 - 4GB)&lt;/div&gt;&lt;/div&gt;" vertex="1">
           <mxGeometry height="253" width="267" x="406.99999999999994" y="-406" as="geometry" />
         </mxCell>
         <mxCell id="GvGBzjtlAZ09NPVF7C73-4" parent="1" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" value="University Database&lt;br&gt;(MOCK)" vertex="1">
@@ -19,7 +19,7 @@
         <mxCell id="GvGBzjtlAZ09NPVF7C73-8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" value="&lt;div&gt;5&quot; Pi Screen&lt;/div&gt;&lt;div&gt;(Kivy UI)&lt;/div&gt;" vertex="1">
           <mxGeometry height="60" width="120" x="185.99999999999994" y="-374" as="geometry" />
         </mxCell>
-        <mxCell id="GvGBzjtlAZ09NPVF7C73-9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" value="V2 Camera Module&lt;br&gt;&lt;div&gt;(Batch scan)&lt;/div&gt;" vertex="1">
+        <mxCell id="GvGBzjtlAZ09NPVF7C73-9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" value="Phone Camera" vertex="1">
           <mxGeometry height="60" width="120" x="183.99999999999994" y="-310" as="geometry" />
         </mxCell>
         <mxCell id="GvGBzjtlAZ09NPVF7C73-19" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" value="CSI interface" vertex="1">
@@ -46,7 +46,7 @@
             <mxPoint x="386.99999999999994" y="-353" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="E5Vc4qlOW0jQJdsC6d3C-17" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" value="CSI interface" vertex="1">
+        <mxCell id="E5Vc4qlOW0jQJdsC6d3C-17" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" value="Type - C interface" vertex="1">
           <mxGeometry height="30" width="60" x="323.99999999999994" y="-296" as="geometry" />
         </mxCell>
         <mxCell id="E5Vc4qlOW0jQJdsC6d3C-19" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" value="SPI Master Mode" vertex="1">
@@ -61,8 +61,10 @@
         <mxCell id="E5Vc4qlOW0jQJdsC6d3C-22" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" value="University and SMS API" vertex="1">
           <mxGeometry height="51" width="120" x="414.99999999999994" y="-376" as="geometry" />
         </mxCell>
-        <mxCell id="DyQRGeZsXbvgGfZXNQhn-3" edge="1" parent="1" source="E5Vc4qlOW0jQJdsC6d3C-23" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" target="3yzsLYypy8BireBofEtp-1">
-          <mxGeometry relative="1" as="geometry" />
+        <mxCell id="DyQRGeZsXbvgGfZXNQhn-3" edge="1" parent="1" source="E5Vc4qlOW0jQJdsC6d3C-23" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" target="E5Vc4qlOW0jQJdsC6d3C-24">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="785" y="258" as="targetPoint" />
+          </mxGeometry>
         </mxCell>
         <mxCell id="E5Vc4qlOW0jQJdsC6d3C-23" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" value="Power Supply Unit&lt;br&gt;&lt;div&gt;(12V, 10A)&lt;/div&gt;" vertex="1">
           <mxGeometry height="60" width="120" x="883" y="-243.5" as="geometry" />
@@ -133,9 +135,6 @@
         <mxCell id="ub_tx6bPQbAAc2E0zEvq-16" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" value="&lt;div&gt;Sensor Polling&lt;/div&gt;&lt;div&gt;(IR and Hall sensors)&lt;/div&gt;" vertex="1">
           <mxGeometry height="42" width="120" x="414.99999999999994" y="102" as="geometry" />
         </mxCell>
-        <mxCell id="ub_tx6bPQbAAc2E0zEvq-17" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" value="Solenoid lock control" vertex="1">
-          <mxGeometry height="42" width="120" x="546" y="102" as="geometry" />
-        </mxCell>
         <mxCell id="ub_tx6bPQbAAc2E0zEvq-45" edge="1" parent="1" source="E5Vc4qlOW0jQJdsC6d3C-24" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" target="ub_tx6bPQbAAc2E0zEvq-30">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
@@ -170,12 +169,6 @@
         </mxCell>
         <mxCell id="LeAnnW7A5j2esEQeNNGv-2" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" value="5V to 3.3V" vertex="1">
           <mxGeometry height="30" width="76.5" x="328" y="39" as="geometry" />
-        </mxCell>
-        <mxCell id="DyQRGeZsXbvgGfZXNQhn-4" edge="1" parent="1" source="3yzsLYypy8BireBofEtp-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" target="E5Vc4qlOW0jQJdsC6d3C-24">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="3yzsLYypy8BireBofEtp-1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" value="&lt;div&gt;Reverse Polarity Protection&lt;/div&gt;&lt;div&gt;(12V, 5A)&lt;/div&gt;" vertex="1">
-          <mxGeometry height="60" width="120" x="665" y="228" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
