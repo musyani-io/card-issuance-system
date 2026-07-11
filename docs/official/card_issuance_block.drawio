@@ -16,14 +16,8 @@
         <mxCell id="GvGBzjtlAZ09NPVF7C73-7" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" value="&lt;div&gt;WiFi&lt;/div&gt;" vertex="1">
           <mxGeometry height="30" width="60" x="423.99999999999994" y="-446" as="geometry" />
         </mxCell>
-        <mxCell id="GvGBzjtlAZ09NPVF7C73-8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" value="&lt;div&gt;5&quot; Pi Screen&lt;/div&gt;&lt;div&gt;(Kivy UI)&lt;/div&gt;" vertex="1">
-          <mxGeometry height="60" width="120" x="185.99999999999994" y="-374" as="geometry" />
-        </mxCell>
         <mxCell id="GvGBzjtlAZ09NPVF7C73-9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" value="Phone Camera" vertex="1">
           <mxGeometry height="60" width="120" x="183.99999999999994" y="-310" as="geometry" />
-        </mxCell>
-        <mxCell id="GvGBzjtlAZ09NPVF7C73-19" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" value="CSI interface" vertex="1">
-          <mxGeometry height="30" width="60" x="323.99999999999994" y="-358" as="geometry" />
         </mxCell>
         <mxCell id="E5Vc4qlOW0jQJdsC6d3C-3" edge="1" parent="1" source="E5Vc4qlOW0jQJdsC6d3C-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" target="GvGBzjtlAZ09NPVF7C73-2">
           <mxGeometry relative="1" as="geometry" />
@@ -35,15 +29,6 @@
           <mxGeometry height="50" relative="1" width="50" as="geometry">
             <mxPoint x="370.99999999999994" y="-279.77272727272725" as="sourcePoint" />
             <mxPoint x="378.99999999999994" y="-309" as="targetPoint" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="E5Vc4qlOW0jQJdsC6d3C-14" edge="1" parent="1" source="GvGBzjtlAZ09NPVF7C73-8" style="endArrow=classic;startArrow=classic;html=1;rounded=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" target="GvGBzjtlAZ09NPVF7C73-2" value="">
-          <mxGeometry height="50" relative="1" width="50" as="geometry">
-            <Array as="points">
-              <mxPoint x="387.99999999999994" y="-343" />
-            </Array>
-            <mxPoint x="336.99999999999994" y="-303" as="sourcePoint" />
-            <mxPoint x="386.99999999999994" y="-353" as="targetPoint" />
           </mxGeometry>
         </mxCell>
         <mxCell id="E5Vc4qlOW0jQJdsC6d3C-17" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Times New Roman;fontStyle=0;fontSize=13;labelBackgroundColor=none;textShadow=1;" value="Type - C interface" vertex="1">
