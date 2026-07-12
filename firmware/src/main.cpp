@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <Servo.h>
+#include <SPI.h>
 
 // Objects
 Servo servo1; // card holder
@@ -11,16 +12,47 @@ Servo servo3;
 #define SERVO2 23
 #define SERVO3 24
 
+// Hardware SPI pins on the Mega 2560
+constexpr uint8_t SPI_SS_PIN = 53;
+constexpr uint8_t SPI_MOSI_PIN = 51;
+constexpr uint8_t SPI_MISO_PIN = 50;
+constexpr uint8_t SPI_SCK_PIN = 52;
+
+// SPI status frames from Raspberry Pi: "00" for error, "1X" for success
+constexpr uint8_t SPI_FRAME_LEN = 2;
+
+volatile char spiFrame[SPI_FRAME_LEN + 1] = {0};
+volatile uint8_t spiFrameIndex = 0;
+volatile bool spiFrameReady = false;
+
 // Variables
 const int MIN_PULSE = 550;
 const int PULSE_BAL = 1000;
 const int MID_PULSE = 1600;
 const int PULSE_45 = 1300;
 const int STEP_REV = 200;
+int currAngle = 0;
 
 // Functions
 void servoTo45(Servo servo);
 void servoToAngle(Servo servo, int angle);
+void setupSpiReceiver();
+bool receiveSpiMessage(char *out, size_t outSize);
+
+ISR(SPI_STC_vect) {
+  char received = static_cast<char>(SPDR);
+
+  if (spiFrameIndex < SPI_FRAME_LEN) {
+    spiFrame[spiFrameIndex++] = received;
+    if (spiFrameIndex == SPI_FRAME_LEN) {
+      spiFrame[SPI_FRAME_LEN] = '\0';
+      spiFrameReady = true;
+      spiFrameIndex = 0;
+    }
+  } else {
+    spiFrameIndex = 0;
+  }
+}
 
 void setup() {
 
@@ -28,36 +60,75 @@ void setup() {
   Serial.println("System initializing!");
   delayMicroseconds(10);
 
-  // Pin init
-  pinMode(SERVO1, OUTPUT);
-  pinMode(SERVO2, OUTPUT);
-  pinMode(DIR_PIN, OUTPUT);
-  pinMode(STEP_PIN, OUTPUT);
-  pinMode(EN_PIN, OUTPUT);
+  setupSpiReceiver();
 
   // Motors
   servo1.attach(SERVO1);
   servo2.attach(SERVO2);
+  servoTo45(servo1);
   servo2.writeMicroseconds(MIN_PULSE);
 
+  Serial.println("Servos OG!");
+  delay(3000);
 
 }
 
 void loop() {
-  servoTo45(servo1);
-  delay(2000);
-  servoToAngle(servo2, 180);
-  delay(2000);
+  char spiMessage[SPI_FRAME_LEN + 1];
+
+  if (receiveSpiMessage(spiMessage, sizeof(spiMessage))) {
+    // Message already printed by receiveSpiMessage().
+  }
 }
+
 
 // FUNCTIONS
 
-void servoTo45(Servo servo) {
+void setupSpiReceiver() {
+  pinMode(SPI_SS_PIN, INPUT_PULLUP);
+  pinMode(SPI_MOSI_PIN, INPUT);
+  pinMode(SPI_SCK_PIN, INPUT);
+  pinMode(SPI_MISO_PIN, OUTPUT);
+
+  SPCR |= _BV(SPE);
+  SPI.attachInterrupt();
+}
+
+bool readSpiFrame(char *out, size_t outSize) {
+  if (out == nullptr || outSize < (SPI_FRAME_LEN + 1)) {
+    return false;
+  }
+
+  noInterrupts();
+  bool ready = spiFrameReady;
+  if (ready) {
+    out[0] = spiFrame[0];
+    out[1] = spiFrame[1];
+    out[2] = '\0';
+    spiFrameReady = false;
+  }
+  interrupts();
+
+  return ready;
+}
+
+bool receiveSpiMessage(char *out, size_t outSize) {
+  if (!readSpiFrame(out, outSize)) {
+    return false;
+  }
+
+  Serial.print("Received SPI: ");
+  Serial.println(out);
+  return true;
+}
+
+
+void servoTo45(Servo servo) { // Call after OCR detectioon is done. But the carousel has already rotated!!
   int pos = 0;
 
   for (int i = PULSE_BAL; i < PULSE_45; i++) {  // Center to 45
     servo.writeMicroseconds(i);
-    delayMicroseconds(3500);
+    delayMicroseconds(4000);
     pos = i;
   }
   Serial.println("To 45....");
@@ -81,136 +152,23 @@ void servoTo45(Servo servo) {
 }
 
 void servoToAngle(Servo servo, int angle) {
-  int pulse =  550 + ((1850/180) * angle);
-  int pos = 0;
 
-  for (int i = MIN_PULSE; i < pulse; i++) {   // 45 to upper - card release
+  int pulse = MIN_PULSE + ((1850 / 180) * angle);
+
+  for (int i = MIN_PULSE ; i < pulse; i++) {
+
     servo.writeMicroseconds(i);
-    delayMicroseconds(1000);
-    pos = i;
+    delayMicroseconds(1500);
+
   }
 
-  delay(3000);
-  for (int i = pos; i > MIN_PULSE; i--) {
+  delay(2500);
+
+  for (int i = pulse; i > MIN_PULSE; i--) {
+
     servo.writeMicroseconds(i);
-    delayMicroseconds(1000);
+    delayMicroseconds(1500);
+    
   }
+  
 }
-
-}
-
-// REFERENCE CODE
-
-// #include <Arduino.h>
-// #include <Servo.h>
-// #include <SPI.h>
-
-// // Object definitions
-// Servo servo1;
-
-
-// // Variable definition
-// #define HALL_PIN 2
-// #define SERVO1 25
-// #define DIR_PIN 22
-// #define STEP_PIN 24 
-// #define ENABLE_PIN 23
-// #define SCK_PIN 52
-// #define SS_PIN 53
-// #define MISO_PIN 50
-// #define MOSI_PIN 51
-
-// // Constants
-// const int L_SERVO = 600;
-// const int R_SERVO = 2400;
-// const int C_SERVO = 1600;
-// const int STEPS_PER_REV = 200;
-// volatile byte recievedByte;
-// volatile bool newData = false;
-
-// // Commands 
-
-// // Functions
-// bool checkOrigin();
-// void rotateSteps(int steps);
-// bool rotateToOrigin();
-// ISR(SPI_STC_vect) {
-//   recievedByte = SPDR;
-//   newData = true;
-// }
-
-// void setup() {
-
-//   // Serial initialization
-//   Serial.begin(115200);
-//   delayMicroseconds(10);
-
-//   // Pin definition
-//   pinMode(DIR_PIN, OUTPUT);
-//   pinMode(STEP_PIN, OUTPUT);
-//   pinMode(ENABLE_PIN, OUTPUT);
-//   pinMode(MISO_PIN, OUTPUT);
-//   pinMode(SS_PIN, INPUT);
-//   pinMode(HALL_PIN, INPUT_PULLUP);
-
-//   // Servo motor
-//   servo1.attach(SERVO1);
-//   servo1.writeMicroseconds(C_SERVO); // to center
-//   delayMicroseconds(50);
-
-//   // SPI communication
-//   SPCR |= _BV(SPE);
-//   SPI.attachInterrupt();
-//   delay(1000);
-//   Serial.println("SPI Initiated!");
-
-// }
-
-// void loop() {
-
-//   if (newData) {
-//     newData = false;
-
-//     Serial.print("Recieved from Pi: ");
-//     Serial.println((char)recievedByte);
-//   }
-
-//   Serial.println(rotateToOrigin());
-// }
-
-// void rotateSteps(int steps) {
-//   digitalWrite(ENABLE_PIN, LOW);
-//   digitalWrite(DIR_PIN, HIGH);
-//   delayMicroseconds(20);
-
-//   for (int i = 0; i < steps; i++) {
-
-//     digitalWrite(STEP_PIN, HIGH);
-//     delayMicroseconds(5000);
-//     digitalWrite(STEP_PIN, LOW);
-//     delayMicroseconds(5000);
-
-//     Serial.println(i);
-//   }
-// }
-
-// bool rotateToOrigin() {
-//   digitalWrite(ENABLE_PIN, LOW);
-//   digitalWrite(DIR_PIN, LOW);
-//   delayMicroseconds(20);
-
-//   while (!checkOrigin()) {
-//     digitalWrite(13, HIGH);
-//   }
-
-//   digitalWrite(13, LOW);
-//   return true;
-// }
-
-// bool checkOrigin() {
-
-//   delayMicroseconds(10);
-//   int magnet = digitalRead(HALL_PIN);
-//   return !magnet;
-
-// }

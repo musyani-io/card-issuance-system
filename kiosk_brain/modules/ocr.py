@@ -345,73 +345,95 @@ def run_ocr_pipeline() -> str:
         save_roi_preview,
     )
     from modules.database import ingest_card
+    from modules.spi_master import send_status
 
-    pipeline_output_dir = Path(config.PROCESS_OUTPUT_DIR) / latest_image.stem
-    pipeline_output_dir.mkdir(parents=True, exist_ok=True)
+    status_sent = False
+    try:
+        pipeline_output_dir = Path(config.PROCESS_OUTPUT_DIR) / latest_image.stem
+        pipeline_output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Stage 1: card detection overlay and metadata
-    detection_dir = pipeline_output_dir / "01_card_detection"
-    save_detection_preview(latest_image, detection_dir)
+        # Stage 1: card detection overlay and metadata
+        detection_dir = pipeline_output_dir / "01_card_detection"
+        save_detection_preview(latest_image, detection_dir)
 
-    # Stage 2: grayscale conversion artifacts
-    grayscale_dir = pipeline_output_dir / "02_grayscale"
-    save_grayscale_preview(latest_image, grayscale_dir)
+        # Stage 2: grayscale conversion artifacts
+        grayscale_dir = pipeline_output_dir / "02_grayscale"
+        save_grayscale_preview(latest_image, grayscale_dir)
 
-    # Stage 3: perspective-corrected card outputs
-    perspective_dir = pipeline_output_dir / "03_perspective"
-    save_perspective_preview(latest_image, perspective_dir)
+        # Stage 3: perspective-corrected card outputs
+        perspective_dir = pipeline_output_dir / "03_perspective"
+        save_perspective_preview(latest_image, perspective_dir)
 
-    # Stage 4: ROI crop based on config.ROI['default'] + pre-OCR outputs
-    roi_dir = pipeline_output_dir / "04_roi"
-    roi_outputs = save_roi_preview(latest_image, roi_dir)
+        # Stage 4: ROI crop based on config.ROI['default'] + pre-OCR outputs
+        roi_dir = pipeline_output_dir / "04_roi"
+        roi_outputs = save_roi_preview(latest_image, roi_dir)
 
-    ocr_inputs = [
-        roi_outputs.get("roi"),
-        roi_outputs.get("roi_preocr"),
-        roi_outputs.get("threshold"),
-        roi_outputs.get("grayscale"),
-    ]
-    ocr_inputs = [path for path in ocr_inputs if path is not None and path.exists()]
+        ocr_inputs = [
+            roi_outputs.get("roi"),
+            roi_outputs.get("roi_preocr"),
+            roi_outputs.get("threshold"),
+            roi_outputs.get("grayscale"),
+        ]
+        ocr_inputs = [path for path in ocr_inputs if path is not None and path.exists()]
 
-    if not ocr_inputs:
-        raise FileNotFoundError("no OCR input images were produced by the ROI pipeline")
+        if not ocr_inputs:
+            raise FileNotFoundError(
+                "no OCR input images were produced by the ROI pipeline"
+            )
 
-    whitelist = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/-"
-    last_text = ""
-    last_confidence = None
+        whitelist = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/-"
+        last_text = ""
+        last_confidence = None
 
-    for candidate_path in ocr_inputs:
-        image = cv2.imread(str(candidate_path))
-        if image is None:
-            continue
+        for candidate_path in ocr_inputs:
+            image = cv2.imread(str(candidate_path))
+            if image is None:
+                continue
 
-        for psm in (7, 8):
-            result = perform_ocr(image, psm=psm, whitelist=whitelist)
-            text = result.get("text", "")
-            registration_number = extract_registration_number(text)
-            if registration_number:
-                ingest_result = ingest_card(registration_number)
-                if not ingest_result.get("success"):
-                    raise RuntimeError(
-                        "ingest failed: "
-                        f"{ingest_result.get('step', 'unknown step')} - "
-                        f"{ingest_result.get('error', 'unknown error')}"
-                    )
+            for psm in (7, 8):
+                result = perform_ocr(image, psm=psm, whitelist=whitelist)
+                text = result.get("text", "")
+                registration_number = extract_registration_number(text)
+                if registration_number:
+                    ingest_result = ingest_card(registration_number)
+                    if not ingest_result.get("success"):
+                        raise RuntimeError(
+                            "ingest failed: "
+                            f"{ingest_result.get('step', 'unknown step')} - "
+                            f"{ingest_result.get('error', 'unknown error')}"
+                        )
 
-                print(f"latest capture: {latest_image}")
-                print(f"pipeline output: {pipeline_output_dir}")
-                print(f"ocr input: {candidate_path.name}")
-                print(f"registration number: {registration_number}")
-                print(f"ingest result: {ingest_result}")
-                return registration_number
+                    slot_index = ingest_result.get("slot_index")
+                    if slot_index is None:
+                        raise RuntimeError(
+                            "ingest succeeded but slot_index was missing"
+                        )
 
-            last_text = text
-            last_confidence = result.get("mean_confidence")
+                    spi_frame = send_status(True, slot_index)
+                    status_sent = True
 
-    raise RuntimeError(
-        "could not extract a registration number from the latest capture "
-        f"{latest_image}. Last OCR text={last_text!r}, confidence={last_confidence}"
-    )
+                    print(f"latest capture: {latest_image}")
+                    print(f"pipeline output: {pipeline_output_dir}")
+                    print(f"ocr input: {candidate_path.name}")
+                    print(f"registration number: {registration_number}")
+                    print(f"ingest result: {ingest_result}")
+                    print(f"spi frame: {spi_frame}")
+                    return registration_number
+
+                last_text = text
+                last_confidence = result.get("mean_confidence")
+
+        raise RuntimeError(
+            "could not extract a registration number from the latest capture "
+            f"{latest_image}. Last OCR text={last_text!r}, confidence={last_confidence}"
+        )
+    except Exception:
+        if not status_sent:
+            try:
+                send_status(False)
+            except Exception:
+                pass
+        raise
 
 
 def main() -> int:
