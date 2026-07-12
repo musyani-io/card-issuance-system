@@ -55,32 +55,34 @@ ISR(SPI_STC_vect) {
 }
 
 void setup() {
-
   Serial.begin(115200);
   Serial.println("System initializing!");
   delayMicroseconds(10);
 
   setupSpiReceiver();
 
-  // // Motors
-  // servo1.attach(SERVO1);
-  // servo2.attach(SERVO2);
-  // servoTo45(servo1);
-  // servo2.writeMicroseconds(MIN_PULSE);
+  // Motors
+  servo1.attach(SERVO1);
+  servo2.attach(SERVO2);
+  servoTo45(servo1);
+  servo2.writeMicroseconds(MIN_PULSE);
 
-  // Serial.println("Servos OG!");
-  // delay(3000);
-
+  Serial.println("Servos OG!");
+  delay(3000);
 }
 
 void loop() {
+  
+  if (digitalRead(SPI_SS_PIN) == HIGH) {
+    spiFrameIndex = 0;
+  }
+  
   char spiMessage[SPI_FRAME_LEN + 1];
 
   if (receiveSpiMessage(spiMessage, sizeof(spiMessage))) {
-    // Message already printed by receiveSpiMessage().
+    // Message processed inside receiveSpiMessage()
   }
 }
-
 
 // FUNCTIONS
 
@@ -99,13 +101,6 @@ bool readSpiFrame(char *out, size_t outSize) {
     return false;
   }
 
-  // If SS is HIGH, the master is not communicating; reset index to maintain sync
-  if (digitalRead(SPI_SS_PIN) == HIGH) {
-    noInterrupts();
-    spiFrameIndex = 0; 
-    interrupts();
-  }
-
   noInterrupts();
   bool ready = spiFrameReady;
   if (ready) {
@@ -119,7 +114,6 @@ bool readSpiFrame(char *out, size_t outSize) {
   return ready;
 }
 
-
 bool receiveSpiMessage(char *out, size_t outSize) {
   if (!readSpiFrame(out, outSize)) {
     return false;
@@ -130,8 +124,7 @@ bool receiveSpiMessage(char *out, size_t outSize) {
   return true;
 }
 
-
-void servoTo45(Servo servo) { // Call after OCR detectioon is done. But the carousel has already rotated!!
+void servoTo45(Servo servo) {
   int pos = 0;
 
   for (int i = PULSE_BAL; i < PULSE_45; i++) {  // Center to 45
@@ -156,27 +149,20 @@ void servoTo45(Servo servo) { // Call after OCR detectioon is done. But the caro
     delayMicroseconds(1000);
   }
   Serial.println("Back to level!");
-
 }
 
 void servoToAngle(Servo servo, int angle) {
-
   int pulse = MIN_PULSE + ((1850 / 180) * angle);
 
   for (int i = MIN_PULSE ; i < pulse; i++) {
-
     servo.writeMicroseconds(i);
     delayMicroseconds(1500);
-
   }
 
   delay(2500);
 
   for (int i = pulse; i > MIN_PULSE; i--) {
-
     servo.writeMicroseconds(i);
     delayMicroseconds(1500);
-    
   }
-  
 }
