@@ -36,7 +36,6 @@ REG_NUMBER_PATTERNS = (
 
 def _format_compact_registration_number(digits: str) -> str | None:
     """Format a compact 11-digit registration number into XXXX-XX-XXXXX."""
-
     if len(digits) == 11:
         return f"{digits[:4]}-{digits[4:6]}-{digits[6:]}"
     return None
@@ -44,7 +43,6 @@ def _format_compact_registration_number(digits: str) -> str | None:
 
 def convert_to_grayscale(image: np.ndarray) -> np.ndarray:
     """Convert a BGR or grayscale image to a single-channel grayscale image."""
-
     if image is None:
         raise ValueError("image cannot be None")
 
@@ -59,7 +57,6 @@ def convert_to_grayscale(image: np.ndarray) -> np.ndarray:
 
 def apply_adaptive_threshold(image: np.ndarray) -> np.ndarray:
     """Apply Gaussian adaptive thresholding to a grayscale image."""
-
     if image is None:
         raise ValueError("image cannot be None")
 
@@ -91,7 +88,6 @@ def apply_adaptive_threshold(image: np.ndarray) -> np.ndarray:
 
 def load_image(image_path: str | Path) -> np.ndarray:
     """Load an image from disk in BGR format."""
-
     path = Path(image_path)
     image = cv2.imread(str(path))
     if image is None:
@@ -103,7 +99,6 @@ def save_grayscale_preview(
     image_path: str | Path, output_dir: str | Path
 ) -> dict[str, Path]:
     """Save the original image, grayscale image, and a side-by-side preview."""
-
     source_path = Path(image_path)
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
@@ -147,7 +142,6 @@ def save_threshold_preview(
     image_path: str | Path, output_dir: str | Path
 ) -> dict[str, Path]:
     """Save the grayscale and adaptive-threshold images plus a side-by-side preview."""
-
     source_path = Path(image_path)
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
@@ -202,32 +196,18 @@ def save_threshold_preview(
 
 
 def apply_pre_ocr_enhancement(image: np.ndarray) -> np.ndarray:
-    """Apply mild blur followed by a sharpening kernel to an image.
-
-    This is Task 1.2.6: reduces small noise while preserving character edges.
-    Reads `PRE_OCR` settings from `config` and returns a BGR or grayscale image
-    with the same number of channels as the input.
-    """
-
+    """Apply mild blur followed by a sharpening kernel to an image."""
     if image is None:
         raise ValueError("image cannot be None")
 
-    # preserve input shape/channels
     orig_ndim = image.ndim
-
-    # Apply small Gaussian blur
     bk = tuple(config.PRE_OCR["blur_ksize"])
     blurred = cv2.GaussianBlur(image, bk, 0)
 
-    # Apply sharpening kernel
     kernel = np.array(config.PRE_OCR["sharpen_kernel"], dtype=np.float32)
-    # filter2D works on multi-channel images as well
     sharpened = cv2.filter2D(blurred, -1, kernel)
-
-    # Clip to valid uint8 range and cast back
     sharpened = np.clip(sharpened, 0, 255).astype("uint8")
 
-    # Return image with same dimensionality as input
     if orig_ndim == 2 and sharpened.ndim == 3:
         return cv2.cvtColor(sharpened, cv2.COLOR_BGR2GRAY)
     return sharpened
@@ -236,17 +216,10 @@ def apply_pre_ocr_enhancement(image: np.ndarray) -> np.ndarray:
 def perform_ocr(
     image: np.ndarray, *, psm: int | None = None, whitelist: str | None = None
 ) -> dict:
-    """Run Tesseract OCR on `image` and return text and confidence metadata.
-
-    - `image` may be grayscale, BGR, or binarized. The function will call
-      `pytesseract.image_to_data` and compute average confidence where available.
-    - Returns: {"text": str, "mean_confidence": float or None, "raw": str}
-    """
-
+    """Run Tesseract OCR on `image` and return text and confidence metadata."""
     if pytesseract is None:
         raise RuntimeError("pytesseract not available in this environment")
 
-    # Ensure image is in a format pytesseract accepts (BGR -> RGB)
     img = image
     if img.ndim == 3 and img.shape[2] == 3:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -255,16 +228,12 @@ def perform_ocr(
     if psm is not None:
         config_parts.append(f"--psm {int(psm)}")
     if whitelist:
-        # tessedit_char_whitelist expects no spaces
         wl = whitelist.replace(" ", "")
         config_parts.append(f"-c tessedit_char_whitelist={wl}")
 
     config_str = " ".join(config_parts)
-
-    # Get plain text
     text = pytesseract.image_to_string(img, config=config_str).strip()
 
-    # Get detailed data to compute confidences
     data = pytesseract.image_to_data(
         img, config=config_str, output_type=pytesseract.Output.DICT
     )
@@ -274,7 +243,6 @@ def perform_ocr(
             c = float(conf)
         except Exception:
             continue
-        # Tesseract uses -1 for blanks; skip those
         if c >= 0:
             confs.append(c)
 
@@ -307,7 +275,6 @@ def _latest_capture_image(capture_dir: Path) -> Path:
 
 def extract_registration_number(text: str) -> str | None:
     """Extract a likely registration number from OCR text."""
-
     if not text:
         return None
 
@@ -326,45 +293,34 @@ def extract_registration_number(text: str) -> str | None:
 
 
 def run_ocr_pipeline() -> str:
-    """Capture, run stage-by-stage processing, and return the registration number.
-
-    Required order:
-    1) card detection
-    2) grayscale conversion
-    3) perspective correction
-    4) ROI extraction (using ROI values from config)
-    5) OCR on generated ROI artifacts
-    """
-
-    capture_dir = _run_capture_script()
-    latest_image = _latest_capture_image(capture_dir)
-
-    from modules.card_detector import (
-        save_detection_preview,
-        save_perspective_preview,
-        save_roi_preview,
-    )
-    from modules.database import ingest_card
+    """Capture, run stage-by-stage processing, and return the registration number."""
     from modules.spi_master import send_status
 
     status_sent = False
     try:
+        # Protected: Initial system capture environment validation
+        capture_dir = _run_capture_script()
+        latest_image = _latest_capture_image(capture_dir)
+
+        from modules.card_detector import (
+            save_detection_preview,
+            save_perspective_preview,
+            save_roi_preview,
+        )
+        from modules.database import ingest_card
+
         pipeline_output_dir = Path(config.PROCESS_OUTPUT_DIR) / latest_image.stem
         pipeline_output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Stage 1: card detection overlay and metadata
         detection_dir = pipeline_output_dir / "01_card_detection"
         save_detection_preview(latest_image, detection_dir)
 
-        # Stage 2: grayscale conversion artifacts
         grayscale_dir = pipeline_output_dir / "02_grayscale"
         save_grayscale_preview(latest_image, grayscale_dir)
 
-        # Stage 3: perspective-corrected card outputs
         perspective_dir = pipeline_output_dir / "03_perspective"
         save_perspective_preview(latest_image, perspective_dir)
 
-        # Stage 4: ROI crop based on config.ROI['default'] + pre-OCR outputs
         roi_dir = pipeline_output_dir / "04_roi"
         roi_outputs = save_roi_preview(latest_image, roi_dir)
 
