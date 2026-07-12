@@ -1,9 +1,10 @@
 #include <Arduino.h>
 #include <Servo.h>
 #include <SPI.h>
+#include <string.h>
 
 // Objects
-Servo servo1; // card holder
+Servo servo1; // card holder (60 DOWN, FLIPS THE CARD, 2 SECONDS HOLD)
 Servo servo2; // carousel rotater
 Servo servo3;
 
@@ -25,19 +26,16 @@ volatile char spiFrame[SPI_FRAME_LEN + 1] = {0};
 volatile uint8_t spiFrameIndex = 0;
 volatile bool spiFrameReady = false;
 
-// Variables
-const int MIN_PULSE = 550;
-const int PULSE_BAL = 1000;
-const int MID_PULSE = 1600;
-const int PULSE_45 = 1300;
-const int STEP_REV = 200;
-int currAngle = 0;
+// Constants
+constexpr int ORIGIN_PULSE = 544;  // Standard 0-degree microsecond mapping
+constexpr int MAX_PULSE = 2400;    // Standard 180-degree microsecond mapping
+constexpr int CARD_DOWN = 60;
 
 // Functions
-void servoTo45(Servo servo);
-void servoToAngle(Servo servo, int angle);
 void setupSpiReceiver();
 bool receiveSpiMessage(char *out, size_t outSize);
+void servoToOrigin(Servo &servo);
+void servoToAngle(Servo &servo, int angle);
 
 ISR(SPI_STC_vect) {
   char received = static_cast<char>(SPDR);
@@ -61,30 +59,58 @@ void setup() {
 
   setupSpiReceiver();
 
-  // Motors
+  // 1. Pre-load the 0-degree pulse width BEFORE attaching the pins
+  servo1.writeMicroseconds(ORIGIN_PULSE);
+  servo2.writeMicroseconds(ORIGIN_PULSE);
+  servo3.writeMicroseconds(ORIGIN_PULSE);
+  delayMicroseconds(10);
+
+  // 2. Attach motors (they will now initialize quietly at 544 µs instead of jumping)
   servo1.attach(SERVO1);
   servo2.attach(SERVO2);
-  servoTo45(servo1);
-  servo2.writeMicroseconds(MIN_PULSE);
+  servo3.attach(SERVO3);
+  delayMicroseconds(100);
 
-  Serial.println("Servos OG!");
-  delay(3000);
+  // 3. Verify homing alignment softly
+  Serial.println("Homing verification...");
+  servoToOrigin(servo1);
+  servoToOrigin(servo2);
+  servoToOrigin(servo3);
+
+  Serial.println("System Ready! Awaiting SPI commands...");
 }
 
 void loop() {
-  
+  // Clear software buffer memory tracking whenever the Pi releases Chip Select (SS Pin goes HIGH)
   if (digitalRead(SPI_SS_PIN) == HIGH) {
     spiFrameIndex = 0;
   }
   
   char spiMessage[SPI_FRAME_LEN + 1];
 
+  // Evaluate message logic if a frame is fully assembled
   if (receiveSpiMessage(spiMessage, sizeof(spiMessage))) {
-    // Message processed inside receiveSpiMessage()
+    
+    if (strcmp(spiMessage, "10") == 0) {
+      Serial.println("Target: Compartment A -> Entrance (0 deg)");
+      servoToAngle(servo2, 0);
+    } 
+    else if (strcmp(spiMessage, "00") == 0) {
+      Serial.println("Target: Compartment C -> Entrance (90 deg)");
+      servoToAngle(servo2, 90);
+    } 
+    else if (strcmp(spiMessage, "11") == 0) {
+      Serial.println("Target: Compartment B -> Entrance (180 deg)");
+      servoToAngle(servo2, 180);
+    }
+    else {
+      Serial.print("Unknown Frame: ");
+      Serial.println(spiMessage);
+    }
   }
 }
 
-// FUNCTIONS
+// SPI INFRASTRUCTURE FUNCTIONS
 
 void setupSpiReceiver() {
   pinMode(SPI_SS_PIN, INPUT_PULLUP);
@@ -124,45 +150,53 @@ bool receiveSpiMessage(char *out, size_t outSize) {
   return true;
 }
 
-void servoTo45(Servo servo) {
-  int pos = 0;
+// ROBUST SERVO MOTION CONTROL FUNCTIONS
 
-  for (int i = PULSE_BAL; i < PULSE_45; i++) {  // Center to 45
-    servo.writeMicroseconds(i);
-    delayMicroseconds(4000);
-    pos = i;
+/**
+ * Sweeps a given Servo object smoothly back to its 0-degree origin (544 µs).
+ * Uses a reference (&) parameter to prevent object copying.
+ */
+void servoToOrigin(Servo &servo) {
+  int currentPulse = servo.readMicroseconds();
+  
+  if (currentPulse == ORIGIN_PULSE) {
+    return; 
   }
-  Serial.println("To 45....");
-  delay(3000);
 
-  for (int i = pos; i > 0; i--) {   // 45 to upper - card release
-    servo.writeMicroseconds(i);
-    delayMicroseconds(1500);
-    pos = i;
+  if (currentPulse < ORIGIN_PULSE) {
+    for (int p = currentPulse; p <= ORIGIN_PULSE; p++) {
+      servo.writeMicroseconds(p);
+      delayMicroseconds(1500); // Step delay controlling speed and current limit
+    }
+  } else {
+    for (int p = currentPulse; p >= ORIGIN_PULSE; p--) {
+      servo.writeMicroseconds(p);
+      delayMicroseconds(1500); // Step delay controlling speed and current limit
+    }
   }
-  Serial.println("Back to -45....");
-  delay(1000);
-
-  servo.writeMicroseconds(PULSE_BAL);
-  for (int i = pos; i < PULSE_BAL; i++) {   // Back to center
-    servo.writeMicroseconds(i);
-    delayMicroseconds(1000);
-  }
-  Serial.println("Back to level!");
 }
 
-void servoToAngle(Servo servo, int angle) {
-  int pulse = MIN_PULSE + ((1850 / 180) * angle);
+/**
+ * Sweeps a given Servo object smoothly to a targeted angle and holds it.
+ * @param servo Referenced Servo object.
+ * @param angle Target position in degrees (0 to 180).
+ */
+void servoToAngle(Servo &servo, int angle) {
+  // Standard conversion mapping from geometric degrees to microsecond pulse timings
+  int targetPulse = map(angle, 0, 180, ORIGIN_PULSE, MAX_PULSE);
+  targetPulse = constrain(targetPulse, ORIGIN_PULSE, MAX_PULSE);
 
-  for (int i = MIN_PULSE ; i < pulse; i++) {
-    servo.writeMicroseconds(i);
-    delayMicroseconds(1500);
-  }
+  int currentPulse = servo.readMicroseconds();
 
-  delay(2500);
-
-  for (int i = pulse; i > MIN_PULSE; i--) {
-    servo.writeMicroseconds(i);
-    delayMicroseconds(1500);
+  if (currentPulse < targetPulse) {
+    for (int p = currentPulse; p <= targetPulse; p++) {
+      servo.writeMicroseconds(p);
+      delayMicroseconds(1500); 
+    }
+  } else {
+    for (int p = currentPulse; p >= targetPulse; p--) {
+      servo.writeMicroseconds(p);
+      delayMicroseconds(2000);
+    }
   }
 }
