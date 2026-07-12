@@ -2,8 +2,8 @@
 #include <Servo.h>
 
 // Objects
-Servo servo1;
-Servo servo2;
+Servo servo1; // card holder
+Servo servo2; // carousel rotater
 Servo servo3;
 
 // Pin definition
@@ -16,10 +16,11 @@ const int MIN_PULSE = 550;
 const int PULSE_BAL = 1000;
 const int MID_PULSE = 1600;
 const int PULSE_45 = 1300;
+const int STEP_REV = 200;
 
 // Functions
 void servoTo45(Servo servo);
-void servoBalance(Servo servo, int position);
+void servoToAngle(Servo servo, int angle);
 
 void setup() {
 
@@ -28,20 +29,31 @@ void setup() {
   delayMicroseconds(10);
 
   // Pin init
+  pinMode(SERVO1, OUTPUT);
   pinMode(SERVO2, OUTPUT);
+  pinMode(DIR_PIN, OUTPUT);
+  pinMode(STEP_PIN, OUTPUT);
+  pinMode(EN_PIN, OUTPUT);
 
   // Motors
+  servo1.attach(SERVO1);
   servo2.attach(SERVO2);
-  servo2.writeMicroseconds(PULSE_BAL);
+  servo2.writeMicroseconds(MIN_PULSE);
+
 
 }
 
-void loop() {}
+void loop() {
+  servoTo45(servo1);
+  delay(2000);
+  servoToAngle(servo2, 180);
+  delay(2000);
+}
 
 // FUNCTIONS
+
 void servoTo45(Servo servo) {
   int pos = 0;
-  // servo.writeMicroseconds(PULSE_BAL);
 
   for (int i = PULSE_BAL; i < PULSE_45; i++) {  // Center to 45
     servo.writeMicroseconds(i);
@@ -49,7 +61,7 @@ void servoTo45(Servo servo) {
     pos = i;
   }
   Serial.println("To 45....");
-  delay(2000);
+  delay(3000);
 
   for (int i = pos; i > 0; i--) {   // 45 to upper - card release
     servo.writeMicroseconds(i);
@@ -57,16 +69,35 @@ void servoTo45(Servo servo) {
     pos = i;
   }
   Serial.println("Back to -45....");
-  delay(500);
+  delay(1000);
 
   servo.writeMicroseconds(PULSE_BAL);
   for (int i = pos; i < PULSE_BAL; i++) {   // Back to center
     servo.writeMicroseconds(i);
     delayMicroseconds(1000);
   }
+  Serial.println("Back to level!");
 
 }
 
+void servoToAngle(Servo servo, int angle) {
+  int pulse =  550 + ((1850/180) * angle);
+  int pos = 0;
+
+  for (int i = MIN_PULSE; i < pulse; i++) {   // 45 to upper - card release
+    servo.writeMicroseconds(i);
+    delayMicroseconds(1000);
+    pos = i;
+  }
+
+  delay(3000);
+  for (int i = pos; i > MIN_PULSE; i--) {
+    servo.writeMicroseconds(i);
+    delayMicroseconds(1000);
+  }
+}
+
+}
 
 // REFERENCE CODE
 

@@ -92,6 +92,14 @@ PRE_OCR = {
     ],  # Sharpens text edges before OCR.
 }
 
+FIXED_FLATTEN_SOURCE_POINTS = (
+    (0.08, 0.06),
+    (0.92, 0.06),
+    (0.95, 0.94),
+    (0.05, 0.94),
+)  # Normalized TL, TR, BR, BL points for manual card flattening.
+FIXED_FLATTEN_OUTPUT_SIZE = (880, 550)  # Increase/decrease to change flatten zoom.
+
 CAPTURE_DEVICE = "/dev/video2"  # USB webcam device exposed by the phone.
 CAPTURE_DEVICE_CANDIDATES = [
     "/dev/video4",

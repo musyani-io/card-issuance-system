@@ -11,7 +11,6 @@ from __future__ import annotations
 import re
 import subprocess
 import sys
-from datetime import datetime
 from pathlib import Path
 
 import cv2
@@ -327,17 +326,44 @@ def extract_registration_number(text: str) -> str | None:
 
 
 def run_ocr_pipeline() -> str:
-    """Capture a fresh image, process the latest capture, and return reg number."""
+    """Capture, run stage-by-stage processing, and return the registration number.
+
+    Required order:
+    1) card detection
+    2) grayscale conversion
+    3) perspective correction
+    4) ROI extraction (using ROI values from config)
+    5) OCR on generated ROI artifacts
+    """
 
     capture_dir = _run_capture_script()
     latest_image = _latest_capture_image(capture_dir)
 
-    from modules.card_detector import save_roi_preview
+    from modules.card_detector import (
+        save_detection_preview,
+        save_perspective_preview,
+        save_roi_preview,
+    )
+    from modules.database import ingest_card
 
     pipeline_output_dir = Path(config.PROCESS_OUTPUT_DIR) / latest_image.stem
     pipeline_output_dir.mkdir(parents=True, exist_ok=True)
 
-    roi_outputs = save_roi_preview(latest_image, pipeline_output_dir)
+    # Stage 1: card detection overlay and metadata
+    detection_dir = pipeline_output_dir / "01_card_detection"
+    save_detection_preview(latest_image, detection_dir)
+
+    # Stage 2: grayscale conversion artifacts
+    grayscale_dir = pipeline_output_dir / "02_grayscale"
+    save_grayscale_preview(latest_image, grayscale_dir)
+
+    # Stage 3: perspective-corrected card outputs
+    perspective_dir = pipeline_output_dir / "03_perspective"
+    save_perspective_preview(latest_image, perspective_dir)
+
+    # Stage 4: ROI crop based on config.ROI['default'] + pre-OCR outputs
+    roi_dir = pipeline_output_dir / "04_roi"
+    roi_outputs = save_roi_preview(latest_image, roi_dir)
 
     ocr_inputs = [
         roi_outputs.get("roi"),
@@ -364,9 +390,19 @@ def run_ocr_pipeline() -> str:
             text = result.get("text", "")
             registration_number = extract_registration_number(text)
             if registration_number:
+                ingest_result = ingest_card(registration_number)
+                if not ingest_result.get("success"):
+                    raise RuntimeError(
+                        "ingest failed: "
+                        f"{ingest_result.get('step', 'unknown step')} - "
+                        f"{ingest_result.get('error', 'unknown error')}"
+                    )
+
                 print(f"latest capture: {latest_image}")
+                print(f"pipeline output: {pipeline_output_dir}")
                 print(f"ocr input: {candidate_path.name}")
                 print(f"registration number: {registration_number}")
+                print(f"ingest result: {ingest_result}")
                 return registration_number
 
             last_text = text
