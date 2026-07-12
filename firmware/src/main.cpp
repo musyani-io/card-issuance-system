@@ -62,14 +62,14 @@ void setup() {
 
   setupSpiReceiver();
 
-  // Motors
-  servo1.attach(SERVO1);
-  servo2.attach(SERVO2);
-  servoTo45(servo1);
-  servo2.writeMicroseconds(MIN_PULSE);
+  // // Motors
+  // servo1.attach(SERVO1);
+  // servo2.attach(SERVO2);
+  // servoTo45(servo1);
+  // servo2.writeMicroseconds(MIN_PULSE);
 
-  Serial.println("Servos OG!");
-  delay(3000);
+  // Serial.println("Servos OG!");
+  // delay(3000);
 
 }
 
@@ -99,6 +99,13 @@ bool readSpiFrame(char *out, size_t outSize) {
     return false;
   }
 
+  // If SS is HIGH, the master is not communicating; reset index to maintain sync
+  if (digitalRead(SPI_SS_PIN) == HIGH) {
+    noInterrupts();
+    spiFrameIndex = 0; 
+    interrupts();
+  }
+
   noInterrupts();
   bool ready = spiFrameReady;
   if (ready) {
@@ -111,6 +118,7 @@ bool readSpiFrame(char *out, size_t outSize) {
 
   return ready;
 }
+
 
 bool receiveSpiMessage(char *out, size_t outSize) {
   if (!readSpiFrame(out, outSize)) {

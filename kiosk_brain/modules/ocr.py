@@ -430,9 +430,11 @@ def run_ocr_pipeline() -> str:
     except Exception:
         if not status_sent:
             try:
-                send_status(False)
+                spi_frame = send_status(False)
+                status_sent = True
+                print(f"spi frame: {spi_frame}")
             except Exception:
-                pass
+                print("failed to send SPI failure frame", file=sys.stderr)
         raise
 
 
