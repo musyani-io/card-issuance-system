@@ -94,14 +94,29 @@ void loop() {
     if (strcmp(spiMessage, "10") == 0) {
       Serial.println("Target: Compartment A -> Entrance (0 deg)");
       servoToAngle(servo2, 0);
+      delay(2000);
+      servoToAngle(servo1, 70);
+      delay(1000);
+      servoToOrigin(servo1);
+      servoToOrigin(servo2);
     } 
     else if (strcmp(spiMessage, "00") == 0) {
       Serial.println("Target: Compartment C -> Entrance (90 deg)");
       servoToAngle(servo2, 90);
+      delay(2000);
+      servoToAngle(servo1, 70);
+      delay(1000);
+      servoToOrigin(servo1);
+      servoToOrigin(servo2);
     } 
     else if (strcmp(spiMessage, "11") == 0) {
       Serial.println("Target: Compartment B -> Entrance (180 deg)");
       servoToAngle(servo2, 180);
+      delay(2000);
+      servoToAngle(servo1, 70);
+      delay(1000);
+      servoToOrigin(servo1);
+      servoToOrigin(servo2);
     }
     else {
       Serial.print("Unknown Frame: ");
@@ -191,7 +206,7 @@ void servoToAngle(Servo &servo, int angle) {
   if (currentPulse < targetPulse) {
     for (int p = currentPulse; p <= targetPulse; p++) {
       servo.writeMicroseconds(p);
-      delayMicroseconds(1500); 
+      delayMicroseconds(500); 
     }
   } else {
     for (int p = currentPulse; p >= targetPulse; p--) {
@@ -199,4 +214,5 @@ void servoToAngle(Servo &servo, int angle) {
       delayMicroseconds(2000);
     }
   }
+  delay(1000);
 }
