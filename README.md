@@ -1,540 +1,869 @@
-# Smart ID Card Distribution Kiosk
+# Smart ID Card Issuance Kiosk
 
-## Overview
+A prototype university ID-card issuance system that combines a Raspberry Pi application, OCR-based card registration, local SQLite storage, student authentication, SMS/email credential delivery, and an Arduino Mega hardware-control prototype.
 
-A distributed embedded system for autonomous ID card issuance in university environments. The system combines:
+> **Project status:** Active prototype. The software modules are partly integrated, while physical card dispensing is still simulated in the current Kivy application.
 
-- **Raspberry Pi 5 (4GB)**: Python application tier with Kivy touchscreen UI
-- **STM32 Nucleo-F401RE**: Hardware control tier via SPI communication
-- **Multi-stage Transport**: Card carousel, conveyor, OCR, and dispensing mechanisms
+---
 
-**Core Features**: Batch card loading (staff) | Student card collection | Two-factor authentication (OTP + PIN) | OCR registration number extraction | Immutable audit logging
+## Table of Contents
 
-## System Architecture
+- [Project Overview](#project-overview)
+- [Current Implementation Status](#current-implementation-status)
+- [System Workflow](#system-workflow)
+- [Architecture](#architecture)
+- [Technology Stack](#technology-stack)
+- [Repository Structure](#repository-structure)
+- [Kiosk Application Setup](#kiosk-application-setup)
+- [Database Setup](#database-setup)
+- [Mock University API Setup](#mock-university-api-setup)
+- [Running the OCR Pipeline](#running-the-ocr-pipeline)
+- [Running the Kiosk UI](#running-the-kiosk-ui)
+- [Firmware Setup](#firmware-setup)
+- [Testing](#testing)
+- [Configuration Reference](#configuration-reference)
+- [Security Design](#security-design)
+- [Known Limitations](#known-limitations)
+- [Development Priorities](#development-priorities)
+- [Documentation and Hardware Files](#documentation-and-hardware-files)
+- [License](#license)
 
-### Computing Tiers
+---
 
-**Raspberry Pi 5 (Application Controller)**
+## Project Overview
 
-- Python 3.11 runtime with Kivy 2.3.1 touch UI framework
-- 5" DSI touchscreen interface (800×400 resolution, landscape-only)
-- OCR pipeline (OpenCV + Tesseract 5) for batch card scanning
-- SQLite database with immutable audit logs
-- SPI master (1 MHz, 3-byte frames) to STM32 for motor/sensor control
-- HTTPS API client for university database (mDNS discovery: `ubuntu.local`)
-- SMS dispatch via BRIQ Solutions REST API (Tanzania)
+The project is intended to automate the storage and collection of university identity cards.
 
-**STM32 Nucleo-F401RE (Hardware Control)**
+The repository currently contains four main parts:
 
-- SPI slave mode (1 MHz, responds to 3-byte frame format)
-- Motor control: 2× NEMA 17 stepper motors via A4988 drivers (carousel, conveyor)
-- Servo control: 2× SG90 servos via PWM (card ejection, expired-card latch)
-- Solenoid lock control: 12V energized-to-lock (fail-secure on power loss)
-- Sensor polling: 4× IR break-beam sensors, 1× Hall-effect sensor (absolute homing)
-- Hardware watchdog: Door-open IR → automatic motor disable (failsafe)
+1. **Raspberry Pi kiosk application**
+   - Kivy touchscreen interface
+   - Student registration-number entry
+   - OTP verification
+   - Temporary and permanent PIN handling
+   - SQLite card and authentication records
+   - Session timeout and lockout screens
 
-### Mechanical Subsystems
+2. **OCR and card-ingestion pipeline**
+   - Camera image capture
+   - Card contour detection
+   - Perspective correction
+   - Registration-number region extraction
+   - Tesseract OCR
+   - University API lookup
+   - Local card-slot assignment
 
-- **Turntable Carousel**: 10-slot disc with neodymium magnets for passive card retention; step-indexed by stepper motor; expandable to 20-slot with firmware changes
-- **Conveyor Systems**: Input transport (staff tray → carousel rear gate) + Output (carousel front → student collection point); both driven by NEMA 17 steppers
-- **Scan Station**: CSI camera mounted above Conveyor 1 for batch OCR; USB camera in front panel for expired-card registration verification
-- **Card Dispensing**: SG90 servo pushes card from carousel front gate to ejection point
-- **Security**: 12V solenoid lock on staff access door; energized-to-lock design (fails secure on power loss)
+3. **Mock university database API**
+   - Flask REST API
+   - MySQL-backed student lookup
+   - API-key authentication
+   - Student-field normalization
 
-## Directory Structure
+4. **Hardware-control prototype**
+   - Arduino Mega 2560 PlatformIO project
+   - SPI frame reception from Raspberry Pi
+   - Servo test routines
+   - Hardware, PCB, mechanical, simulation, and datasheet files
 
-```bash
+---
+
+## Current Implementation Status
+
+| Subsystem                               | Current state                                          |
+| --------------------------------------- | ------------------------------------------------------ |
+| Kivy student collection interface       | Implemented                                            |
+| Registration-number validation          | Implemented                                            |
+| Local SQLite database                   | Implemented                                            |
+| OTP generation and verification         | Implemented                                            |
+| Temporary PIN and permanent PIN storage | Implemented                                            |
+| Bcrypt credential hashing               | Implemented                                            |
+| Authentication lockout logic            | Implemented                                            |
+| SMS delivery through BRIQ Solutions     | Implemented; requires credentials                      |
+| Email delivery through Gmail SMTP       | Implemented; requires credentials                      |
+| University API client                   | Implemented                                            |
+| Flask/MySQL mock university API         | Implemented; requires local configuration and database |
+| Camera image capture                    | Implemented                                            |
+| Card contour and perspective correction | Implemented                                            |
+| Tesseract OCR extraction                | Implemented                                            |
+| Card ingestion and four-slot assignment | Implemented                                            |
+| Raspberry Pi SPI sender                 | Basic two-byte status frames implemented               |
+| Arduino Mega SPI receiver               | Basic frame reception implemented                      |
+| Servo prototype                         | Implemented at firmware-test level                     |
+| Staff batch-loading Kivy interface      | Not integrated into `main.py`                          |
+| Automatic motorised card dispensing     | Not integrated; simulated in `main.py`                 |
+| Complete carousel/conveyor control      | Not implemented in the checked-in firmware             |
+| Production deployment and enclosure     | Not complete                                           |
+
+The repository documentation contains earlier STM32 and 10-slot carousel plans. The current checked-in firmware instead targets an **Arduino Mega 2560**, and the current SQLite ingestion logic assigns a maximum of **four active slots**.
+
+---
+
+## System Workflow
+
+### Card registration and ingestion
+
+```text
+Camera capture
+      |
+      v
+Card contour detection
+      |
+      v
+Perspective correction
+      |
+      v
+Registration-number ROI extraction
+      |
+      v
+Tesseract OCR
+      |
+      v
+University API lookup
+      |
+      v
+Generate OTP and temporary PIN when required
+      |
+      v
+Store student, authentication, card, and audit records in SQLite
+      |
+      v
+Send credentials through SMS and email
+```
+
+### Student card collection
+
+```text
+Idle screen
+      |
+      v
+Enter registration number
+      |
+      v
+Check local student and card record
+      |
+      v
+Enter six-digit OTP
+      |
+      +-------------------------------+
+      |                               |
+      v                               v
+Temporary PIN exists             Permanent PIN exists
+      |                               |
+      v                               |
+Verify temporary PIN                  |
+      |                               |
+      v                               |
+Create permanent PIN                  |
+      +---------------+---------------+
+                      |
+                      v
+Load assigned slot
+                      |
+                      v
+Mark card as collected
+                      |
+                      v
+Simulated dispensing delay
+                      |
+                      v
+Confirmation screen
+```
+
+> The returning-student branch currently proceeds after OTP verification without displaying the permanent-PIN entry screen. The authentication module contains permanent-PIN verification logic, but that step is not connected to the returning-student path in `main.py`.
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+    CAM[Camera or phone webcam] --> OCR[OpenCV and Tesseract OCR]
+    OCR --> INGEST[Card ingestion service]
+    API[Flask university API] --> INGEST
+    MYSQL[(University MySQL database)] --> API
+    INGEST --> SQLITE[(Local SQLite database)]
+    INGEST --> SMS[BRIQ SMS API]
+    INGEST --> EMAIL[Gmail SMTP]
+    UI[Kivy touchscreen UI] --> SQLITE
+    UI --> AUTH[OTP and PIN authentication]
+    AUTH --> SQLITE
+    UI -. basic status frames .-> SPI[Raspberry Pi SPI master]
+    SPI --> MEGA[Arduino Mega 2560]
+    MEGA --> SERVO[Servo prototype]
+```
+
+### Raspberry Pi application layer
+
+The `kiosk_brain` application is responsible for:
+
+- Kivy user-interface screens
+- Student-session state
+- Local database access
+- OTP and PIN verification
+- OCR processing
+- University API communication
+- SMS and email credential delivery
+- Basic SPI transmission
+
+### Local database layer
+
+SQLite stores:
+
+- Students
+- Cards and assigned slots
+- OTP and PIN hashes
+- Authentication attempts and lockouts
+- Audit events
+- Batch metadata
+
+### University API layer
+
+The mock API provides:
+
+```http
+GET /students/<registration_number>
+X-API-Key: <configured-key>
+```
+
+It reads student records from MySQL and normalizes alternative field names such as:
+
+- `reg_number` or `registration_number`
+- `last_name` or `surname`
+- `phone` or `phone_number`
+- `status` or `registration_status`
+
+### Hardware-control layer
+
+The current firmware is a PlatformIO Arduino project for the Mega 2560. It currently:
+
+- Configures the Mega as an SPI slave
+- Receives two-character ASCII frames
+- Prints received frames through the serial monitor
+- Runs prototype servo movement routines
+
+It does not yet implement the complete carousel, conveyor, sensor, lock, or dispensing sequence described in the planning documents.
+
+---
+
+## Technology Stack
+
+### Application
+
+- Python
+- Kivy
+- OpenCV
+- Tesseract OCR through `pytesseract`
+- SQLite
+- Requests
+- Bcrypt
+- `spidev`
+- Pytest
+
+### API
+
+- Flask
+- MySQL Connector/Python
+- MySQL
+
+### Firmware
+
+- PlatformIO
+- Arduino framework
+- Arduino Mega 2560
+- Servo library
+- AVR SPI interrupt handling
+
+### Hardware and design
+
+- Altium project files
+- KiCad files
+- FreeCAD files
+- Simulation files
+- Component datasheets
+- Raspberry Pi and embedded-controller planning documents
+
+---
+
+## Repository Structure
+
+```text
 card-issuance-system/
-├── README.md                      # This file
-├── BUILD.md                       # Build instructions and current project status
-├── docs/                          # Architecture diagrams and project documents
-│   ├── carousel_3d_v2.html
-│   ├── kiosk_architecture.html
+├── README.md
+├── BUILD.md
+├── docs/
 │   ├── business/
-│   │   └── business-plan.docx
 │   ├── official/
-│   │   ├── card_issuance_block.drawio
-│   │   ├── concept-note.docx
-│   │   ├── end-semester-one report.docx
-│   │   ├── mid-semester-two report.docx
-│   │   ├── mid-semester-two.pptx
-│   │   └── mid-semeter-one report.docx
-│   └── primary/
-│       └── smart_kiosk_proposal_v2.docx
-├── kiosk_brain/                   # Raspberry Pi 5 Python application
+│   ├── primary/
+│   ├── carousel_3d_v2.html
+│   └── kiosk_architecture.html
+├── firmware/
+│   ├── docs/
+│   ├── include/
+│   ├── src/
+│   │   └── main.cpp
+│   ├── test/
+│   └── platformio.ini
+├── hardware/
+│   ├── Altium/
+│   ├── FreeCAD/
+│   ├── datasheets/
+│   ├── kiCAD/
+│   ├── simulations/
+│   └── README.md
+├── kiosk_brain/
 │   ├── main.py
 │   ├── config.example.py
 │   ├── requirements.txt
-│   ├── PHASE1_README.md
-│   ├── SPI_PROTOCOL.md
 │   ├── modules/
-│   │   ├── README.md
-│   │   ├── __init__.py
 │   │   ├── api_client.py
 │   │   ├── auth.py
+│   │   ├── capture_image.py
 │   │   ├── card_detector.py
 │   │   ├── database.py
 │   │   ├── ocr.py
-│   │   ├── phone_camera.py
 │   │   ├── session_manager.py
 │   │   ├── sms_client.py
 │   │   └── spi_master.py
-│   ├── tests/
-│   │   ├── all_test.py
-│   │   ├── generate_task_1_2_1_detection_outputs.py
-│   │   ├── generate_task_1_2_1_outputs.py
-│   │   ├── generate_task_1_2_2_outputs.py
-│   │   ├── generate_task_1_2_2_perspective_outputs.py
-│   │   ├── generate_task_1_2_3_4_outputs.py
-│   │   ├── generate_task_1_2_5_roi_outputs.py
-│   │   ├── generate_task_1_3_ocr_outputs.py
-│   │   ├── test_auth.py
-│   │   ├── test_ingest.py
-│   │   └── test_spi.py
+│   ├── db/
+│   │   ├── DATABASE_DESIGN.md
+│   │   ├── init_db.py
+│   │   └── schema.sql
 │   ├── ui/
-│   │   ├── __init__.py
 │   │   ├── constants.py
 │   │   ├── screens.py
 │   │   ├── styled_widgets.py
 │   │   └── styles.kv
-│   └── db/
-│       ├── DATABASE_DESIGN.md
-│       ├── init_db.py
-│       └── schema.sql
-├── mock_db_api/
-│   ├── README.md
-│   ├── app.py
-│   └── requirements.txt
-├── firmware/
-│   ├── BUILD.md
-│   ├── pin_assignment.txt
-│   ├── datasheets/
-│   │   ├── um1724-stm32-nucleo64-boards-mb1136-stmicroelectronics-1.pdf
-│   │   └── um1725.pdf
-│   └── real-time-controller/
-│       ├── Core/
-│       │   ├── Inc/
-│       │   │   ├── main.h
-│       │   │   ├── servo.h
-│       │   │   ├── stm32f4xx_hal_conf.h
-│       │   │   └── stm32f4xx_it.h
-│       │   ├── Src/
-│       │   │   ├── main.c
-│       │   │   ├── servo.c
-│       │   │   ├── stm32f4xx_hal_msp.c
-│       │   │   ├── stm32f4xx_it.c
-│       │   │   ├── syscalls.c
-│       │   │   ├── sysmem.c
-│       │   │   └── system_stm32f4xx.c
-│       │   └── Startup/
-│       │       └── startup_stm32f401retx.s
-│       ├── STM32F401RETX_FLASH.ld
-│       ├── STM32F401RETX_RAM.ld
-│       ├── real-time-controller Debug.launch
-│       └── real-time-controller.ioc
-└── hardware/
+│   └── tests/
+│       ├── all_test.py
+│       ├── test_auth.py
+│       ├── test_ingest.py
+│       ├── test_spi.py
+│       └── OCR output-generation scripts
+└── mock_db_api/
+    ├── app.py
     ├── README.md
-    ├── Altium/
-    │   ├── buck_converter/
-    │   └── reverse_pol_protection/
-    ├── FreeCAD/
-    │   ├── Design/
-    │   └── Exports/
-    ├── kiCAD/
-    │   ├── buck_converter.kicad_pcb
-    │   ├── buck_converter.kicad_pro
-    │   ├── buck_converter.kicad_sch
-    │   ├── rev_polarity_prot.kicad_pcb
-    │   ├── rev_polarity_prot.kicad_pro
-    │   ├── rev_polarity_prot.kicad_sch
-    │   ├── servo-motor.kicad_pcb
-    │   ├── servo-motor.kicad_pro
-    │   ├── servo-motor.kicad_sch
-    │   ├── hall-sensor.kicad_pro
-    │   ├── stepper-motor.kicad_pro
-    │   └── stepper-motor.kicad_sch
-    ├── simulations/
-    │   ├── buck_converter_12_5_V.pdsprj
-    │   ├── rev_polarity_protection.pdsprj
-    │   └── rev_polarity_protection.PDF
-    └── datasheets/
-        ├── 1N4728A_SER.pdf
-        ├── 1n5822.pdf
-        ├── MBRB1045-D.PDF
-        ├── XL4015.pdf
-        ├── carbon-film-resistor-datasheet.pdf
-        ├── infineon-irf4905-datasheet-en.pdf
-        ├── infineon-irfz44n-datasheet-en.pdf
-        ├── smd-capacitors.pdf
-        └── terminal-block.pdf
+    └── requirements.txt
 ```
 
-## Architecture Details
+---
 
-### Network Communication
+## Kiosk Application Setup
 
-**Pi ↔ University Database**: HTTPS + mDNS (development mode auto-discovers `ubuntu.local`)
-
-- Endpoint: `GET /students/{reg_number}` with Bearer token authentication
-- Timeout: 5 seconds with 3× exponential backoff retry
-- Supports WiFi and mobile hotspot failover
-- Falls back to local SQLite cache if API unavailable
-
-**Pi ↔ SMS Gateway**: HTTPS POST to BRIQ Solutions (Tanzania)
-
-- Endpoint: `POST /v1/message/send-instant`
-- Authentication: API key + sender ID in `config.example.py`
-- Retry queue: Failed sends stored in SQLite, background retry every 15 min
-- Supports both OTP and custom PIN messages
-
-**Pi ↔ STM32**: SPI serial communication (1 MHz, local link only)
-
-- Frame format: [COMMAND (1B)][PARAMETER (1B)][CHECKSUM (1B)]
-- Commands: Carousel rotation, card ejection, lock/unlock, sensor polling, homing
-- Safety: Pi crash → STM32 receives no commands → all motors remain stopped (no runaway)
-
-### Authentication & Sessions
-
-**Two-Factor Authentication**
-
-- **Factor 1 (OTP)**: 6-digit code generated via Python `secrets` module, bcrypt-hashed in DB, 24h expiry
-  - Sent via SMS (BRIQ) + Email (optional future enhancement)
-  - 3 consecutive failures → 30-min soft lockout (user can retry after cooldown)
-- **Factor 2 (PIN)**: 4–6 digits; bcrypt-hashed in database
-  - Returning students use existing PIN
-  - First-year students receive temporary PIN in SMS, must verify and create permanent PIN
-  - 3 consecutive failures → 24-hour hard lockout (flagged for administrator review)
-
-**Session Management**
-
-- Per-transaction state tracked in volatile `SessionManager` Python object (in-memory, not persistent)
-- Explicit cleanup on transaction completion or 5-min timeout (prevents card hijacking)
-- SessionManager methods: `initialize()`, `set_otp_valid()`, `set_pin_valid()`, `teardown()`
-- All events logged to immutable `audit_log` table (registration number, event type, timestamp, session ID)
-
-### Database
-
-**SQLite schema** (5 tables, no external dependencies) includes:
-
-- `students`: Registration number (PK), first/surname, email, phone, programme, status
-- `authentication`: OTP hash, PIN hash, is_temp_pin flag, failed attempt counters, lockout expiry
-- `cards`: Card ID, registration number (FK), slot index, batch reference, status, timestamps
-- `audit_log`: Immutable append-only log (registration number, event type, failure reason, session ID, timestamp)
-- `batches`: Batch metadata, card counts, staff ID, scan timestamp
-
-**Consistency**: All tables use TIMESTAMP for sorting; registration_number is the natural foreign key linking students, authentication, and cards. No cascading deletes (soft deletes via status field instead).
-
-**Performance**: Indexed on registration_number and audit_log.event_time for fast queries; SQLite sufficient for single-instance kiosk (no concurrency)
-
-### Power Architecture
-
-**Three-rail isolation strategy** (prevents motor noise coupling into Pi logic):
-
-| Rail       | Voltage | Current | Components                              | Protection                        |
-| ---------- | ------- | ------- | --------------------------------------- | --------------------------------- |
-| Primary    | 12V     | 10A     | NEMA 17 motors, A4988 drivers, solenoid | 12A fuse, separate ground plane   |
-| Logic      | 5V      | 3A      | Raspberry Pi, display, STM32, servos    | 3A buck converter, TVS diode      |
-| Backup UPS | 5V      | 1A      | Pi + display + STM32 emergency runtime  | Ideal diode, automatic switchover |
-
-**Topology**:
-
-- Single 12V/10A switching PSU (mains input 220–240V AC)
-- 12V→5V buck converter with LC filtering (1000µF + 100nF capacitors) feeds logic rail
-- 5V Li-ion UPS module with ideal diode provides seamless switchover on mains loss
-- Star ground connection at PSU negative terminal only (minimizes ground loops)
-- Main 12A fuse on 12V rail; 3A fused outputs to motor drivers, solenoid, and servo rails
-
-**Failsafe behavior**:
-
-- On mains loss: UPS supplies ~5–10 min runtime (Pi + display + STM32 only, motors stop immediately)
-- Ensures SQLite database closes cleanly; motors fail-safe (no backup power for motion)
-- Door solenoid is energized-to-lock (loses power → lock engages, fail-secure)
-
-### Sensors
-
-| Sensor | Type        | GPIO (STM32)   | Purpose                                             | Active Mode |
-| ------ | ----------- | -------------- | --------------------------------------------------- | ----------- |
-| IR1    | Break-beam  | PB4            | Staff door open detection (hardwired interrupt)     | Low         |
-| IR2    | Break-beam  | PB5            | Rear gate card detection (carousel loading check)   | Low         |
-| IR3    | Break-beam  | PB6            | Front gate card ejection confirmation (dispensing)  | Low         |
-| IR4    | Break-beam  | PB7            | Expired card slot insertion detection               | Low         |
-| Hall A | Hall-effect | PA11 (PULL_UP) | Carousel absolute home reference (slot 0 detection) | Low         |
-
-All inputs use internal pull-ups; firmware polls every 10ms or uses GPIO edge interrupts for critical signals (door open)
-
-### Bill of Materials (Key Components)
-
-- **Compute**: Raspberry Pi 5 (4GB), STM32 Nucleo-F401RE
-- **Display**: Official 5" DSI touchscreen (800×480, now 800×400 landscape-only)
-- **Cameras**: Pi Camera Module v2 (CSI for batch scan), USB 720p webcam (expired card slot)
-- **Motors & Actuation**:
-  - NEMA 17 stepper motors (×2): Carousel, Conveyor 1
-  - SG90 micro servos (×2): Card ejection flap, expired-card latch
-  - A4988 stepper drivers (×2, 12V logic)
-  - IRLZ44N MOSFET (solenoid switch, logic-level gate)
-- **Sensing**: IR break-beam sensors (×4, 5V), A3144 Hall-effect sensor (carousel homing)
-- **Security**: 12V solenoid lock (energized-to-lock, normally closed when de-energized)
-- **Power Distribution**:
-  - 12V/10A switching PSU (mains input 220–240V AC)
-  - 12V→5V buck converter (3A, with LC filtering)
-  - 5V Li-ion UPS module (emergency runtime backup)
-  - 12A main fuse, 3A fused subsystem outputs
-- **Storage**: 64GB Class 10 microSD card (Pi OS + SQLite database)
-- **Mechanical**: 10-slot turntable carousel, GT2 timing belt + pulleys, acrylic or 3D-printed prototype enclosure
-
-## Operation
-
-### Student Card Collection Workflow
-
-**Stage 1: OTP Verification**
-
-1. Student enters registration number on touchscreen
-2. Pi queries university database via HTTPS (or uses cached student record)
-3. Pi generates 6-digit OTP, hashes with bcrypt, stores in database
-4. BRIQ SMS API sends OTP via SMS (+ email if configured)
-5. Student enters OTP; Pi validates hash match within 24h window
-
-**Stage 2: PIN Setup / Verification**
-
-- **Returning student**: Enters existing PIN; Pi validates against bcrypt hash
-- **First-year student**: Receives temporary PIN in SMS, enters it, then creates permanent PIN (stored as is_temp_pin=FALSE)
-
-**Stage 3: Card Dispensing**
-
-1. Pi sends SPI frame: `[0x10, slot_index, checksum]` (ROTATE_TO_SLOT)
-2. STM32 rotates carousel stepper until target slot aligns with front gate
-3. Pi sends SPI frame: `[0x11, 0x00, 0x11]` (EJECT_CARD)
-4. STM32 activates servo; card pushed to student collection point
-5. Pi logs successful collection to audit_log; clears session; returns to IDLE
-
-**Stage 4: Timeout & Cleanup**
-
-- Inactivity > 60 seconds → Pi auto-clears session, returns to IDLE
-- SessionManager.teardown() erases volatile state (prevents card hijacking)
-
-### Lockout Policy
-
-| Failure Type | Attempts | Cooldown   | Effect                      |
-| ------------ | -------- | ---------- | --------------------------- |
-| OTP Failure  | 3        | 30 minutes | Soft lockout; retry allowed |
-| PIN Failure  | 3        | 24 hours   | Hard lockout; admin review  |
-
-### OCR Pipeline (Batch Loading)
-
-**Three-stage image processing** (target <3 sec per card):
-
-1. **Capture**: IR sensor on Conveyor 1 triggers CSI camera frame
-2. **Preprocessing**: Grayscale → adaptive threshold → deskew → ROI crop (OpenCV)
-3. **Extraction**: Tesseract 5 (`--psm 7` single-line mode) with alphanumeric whitelist
-4. **Validation**: Regex match against university registration format
-5. **Gating**: Low confidence (<70%) or regex mismatch → divert to reject bin
-
-## Installation & Setup
-
-### Raspberry Pi 5 Prerequisite Setup
-
-1. **OS Installation**
-
-   Flash Raspberry Pi OS Lite (bookworm, 64-bit ARM) to microSD via Raspberry Pi Imager.
-
-2. **Enable Interfaces** (via `sudo raspi-config`)
-
-   ```
-   Interface Options → SPI (enable)
-   Interface Options → Camera (enable)
-   Interface Options → SSH (enable)
-   ```
-
-3. **System Packages**
-
-   ```bash
-   sudo apt update && sudo apt install -y \
-     python3.11 python3.11-venv python3.11-dev \
-     libopencv-dev tesseract-ocr libtesseract-dev \
-     libsm6 libxrender-dev libxext-dev \
-     libatlas-base-dev libjasper-dev libtiff5 libharfbuzz0b libwebp6 \
-     python3-spidev avahi-daemon
-   ```
-
-### Kiosk Application Setup
+### 1. Clone the repository
 
 ```bash
-cd /home/pi/card-issuance-system/kiosk_brain
+git clone https://github.com/musyani-io/card-issuance-system.git
+cd card-issuance-system/kiosk_brain
+```
 
-# Create virtual environment
-python3.11 -m venv venv
-source venv/bin/activate
+### 2. Install system dependencies
 
-# Install Python dependencies
-pip install --upgrade pip setuptools wheel
+Install Python, Tesseract OCR, and the operating-system packages required by Kivy and OpenCV.
+
+On Debian, Ubuntu, or Raspberry Pi OS:
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip tesseract-ocr
+```
+
+Raspberry Pi hardware access also requires SPI to be enabled:
+
+```bash
+sudo raspi-config
+```
+
+Open **Interface Options**, enable **SPI**, and reboot.
+
+### 3. Create a Python virtual environment
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
 pip install -r requirements.txt
-
-# Initialize SQLite database
-cd db
-python3 init_db.py         # Creates kiosk.db with schema
-cd ..
 ```
 
-### Configuration
-
-Edit `config.example.py` with production values:
-
-- `BRIQ_API_KEY`: BRIQ Solutions API key (from account dashboard)
-- `BRIQ_SENDER_ID`: SMS sender name (max 11 chars)
-- `BRIQ_BASE_URL`: BRIQ endpoint (usually `https://karibu.briq.tz`)
-- `API_BASE_URL`: University database endpoint (e.g., `http://ubuntu.local:5000`)
-- `API_TIMEOUT_SEC`: Network timeout (default 5 sec)
-- `OTP_EXPIRY_HOURS`: OTP validity window (default 24 hours)
-- `PIN_LOCKOUT_HOURS`: Hard lockout duration (default 24 hours)
-
-**NEVER commit credentials to git**; use environment variables or secure config management in production.
-
-### Autostart Service (systemd)
-
-Create `/etc/systemd/system/kiosk.service`:
-
-```ini
-[Unit]
-Description=Smart ID Card Distribution Kiosk
-After=network-online.target avahi-daemon.service
-
-[Service]
-Type=simple
-User=pi
-WorkingDirectory=/home/pi/card-issuance-system/kiosk_brain
-ExecStart=/home/pi/card-issuance-system/kiosk_brain/venv/bin/python main.py
-Restart=on-failure
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable autostart:
+### 4. Create the local configuration file
 
 ```bash
-sudo systemctl enable kiosk.service
-sudo systemctl start kiosk.service
-sudo systemctl status kiosk.service
+cp config.example.py config.py
 ```
 
-### STM32 Firmware Development
+The current example file contains the service and OCR settings, but it also needs a `Path` import and a local database path for the checked-in modules.
 
-- **IDE**: STM32CubeIDE (Linux-native)
-- **Project**: Located in `firmware/real-time-controller/`
-- **Configuration**:
-  - SPI1 in slave mode (PA4=CS, PA5=CLK, PA6=MISO, PA7=MOSI)
-  - TIM2, TIM3 for stepper PWM (1–10 kHz configurable frequency)
-  - GPIO outputs for stepper DIR pins, solenoid control
-  - GPIO inputs (PULL_UP) for IR and Hall-effect sensors
-- **Build & Flash**: Use ST-Link v2 programmer; build via CubeIDE or Makefile
-- **SPI Protocol**: See `kiosk_brain/SPI_PROTOCOL.md` for frame format and command table
+Add the following near the top of `config.py`:
 
-### Unit & Integration Tests
+```python
+from pathlib import Path
 
-```bash
-cd kiosk_brain/tests
-
-# Unit tests
-python3 -m unittest tests.test_auth -v          # Authentication logic (bcrypt, OTP)
-python3 -m unittest tests.test_ocr -v           # OCR pipeline (OpenCV preprocessing)
-python3 -m unittest tests.test_spi -v           # SPI frame encoding/checksums
-
-# Integration test (requires mock API running)
-python3 -m unittest tests.test_integration -v
+BASE_DIR = Path(__file__).resolve().parent
+DB_PATH = BASE_DIR / "db" / "kiosk.db"
 ```
 
-### Mock University API (Development Only)
+Then update:
 
-The mock API simulates the real university student database for testing. See `mock_db_api/README.md` for setup.
+- BRIQ API credentials
+- Gmail SMTP account and app password
+- University API address and API key
+- Camera device paths
+- OCR parameters when necessary
+
+Do not commit `config.py`.
+
+---
+
+## Database Setup
+
+Initialize the local SQLite database from `kiosk_brain`:
 
 ```bash
-cd mock_db_api
+python3 db/init_db.py
+```
+
+The default database is created at:
+
+```text
+kiosk_brain/db/kiosk.db
+```
+
+To clear records and recreate the schema:
+
+```bash
+python3 db/init_db.py --reset
+```
+
+### SQLite tables
+
+| Table            | Purpose                                      |
+| ---------------- | -------------------------------------------- |
+| `students`       | Local student information                    |
+| `cards`          | Card status, batch, and slot assignment      |
+| `authentication` | OTP, PIN, attempt counters, and lockout data |
+| `audit_log`      | Authentication and card-processing events    |
+| `batches`        | Batch-loading statistics                     |
+
+The current ingestion code uses four local slots:
+
+```text
+0, 1, 2, 3
+```
+
+A slot remains occupied while its card status is not `collected`.
+
+---
+
+## Mock University API Setup
+
+The mock API is optional when the local SQLite database already contains the records required by the kiosk UI. It is required for card ingestion through `ingest_card()` or the OCR pipeline.
+
+### 1. Enter the API directory
+
+```bash
+cd ../mock_db_api
+```
+
+### 2. Create an environment
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-python app.py
-# Runs on https://localhost:5000, advertised as ubuntu.local (via mDNS)
 ```
 
-## Performance Targets
+### 3. Create `config.py`
 
-| Metric              | Target           | Notes                                                        |
-| ------------------- | ---------------- | ------------------------------------------------------------ |
-| **Card throughput** | 10–15 cards/min  | Batch mode: conveyor feed + carousel index + servo eject     |
-| **OCR accuracy**    | 98%+             | Assumes uniform lighting and clean card surface              |
-| **Pi startup**      | <30 sec          | OS boot + Kivy initialization + database open                |
-| **SPI latency**     | <10 ms           | Motor response imperceptible to user (<100 ms total)         |
-| **Auth response**   | <2s local        | SQLite hash validation only                                  |
-| **API round-trip**  | <5s (with retry) | Network + university DB query (includes exponential backoff) |
-| **SMS delivery**    | <60 sec          | BRIQ Solutions typical delivery window (Tanzania)            |
-| **Session timeout** | 60 sec           | Inactivity threshold before automatic teardown               |
+`mock_db_api/app.py` expects a local configuration file that is not committed to the repository.
 
-## Limitations & Future Work
+Create `mock_db_api/config.py`:
 
-### Current Release (Phase 4)
+```python
+API_KEY = "test-key-12345"
 
-- **SPI**: Unencrypted communication (trusted local link only; not a concern in kiosk setting)
-- **OCR**: Assumes uniform diffuse lighting (field lighting critical for ~98% accuracy)
-- **Carousel**: 10-slot prototype (firmware-configurable to 20-slot with mechanical change)
-- **Authentication**: SMS-only OTP delivery (email future enhancement)
-- **Database**: SQLite (single-instance; no concurrent access needed)
+DB_HOST = "localhost"
+DB_PORT = 3306
+DB_USER = "root"
+DB_PASSWORD = "your-mysql-password"
+DB_NAME = "card_issuance"
+```
 
-### Hardware Status (Phase 5: In Progress)
+The API key must match `UNIVERSITY_API_KEY` in `kiosk_brain/config.py`.
 
-- Mechanical prototype not yet assembled (waiting for motor/chassis components)
-- Firmware skeleton defined; SPI protocol complete (implementation pending)
-- Power distribution topology designed (not yet wired)
-- 3D-printed carousel CAD model in progress
+### 4. Prepare MySQL
 
-### Known Issues
+Create the configured database and a `students` table containing the student fields used by the application.
 
-- Pi Camera Module v2 uses legacy CSI connector (Pi 5 requires adapter cable)
-- Tesseract 5 may require language data pack installation for non-English text
-- mDNS discovery (avahi) unreliable over some corporate WiFi networks (fallback to IP config required)
+The API first searches by `reg_number` and falls back to `registration_number`.
 
-### Planned Enhancements
+Expected student information includes:
 
-- **Q4 2026**: SPI frame encryption (optional, low priority), multilingual OCR, backup SMS provider (Twilio), wireless firmware updates via U-Boot
-- **Future**: Biometric fingerprint verification, on-site card printing, encrypted tamper detection seals
+- Registration number
+- First name
+- Surname or last name
+- Email address
+- Phone number
+- Programme
+- Registration status
 
-## Additional Resources
+### 5. Run the API
 
-- **Architecture Diagrams**: See `docs/kiosk_architecture.html` (Kiosk flow state machines, hardware interconnect)
-- **Build Instructions**: See `BUILD.md` (current build instructions and project status)
-- **Hardware Design**: See `hardware/README.md` (power distribution, motor control implementation)
-- **Firmware Design**: See `firmware/BUILD.md` (STM32 configuration, pin assignments)
-- **SPI Protocol**: See `kiosk_brain/SPI_PROTOCOL.md` (3-byte frame format, command/response codes)
-- **Kiosk-Brain Subsystem**: See `kiosk_brain/README.md` (module architecture, screen flow)
-- **Mock API**: See `mock_db_api/README.md` (development database simulation)
-- **Database Schema**: See `kiosk_brain/db/DATABASE_DESIGN.md` and `schema.sql`
+```bash
+python3 app.py
+```
 
-## References
+The default service address is:
 
-### Software Libraries & Frameworks
+```text
+http://localhost:5000
+```
 
-- **Kivy 2.3.1**: Touch UI framework · <https://kivy.org/doc/>
-- **OpenCV 4.13.0**: Computer vision preprocessing · <https://docs.opencv.org/>
-- **Tesseract 5**: OCR engine · <https://github.com/UB-Mannheim/tesseract/wiki>
-- **Python bcrypt**: Password & OTP hashing · <https://github.com/pyca/bcrypt>
-- **requests 2.33.0**: HTTP client (API calls) · <https://requests.readthedocs.io/>
-- **SQLite 3**: Embedded database · <https://www.sqlite.org/lang.html>
-- **Flask 2.x**: Mock API framework · <https://flask.palletsprojects.com/>
+Example request:
 
-### Hardware & Microcontrollers
+```bash
+curl \
+  -H "X-API-Key: test-key-12345" \
+  http://localhost:5000/students/2022-04-09050
+```
 
-- **STM32F401RE Reference Manual**: <https://www.st.com/resource/en/reference_manual/dm00031020-stm32f4-series-reference-manual.pdf>
-- **A4988 Stepper Driver**: <https://www.pololu.com/product/1182>
-- **NEMA 17 Stepper Motor**: ~1.5A RMS, ~48mm frame
-- **SG90 Servo Motor**: 3–6V logic, torque ~2.5 kg⋅cm
-- **Raspberry Pi 5 Documentation**: <https://www.raspberrypi.com/documentation/computers/raspberry-pi.html>
+---
 
-### SMS Gateway & APIs
+## Running the OCR Pipeline
 
-- **BRIQ Solutions (Tanzania)**: <https://docs.briq.tz/api-reference/>
-- **mDNS / Avahi**: <https://avahi.org/>
-- **SPI Protocol**: <https://www.kernel.org/doc/html/latest/spi/index.html>
+Return to `kiosk_brain` and activate its virtual environment.
 
-### Development Tools
+### Capture one image
 
-- **STM32CubeIDE**: <https://www.st.com/en/development-tools/stm32cubeide.html>
-- **Git**: Version control · <https://git-scm.com/>
-- **Pytest**: Python unit testing framework · <https://docs.pytest.org/>
+```bash
+python3 modules/capture_image.py
+```
+
+The capture module:
+
+- Tries the configured video-device candidates
+- Applies the configured width, height, and frame rate
+- Warms up the camera
+- Captures one frame
+- Rotates the frame clockwise
+- Saves it in the configured capture directory
+
+### Run capture, OCR, and ingestion
+
+```bash
+python3 modules/ocr.py
+```
+
+The OCR pipeline performs:
+
+1. Camera capture
+2. Card contour detection
+3. Perspective flattening
+4. Registration-number ROI cropping
+5. Grayscale and adaptive-threshold preprocessing
+6. Tesseract OCR
+7. Registration-number extraction
+8. Student API lookup
+9. SQLite ingestion
+10. OTP and credential dispatch
+
+Supported OCR patterns include:
+
+```text
+2022-04-09050
+T/UDSM/2022/1234
+```
+
+An 11-digit compact number can also be reformatted into:
+
+```text
+XXXX-XX-XXXXX
+```
+
+### Ingest a known registration number without OCR
+
+```bash
+python3 -c \
+"from modules.database import ingest_card; print(ingest_card('2022-04-09050'))"
+```
+
+Replace the example with a registration number that exists in the mock university database.
+
+---
+
+## Running the Kiosk UI
+
+From `kiosk_brain`:
+
+```bash
+python3 main.py
+```
+
+The UI is configured for:
+
+```text
+800 × 400 pixels
+```
+
+### Current screens
+
+- Idle
+- Registration-number entry
+- OTP entry
+- PIN entry
+- PIN setup
+- Waiting
+- Confirmation
+- Error
+- Locked
+
+### Current validation values
+
+| Setting                      |         Value |
+| ---------------------------- | ------------: |
+| Registration-number length   | 13 characters |
+| OTP length                   |      6 digits |
+| PIN length                   |      4 digits |
+| Registration lookup attempts |             3 |
+| OTP attempts                 |             3 |
+| PIN attempts                 |             3 |
+| Inactivity timeout           |    15 seconds |
+| Confirmation timeout         |    15 seconds |
+| Locked-screen display        |     5 seconds |
+
+The Kivy UI reads already-ingested records from SQLite. It does not perform card ingestion itself.
+
+---
+
+## Firmware Setup
+
+The current firmware targets an **Arduino Mega 2560**.
+
+### Requirements
+
+Install PlatformIO Core or use PlatformIO inside Visual Studio Code.
+
+### Build
+
+```bash
+cd firmware
+pio run
+```
+
+### Upload
+
+Connect the Mega 2560 and run:
+
+```bash
+pio run --target upload
+```
+
+### Open the serial monitor
+
+```bash
+pio device monitor --baud 115200
+```
+
+### Current firmware behaviour
+
+The firmware currently:
+
+- Attaches prototype servos to pins 22, 23, and 24
+- Configures hardware SPI slave pins on the Mega
+- Receives two-byte ASCII frames
+- Prints received frames to the serial monitor
+- Runs a servo movement test during startup
+
+### Current SPI interface
+
+Raspberry Pi configuration in `modules/spi_master.py`:
+
+| Parameter  | Value               |
+| ---------- | ------------------- |
+| SPI bus    | 0                   |
+| SPI device | 0                   |
+| Speed      | 100 kHz             |
+| Mode       | 0                   |
+| Frame type | Two-character ASCII |
+
+Status frames:
+
+| Frame | Meaning                                   |
+| ----- | ----------------------------------------- |
+| `00`  | Processing error                          |
+| `1X`  | Processing success; `X` is the slot index |
+
+The Mega hardware SPI pins are:
+
+| Signal | Mega 2560 pin |
+| ------ | ------------: |
+| SS     |            53 |
+| MOSI   |            51 |
+| MISO   |            50 |
+| SCK    |            52 |
+
+Use a common ground between the Raspberry Pi and Arduino. Apply appropriate 5 V-to-3.3 V level shifting where required to protect the Raspberry Pi.
+
+---
+
+## Testing
+
+From `kiosk_brain`:
+
+```bash
+pytest tests/test_auth.py tests/test_ingest.py tests/test_spi.py
+```
+
+The repository also contains scripts that generate intermediate OCR images for:
+
+- Card detection
+- Perspective correction
+- Preprocessing
+- ROI extraction
+- OCR output inspection
+
+These scripts are development utilities rather than normal unit tests.
+
+---
+
+## Configuration Reference
+
+### Kiosk configuration
+
+`kiosk_brain/config.py` controls:
+
+- `DB_PATH`
+- `UNIVERSITY_API_BASE_URL`
+- `UNIVERSITY_API_KEY`
+- `BRIQ_API_KEY`
+- `BRIQ_SENDER_ID`
+- `BRIQ_BASE_URL`
+- `SMTP_EMAIL`
+- `APP_PASSWORD`
+- Camera device candidates
+- Capture dimensions and frame rate
+- Card-detection thresholds
+- Perspective output size
+- Registration-number ROI
+- OCR preprocessing values
+
+### Mock API configuration
+
+`mock_db_api/config.py` controls:
+
+- `API_KEY`
+- `DB_HOST`
+- `DB_PORT`
+- `DB_USER`
+- `DB_PASSWORD`
+- `DB_NAME`
+
+### Secrets
+
+The following must remain outside version control:
+
+- API keys
+- SMTP app passwords
+- MySQL passwords
+- Production database addresses
+- Any real student data
+
+---
+
+## Security Design
+
+The authentication module includes:
+
+- Cryptographically generated six-digit OTPs
+- Cryptographically generated four-digit temporary PINs
+- Bcrypt hashing for OTPs and PINs
+- OTP expiry after 24 hours
+- OTP lockout after repeated failures
+- PIN lockout after repeated failures
+- Temporary-to-permanent PIN transition
+- Audit logging
+- Session teardown and inactivity handling
+
+### Authentication behaviour
+
+- OTP lockout is configured for 30 minutes after the threshold is reached.
+- PIN lockout is configured for 24 hours after the threshold is reached.
+- Credentials are sent independently through SMS and email.
+- Credential delivery is considered successful when at least one channel succeeds.
+- Plaintext OTPs and PINs should never be stored in the database or written to production logs.
+
+---
+
+## Known Limitations
+
+1. **Dispensing is simulated.**  
+   `main.py` displays a simulated delay instead of commanding the physical dispenser.
+
+2. **Card status is updated before physical confirmation.**  
+   The current flow marks a card as `collected` before simulated dispensing completes. A production version should update the database only after receiving a verified hardware-success response.
+
+3. **Returning-student permanent PIN is not wired into the UI flow.**  
+   The authentication module supports permanent-PIN verification, but the current returning-student branch proceeds after OTP verification.
+
+4. **The firmware is an early prototype.**  
+   It receives SPI frames and tests servo movement but does not yet execute complete carousel or conveyor commands.
+
+5. **The software and planning documents differ.**  
+   Several documents describe STM32 firmware, a three-byte protocol, 1 MHz SPI, and a 10-slot carousel. The checked-in code uses Arduino Mega 2560, two-byte ASCII frames, 100 kHz SPI, and four software slots.
+
+6. **Staff batch-loading UI is not integrated.**  
+   Card ingestion is available through the OCR module and database functions, not through the current Kivy `main.py` interface.
+
+7. **Local configuration files are required.**  
+   `kiosk_brain/config.py` and `mock_db_api/config.py` must be created locally.
+
+8. **The example kiosk configuration needs two additions.**  
+   The checked-in `config.example.py` uses `Path` and the application imports `DB_PATH`, but the example does not currently define both.
+
+9. **The mock API requires a separately prepared MySQL schema.**  
+   A MySQL student-table creation script is not included in `mock_db_api`.
+
+10. **No production security boundary has been established.**  
+    The development API uses a static API key and HTTP by default. Production deployment should use HTTPS, secret management, restricted network access, and stronger service authentication.
+
+---
+
+## Development Priorities
+
+The following changes are required before a complete hardware demonstration:
+
+1. Connect the returning-student flow to permanent-PIN verification.
+2. Move `mark_card_collected()` after confirmed hardware dispensing.
+3. Replace simulated dispensing with SPI command and acknowledgement handling.
+4. Define one authoritative controller and protocol specification.
+5. Implement carousel homing and slot movement.
+6. Implement conveyor, ejector, lock, and sensor state machines.
+7. Add SPI checksums, timeouts, retries, and fault codes.
+8. Integrate the staff batch-loading workflow into the Kivy application.
+9. Add a MySQL schema and seed data for `mock_db_api`.
+10. Correct and expand the example configuration files.
+11. Add end-to-end tests covering OCR, API, database, authentication, SPI, and physical dispensing.
+12. Update older planning documents so they match the selected hardware.
+
+---
+
+## Documentation and Hardware Files
+
+The repository includes:
+
+- Business and concept documents
+- Semester reports
+- Presentation files
+- Architecture diagrams
+- Mechanical carousel visualisation
+- PCB design directories
+- CAD files
+- Simulations
+- Component datasheets
+- Build-progress notes
+
+Some of these files describe planned architecture rather than the behaviour of the current source code. For implementation work, use the checked-in source files as the current reference.
+
+---
+
+## License
+
+No software license file is currently included in the repository. Add a license before distributing or accepting external contributions.

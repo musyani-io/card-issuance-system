@@ -61,7 +61,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
-MAX_SLOTS = 4
+MAX_SLOTS = 3
 TOTAL_SLOTS = list(range(MAX_SLOTS))  # [0, 1, 2, 3]
 OTP_EXPIRY_HOURS = 24
 
