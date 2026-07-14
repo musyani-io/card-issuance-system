@@ -8,38 +8,49 @@ SPI_DEVICE = 0
 SPI_SPEED_HZ = 100000
 SPI_MODE = 0
 
-# Persistent SPI connection instance
-_spi_instance: spidev.SpiDev | None = None
-
-
-def _get_spi_bus() -> spidev.SpiDev:
-    """Lazy initialize and maintain the SPI port connection."""
-    global _spi_instance
-    if _spi_instance is None:
-        _spi_instance = spidev.SpiDev()
-        _spi_instance.open(SPI_BUS, SPI_DEVICE)
-        _spi_instance.max_speed_hz = SPI_SPEED_HZ
-        _spi_instance.mode = SPI_MODE
-    return _spi_instance
-
 
 def send_spi_message(message: str) -> list[int]:
-    """Send a short ASCII SPI message and return the transferred bytes."""
+    """Send a short ASCII SPI message and immediately release the bus file descriptor."""
     if not message:
         raise ValueError("SPI message cannot be empty")
 
-    spi = _get_spi_bus()
     payload = [ord(char) for char in message]
-    return spi.xfer2(payload)
+    
+    spi = spidev.SpiDev()
+    try:
+        spi.open(SPI_BUS, SPI_DEVICE)
+        spi.max_speed_hz = SPI_SPEED_HZ
+        spi.mode = SPI_MODE
+        return spi.xfer2(payload)
+    finally:
+        spi.close()  # Instantly release /dev/spidev0.0 for other concurrent processes
 
 
-def send_status(success: bool, slot_index: int | None = None) -> str:
-    """Send the card-processing status frame expected by the lower controller."""
-    frame = "00"
-    if success:
-        if slot_index is None:
-            raise ValueError("slot_index is required for a successful SPI status")
-        frame = f"1{int(slot_index)}"
+def send_status(success: bool, slot_index: int | None = None, is_ui: bool = False) -> str:
+    """Send the card-processing status frame expected by the lower controller.
+    
+    UI transactions (is_ui=True):
+        - Success: "2X" (where X is slot_index)
+        - Failure: "FF"
+        
+    OCR transactions (is_ui=False):
+        - Success: "1X" (where X is slot_index)
+        - Failure: "00"
+    """
+    if is_ui:
+        if success:
+            if slot_index is None:
+                raise ValueError("slot_index is required for a successful SPI status")
+            frame = f"2{int(slot_index)}"
+        else:
+            frame = "FF"
+    else:
+        if success:
+            if slot_index is None:
+                raise ValueError("slot_index is required for a successful SPI status")
+            frame = f"1{int(slot_index)}"
+        else:
+            frame = "00"
 
     send_spi_message(frame)
     return frame
