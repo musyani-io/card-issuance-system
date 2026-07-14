@@ -16,6 +16,7 @@ from modules.database import (
     mark_card_collected,
 )
 from modules.session_manager import SessionManager
+from modules.spi_master import send_spi_message  # SPI communication link
 from ui.constants import (
     CONFIRMATION_SCREEN_SECONDS,
     LOCKOUT_SCREEN_SECONDS,
@@ -482,6 +483,11 @@ class KioskApp(App):
         self._run_async(task, callback)
 
     def begin_dispense(self, *_):
+        """
+        Executes physical card retrieval by building a "2X" instruction frame
+        (where '2' is the mandatory retrieval prefix and 'X' is the slot index)
+        and transmitting it over SPI on a non-blocking background thread.
+        """
         if self.dispense_in_progress:
             return
         if session_manager.slot_index is None:
@@ -493,19 +499,38 @@ class KioskApp(App):
 
         self.dispense_in_progress = True
         token = self.flow_token
-        self.wait_screen.set_status("Preparing card dispense...")
+        self.wait_screen.set_status("Positioning Carousel...")
         self.wait_screen.set_detail(
-            "Hardware is not enabled yet, so this step is simulated for now."
+            f"Ejecting card from storage slot index: {session_manager.slot_index}"
         )
 
-        def _complete_simulation(_dt):
+        # Build retrieval target frame using '2' as the retrieval prefix, followed by the slot
+        spi_command = f"2{int(session_manager.slot_index)}"
+
+        # Non-blocking wrapper executes raw SPI transfers away from Kivy's main layout render thread
+        def hardware_task():
+            try:
+                send_spi_message(spi_command)
+                return {"success": True}
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+
+        def hardware_callback(result):
             if token != self.flow_token:
                 return
             self.dispense_in_progress = False
             session_manager.update_activity()
-            self.sm.current = SCREEN_CONFIRMATION
 
-        Clock.schedule_once(_complete_simulation, 1.5)
+            if result.get("success"):
+                self.sm.current = SCREEN_CONFIRMATION
+            else:
+                self._set_error(
+                    "Hardware Connection Failure",
+                    retry_screen=SCREEN_WAIT,
+                    detail=f"SPI Transfer Error: {result.get('error')}",
+                )
+
+        self._run_async(hardware_task, hardware_callback)
 
     def schedule_confirmation_timeout(self):
         self._cancel_events()
