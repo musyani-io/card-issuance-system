@@ -58,8 +58,8 @@ def send_status(success: bool, slot_index: int | None = None, is_ui: bool = Fals
 
 def main() -> int:
     try:
-        sent = send_spi_message("AA")
-        print(f"Sent: AA -> {sent}")
+        sent = send_spi_message("20")
+        print(f"Sent: 20 -> {sent}")
     except Exception as exc:
         print(f"SPI test failed: {exc}")
         return 1
