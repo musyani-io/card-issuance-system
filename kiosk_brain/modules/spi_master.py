@@ -1,6 +1,8 @@
+#!/usr/bin/env python3
 """SPI helpers for sending status frames to the lower controller."""
 
 from __future__ import annotations
+import argparse
 import spidev
 
 SPI_BUS = 0
@@ -57,11 +59,20 @@ def send_status(success: bool, slot_index: int | None = None, is_ui: bool = Fals
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="SPI Master CLI utility.")
+    parser.add_argument(
+        "-c", "--command", 
+        type=str, 
+        required=True, 
+        help="ASCII command string to send over SPI"
+    )
+    args = parser.parse_args()
+
     try:
-        sent = send_spi_message("20")
-        print(f"Sent: 20 -> {sent}")
+        sent = send_spi_message(args.command)
+        print(f"Sent command: {args.command} -> {sent}")
     except Exception as exc:
-        print(f"SPI test failed: {exc}")
+        print(f"SPI transmission failed: {exc}")
         return 1
 
     return 0
