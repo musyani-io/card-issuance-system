@@ -8,9 +8,11 @@ registration number.
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import cv2
@@ -32,6 +34,22 @@ REG_NUMBER_PATTERNS = (
     re.compile(r"\b\d{4}-\d{2}-\d{5}\b"),
     re.compile(r"\bT/UDSM/\d{4}/\d{4}\b", re.IGNORECASE),
 )
+
+# USB camera device index (0 maps to /dev/video0)
+WEBCAM_INDEX = 0
+
+
+def is_webcam_connected(device_index: int = WEBCAM_INDEX) -> bool:
+    """Check if the USB webcam is physically connected and responsive."""
+    device_path = f"/dev/video{device_index}"
+    if not (os.path.exists(device_path) and os.access(device_path, os.R_OK)):
+        return False
+
+    # Attempt to briefly open the camera to verify driver-level responsiveness
+    cap = cv2.VideoCapture(device_index)
+    is_open = cap.isOpened()
+    cap.release()  # Release lock immediately so downstream processes can use it
+    return is_open
 
 
 def _format_compact_registration_number(digits: str) -> str | None:
@@ -298,7 +316,6 @@ def run_ocr_pipeline() -> str:
 
     status_sent = False
     try:
-        # Protected: Initial system capture environment validation
         capture_dir = _run_capture_script()
         latest_image = _latest_capture_image(capture_dir)
 
@@ -395,12 +412,39 @@ def run_ocr_pipeline() -> str:
 
 
 def main() -> int:
-    try:
-        run_ocr_pipeline()
-    except Exception as exc:
-        print(f"ocr pipeline failed: {exc}", file=sys.stderr)
-        return 1
+    print("Starting continuous webcam monitoring loop. Press Ctrl+C to stop.")
+    was_connected = False
 
+    try:
+        while True:
+            device_found = is_webcam_connected(WEBCAM_INDEX)
+
+            if not device_found:
+                if was_connected:
+                    print("Webcam disconnected. Returning to standby monitoring...")
+                    was_connected = False
+                time.sleep(1.0)  # Low CPU-overhead polling interval
+                continue
+
+            # Connection transition check
+            if not was_connected:
+                print("\nWebcam detected! Waiting 5 seconds to stabilize connection...")
+                time.sleep(5.0)
+                was_connected = True
+
+            print("Executing OCR pipeline...")
+            try:
+                run_ocr_pipeline()
+            except Exception as exc:
+                print(f"OCR pipeline run failed: {exc}", file=sys.stderr)
+
+            # Post-execution standby delay before restarting loop cycles
+            print("Pipeline run completed. Waiting 5 seconds before checking status...")
+            time.sleep(5.0)
+
+    except KeyboardInterrupt:
+        print("\nMonitoring stopped by user.")
+    
     return 0
 
 
