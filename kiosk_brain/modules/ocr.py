@@ -426,10 +426,10 @@ def main() -> int:
                 time.sleep(1.0)  # Low CPU-overhead polling interval
                 continue
 
-            # Connection transition check
+            # Connection transition check with 10 seconds carousel settling headroom
             if not was_connected:
-                print("\nWebcam detected! Waiting 5 seconds to stabilize connection...")
-                time.sleep(5.0)
+                print("\nWebcam detected! Waiting 10 seconds for carousel to settle...")
+                time.sleep(10.0)
                 was_connected = True
 
             print("Executing OCR pipeline...")
