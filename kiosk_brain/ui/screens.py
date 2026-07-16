@@ -223,14 +223,12 @@ class PINSetupScreen(Screen):
         self.name = SCREEN_PIN_SETUP
         setup_screen_background(self)
 
-        layout = BoxLayout(orientation="vertical", padding=18, spacing=12)
+        # Split layout mirroring PIN and OTP entry screens
+        layout, left, right = create_entry_split_shell()
         self.add_widget(layout)
 
-        card = create_glass_card(padding=18, spacing=12)
-        layout.add_widget(card)
-
-        card.add_widget(create_title_label(text="Set Permanent PIN"))
-        card.add_widget(
+        left.add_widget(create_title_label(text="Set Permanent PIN"))
+        left.add_widget(
             create_info_label(text="Choose a new 4-digit PIN and confirm it.")
         )
 
@@ -252,13 +250,44 @@ class PINSetupScreen(Screen):
         )
         self.submit_button = create_primary_button(text="Set PIN", size_hint_y=0.16)
 
-        card.add_widget(self.pin_input)
-        card.add_widget(self.confirm_input)
-        card.add_widget(self.submit_button)
+        left.add_widget(self.pin_input)
+        left.add_widget(self.confirm_input)
+        left.add_widget(self.submit_button)
+
+        # Keypad panel on the right side
+        self.keypad = create_number_keypad()
+        right.add_widget(self.keypad)
+
+        # Keep track of active focused input field
+        self.active_input = self.pin_input
+        self.pin_input.bind(focus=self.on_input_focus)
+        self.confirm_input.bind(focus=self.on_input_focus)
+
+        for button in self.keypad.children:
+            button.bind(on_press=self.on_keypad_press)
+
+    def on_input_focus(self, instance, value):
+        """Updates the active targeted field dynamically as focus changes."""
+        if value:
+            self.active_input = instance
+
+    def on_keypad_press(self, button):
+        """Dispatches keypresses dynamically to the focused entry field."""
+        if not self.active_input:
+            return
+
+        if button.text == "DEL":
+            if self.active_input.text:
+                self.active_input.text = self.active_input.text[:-1]
+        elif button.text == "ENTER":
+            self.submit_button.trigger_action()
+        elif len(self.active_input.text) < PIN_LENGTH:
+            self.active_input.insert_text(button.text)
 
     def clear_inputs(self):
         self.pin_input.text = ""
         self.confirm_input.text = ""
+        self.active_input = self.pin_input
 
 
 class WaitScreen(Screen):
