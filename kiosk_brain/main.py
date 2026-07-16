@@ -468,9 +468,7 @@ class KioskApp(App):
                 session_manager.slot_index = result.get("slot_index")
                 session_manager.batch_id = result.get("batch_id")
                 self.wait_screen.set_status("Dispensing card...")
-                self.wait_screen.set_detail(
-                    "Please wait while the kiosk moves your card into position."
-                )
+                self.wait_screen.set_detail("")
                 self.note_activity()
                 self.sm.current = SCREEN_WAIT
             else:
@@ -495,11 +493,9 @@ class KioskApp(App):
         self.dispense_in_progress = True
         token = self.flow_token
         self.wait_screen.set_status("Dispensing Card...")
-        self.wait_screen.set_detail(
-            f"Rotating carousel to slot: {session_manager.slot_index}"
-        )
+        self.wait_screen.set_detail("")
 
-        # 1. Fire SPI status frame synchronously on the main thread (takes only ~160 microseconds)
+        # 1. Fire SPI status frame synchronously on the main thread
         try:
             send_status(success=True, slot_index=session_manager.slot_index, is_ui=True)
         except Exception as exc:
@@ -510,10 +506,11 @@ class KioskApp(App):
             except Exception as spi_exc:
                 print(f"Failed to transmit 'FF' frame: {spi_exc}")
             
+            # Transition to error page upon connection failure with customized user message
             self._set_error(
-                "Hardware Error",
-                retry_screen=SCREEN_WAIT,
-                detail=f"SPI Eject failed: {exc}",
+                "Card dispensing failed",
+                retry_screen=SCREEN_IDLE,
+                detail="Card dispensing failed, come back next time.",
             )
             return
 
