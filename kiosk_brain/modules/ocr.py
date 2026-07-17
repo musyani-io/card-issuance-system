@@ -426,11 +426,16 @@ def main() -> int:
                 time.sleep(1.0)  # Low CPU-overhead polling interval
                 continue
 
-            # Connection transition check with 10 seconds carousel settling headroom
+            # Handle 10-second delays cleanly:
             if not was_connected:
+                # Carousel settling headroom on first camera detection
                 print("\nWebcam detected! Waiting 10 seconds for carousel to settle...")
                 time.sleep(10.0)
                 was_connected = True
+            else:
+                # Continuous monitoring: wait 10 seconds between captures
+                print("\nWaiting 10 seconds before starting next capture cycle...")
+                time.sleep(10.0)
 
             print("Executing OCR pipeline...")
             try:
@@ -438,9 +443,9 @@ def main() -> int:
             except Exception as exc:
                 print(f"OCR pipeline run failed: {exc}", file=sys.stderr)
 
-            # Post-execution standby delay before restarting loop cycles
-            print("Pipeline run completed. Waiting 5 seconds before checking status...")
-            time.sleep(5.0)
+            # Post-execution standby check
+            print("Pipeline run completed. Checking status...")
+            time.sleep(1.0)  # Short polling delay before loop verification
 
     except KeyboardInterrupt:
         print("\nMonitoring stopped by user.")
