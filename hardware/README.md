@@ -1,227 +1,116 @@
 # Hardware Implementation
 
-**Status**: Phase 5 (Mechanical Prototype) — In planning phase. Detailed schematics and implementation guides to follow as components arrive and testing begins.
+**Status**: Phase 5 (Mechanical Prototype) — Active prototyping. Target platform is the Arduino Mega 2560 with the 2-byte ASCII SPI protocol.
 
-This section outlines the hardware architecture and integration strategy for motor control, power distribution, sensing, and inter-controller communication.
+This section outlines the hardware architecture, pin mappings, and integration strategy for motor control, power distribution, sensing, and inter-controller communication.
+
+---
 
 ## Power Distribution Architecture
 
-**Topology**: Three isolated rails with manual and automatic switching
+**Topology**: Single 220VAC-to-12VDC primary power supply with step-down logic regulation and star common ground.
 
-| Rail        | Voltage         | Current | Components                                          | Protection                        |
-| ----------- | --------------- | ------- | --------------------------------------------------- | --------------------------------- |
-| **Primary** | 12V             | 10A     | NEMA motors, stepper drivers, solenoid lock, servos | 12A fuse, relay switching         |
-| **Logic**   | 5V (regulated)  | 3A      | Raspberry Pi, display, STM32 logic, sensors         | 3A buck converter, TVS diode      |
-| **Backup**  | 5V (Li-ion UPS) | 1A      | Pi + display + STM32 runtime on mains loss          | Ideal diode, automatic switchover |
+- **Primary Source**: 220VAC-to-12VDC switching power supply.
+- **Logic Power**: An LM2596 buck converter steps down the 12V rail to 5VDC to power the Raspberry Pi 5, the Arduino Mega 2560, and logic sensors.
+- **Common Reference**: All grounds (12V power supply negative terminal, LM2596 input/output grounds, Raspberry Pi ground, and Arduino Mega ground) are tied together at a single common reference point (star ground configuration) to eliminate ground loop noise.
 
-**Implementation Tasks** (from BUILD.md Phase 5):
+| Rail | Voltage | Components | Regulation / Source | Grounding |
+| --- | --- | --- | --- | --- |
+| **Primary** | 12V | Stepper drivers, solenoid lock, servos | 220VAC to 12VDC PSU | Single-Point Common Ground |
+| **Logic** | 5V | Raspberry Pi 5, display, Arduino Mega, sensors | LM2596 Buck Converter | Single-Point Common Ground |
 
-1. Install 12V/10A switching PSU (mains input 220–240V)
-2. Wire 12V→5V buck converter with input filtering (1000µF, 100nF capacitors)
-3. Connect UPS module with ideal diode to create seamless switchover on power loss
-4. Add 12A main fuse on 12V rail, 3A fused outputs to each subsystem
-5. Use thick gauge wire (AWG 16–18) for all power distribution to minimize voltage drop
+**Implementation Tasks**:
+1. Mount the 220VAC-to-12VDC primary switching power supply securely.
+2. Connect the LM2596 buck converter to the 12V rail and calibrate its output to exactly 5.0V before connecting any logic components.
+3. Establish a single ground terminal block where all grounds are physically joined at one point.
+4. Add safety fuses where appropriate (e.g. on the primary 12V rail).
+5. Use adequate gauge wire (e.g. AWG 16–18 for power paths, AWG 22 for logic grounds) to prevent voltage drops.
 
-**Noise Isolation**: Motor and logic rails physically separated; star ground connection at PSU negative terminal only
+---
 
-### Motor Driver & Stepper Motor Control
+## Motor Driver & Stepper Motor Control
 
-**Architecture**: A4988 stepper drivers (×2) → NEMA 17 motors (Carousel + Conveyor 1)
+**Architecture**: 28BYJ-48 geared stepper motor (5V/12V) with ULN2003 Darlington driver board.
 
-**Per Driver**:
+**Driver Connection**:
+- **Inputs**: IN1, IN2, IN3, IN4 connected to Arduino Mega digital output pins.
+- **Power**: 5V/12V (depending on motor variant) + GND.
+- **Outputs**: 4-phase coil connector to the 28BYJ-48 stepper motor.
 
-- **Inputs**: STEP (GPIO pin), DIR (GPIO pin), MS1/MS2 (microstepping mode select)
-- **Power**: 12V + GND from primary rail
-- **Current Limiting**: Onboard potentiometer calibrated for ~1.5A RMS per motor
-- **Outputs**: Coil A± and B± to NEMA 17 stepper motor
+**Arduino Mega Pin Mapping**:
+- `IN1` ──→ Digital Pin 30
+- `IN2` ──→ Digital Pin 31
+- `IN3` ──→ Digital Pin 32
+- `IN4` ──→ Digital Pin 33
 
-**STM32 Firmware Tasks** (Phase 5.2 from BUILD.md):
+> [!NOTE]
+> The Arduino code constructs the stepper interface using `Stepper stepper(2048, 30, 32, 31, 33)` (IN1, IN3, IN2, IN4 pin order) to match the correct phase sequence required by the 28BYJ-48.
 
-1. Configure Timer TIM2 for carousel stepper control:
-   - Frequency range 1–10 kHz (steps/sec adjustable from firmware)
-   - Pulse generation via PWM channel with 50% duty cycle
-2. Configure Timer TIM3 for conveyor stepper control: Same setup as TIM2
-3. GPIO outputs for DIR pins: Set high/low to control direction (forward/reverse)
-4. `home_carousel()` routine: Rotate until A3144 hall-effect sensor triggers, reset step counter to 0
-5. `rotate_to_slot(index)` routine: Calculate steps from current position to target slot (36°/slot = X steps at configured frequency)
+**Tuning Parameters**:
+- **Steps per full rotation**: 2048 steps (geared down).
+- **Speed**: 5 RPM (configured in firmware to maximize torque and prevent mechanical slippage).
+- **Homing and Carousel Compartments**:
+  - Carousel has 3 compartments: A, B, and C (Failure/Reject slot).
+  - Homing aligns to Compartment A (0° / 0 steps).
+  - Compartment B (120°) is located at 683 steps.
+  - Compartment C (240°) is located at 1365 steps.
 
-**Tuning Parameters** (to be determined during mechanical testing):
+---
 
-- Steps per full rotation (200 or 400, motor dependent)
-- Microstepping mode (full, half, quarter, eighth step)
-- Maximum frequency (limited by motor torque and load)
-- Acceleration/deceleration ramp-up/ramp-down time
+## Servo Motor Control (SG90 Servo)
 
-**Wiring Convention**:
+**Servo**: Single SG90 analog micro-servo for the card holder / front gate release mechanism.
 
-```bash
-PS (+12V) ──→ |A4988| ← STEP/DIR from STM32 GPIO
-GND ──────────|||||── Stepper Coils (A+, A-, B+, B-)
-```
+**Control Signal**: PWM at 50 Hz, 544–2400µs pulse width.
+- **Origin position**: 544µs (0° hold position).
+- **Active release position**: Mapped to 70° in the firmware to retract the card gate.
 
-### Solenoid Lock Control via MOSFET
+**Arduino Mega Connection**:
+- **Vcc**: 5V Logic Rail (from LM2596 output)
+- **GND**: Common Ground
+- **Signal**: Digital Pin 22 (PWM)
 
-**Architecture**: IRLZ44N MOSFET (logic-level, N-channel) as high-side driver for 12V solenoid
+**Firmware Logic**:
+To prevent sudden jumps on startup, the pulse width is preloaded to the origin pulse (544µs) before attaching the servo object. The servo moves smoothly using a microsecond-stepping sweep routine.
 
-**Solenoid Specifications** (typical 12V latch-hold type):
+---
 
-- Activation voltage: 12V DC ±10%
-- Hold current: ~500mA (continuous)
-- Fail-secure: Spring return to locked position on de-energization
+## Raspberry Pi 5 ↔ Arduino Mega 2560 SPI Communication
 
-**MOSFET Gate Drive**:
+**Bus Specification**: SPI Mode 0, 100 kHz clock speed. 
 
-- Gate pin connected to STM32 GPIO output (3.3V high = MOSFET ON, solenoid energized)
-- Source connected to 12V primary rail (-)
-- Drain connected to solenoid terminal
-- Solenoid other terminal to 12V rail (+)
-- Flywheel diode (1N4007, cathode to source) across solenoid to clamp back-EMF on de-energization
+**Physical Interconnect**:
+- **Raspberry Pi 5 (Master)**:
+  - GPIO 11 (SCLK) ──→ Mega Pin 52 (SCK)
+  - GPIO 10 (MOSI) ──→ Mega Pin 51 (MOSI)
+  - GPIO 9  (MISO) ───→ Mega Pin 50 (MISO)
+  - GPIO 8  (CE0)  ───→ Mega Pin 53 (SS, active low)
+  - Common Ground  ───→ GND (tied to the single-point common ground)
 
-**STM32 GPIO Configuration**:
+> [!IMPORTANT]
+> The Arduino Mega operates at 5V logic, while the Raspberry Pi 5 operates at 3.3V. You **MUST** use an appropriate 5V-to-3.3V logic level shifter on the MISO line (Mega TX to Pi RX) to protect the Raspberry Pi GPIO pins.
 
-- Pin PA3 (or equivalent) configured as digital output
-- Set high (3.3V) to energize solenoid → door LOCKED
-- Set low (0V) to de-energize solenoid → door spring-returns to UNLOCKED
+**2-Byte ASCII Protocol**:
+Every transmission frame consists of exactly **2 ASCII characters** without checksum bytes, terminated by a null character in the receiver buffer.
 
-**Safety Interlocks**:
+### Status and Routing Frames (Pi → Mega)
 
-- Door-open IR sensor (GPIO interrupt with high priority) immediately sets solenoid GPIO low on interrupt
-- Cannot be overridden by normal firmware logic — hardware interrupt handler always wins
+| ASCII Frame | Transaction Type | Action / Target Meaning |
+| ----------- | ---------------- | ----------------------- |
+| `"10"`      | Ingestion (OCR)  | Route Compartment A to Entrance (0°) and release card |
+| `"11"`      | Ingestion (OCR)  | Route Compartment B to Entrance (120°) and release card |
+| `"12"`      | Ingestion (OCR)  | Route Compartment C to Entrance (240°) and release card |
+| `"00"`      | Ingestion (OCR)  | OCR Error/Failure: Route Compartment C to Entrance (240°) |
+| `"20"`      | Collection (UI)  | Route Compartment A to Exit (180°) and await pickup |
+| `"21"`      | Collection (UI)  | Route Compartment B to Exit (300°) and await pickup |
+| `"FF"`      | Collection (UI)  | UI Transaction Failure / Cancelled |
 
-**Wiring**:
+---
 
-```bash
-12V (+) ───────────────→ Solenoid(+)
-
-12V (-) → |IRLZ44N MOSFET|
-   [Flywheel Diode: 1N4007]
-   [Junction: Solenoid(-)]
-
-STM32 GPIO PA3 ────→ MOSFET Gate (through 1kΩ resistor for protection)
-```
-
-### Hall-Effect Sensor Integration
-
-**Sensor**: A3144 (or equivalent), 3-pin (GND, Vcc, OUT—open-collector)
-
-**Purpose**: Absolute home reference for carousel homing routine; placed at slot 0 position with neodymium magnet ring on carousel
-
-**Electrical**:
-
-- Vcc (2.7–5.5V logic supply) connected to 5V logic rail through 100Ω protection resistor
-- OUT (open-collector output) pulled high via 10kΩ resistor to 3.3V
-- STM32 GPIO configured as digital input + edge-triggered interrupt (rising edge = sensor active)
-
-**Signal Conditioning**:
-
-- Software debounce: 50ms delay after sensor trigger before accepting signal (filters mechanical bounce)
-- Interrupt priority: Medium (lower than door-open IR, higher than encoder polling)
-
-**Firmware Routine** (`home_carousel()`):
-
-1. Issue N steps at known frequency toward homing position
-2. Wait for hall-effect interrupt (timeout after 5 seconds → error condition)
-3. On interrupt: Stop motor immediately, reset step counter to 0, store as home position
-4. Return success and new step offset value
-
-**Wiring**:
-
-```bash
-5V Logic Rail → [100Ω] ──→ Vcc (A3144)
-GND ────────→ GND (A3144)
-Out (A3144) ──[100Ω]──→ STM32 GPIO PB4 (with 50ms software debounce)
-         └──[10kΩ pull-up to 3.3V]
-```
-
-### Servo Motor Control (SG90 Servos ×2)
-
-**Servos**: SG90 analog servos for card ejector flap (front gate) and expired card latch (side slot)
-
-**Control Signal**: PWM at 50 Hz, 1–2ms pulse width
-
-- 1.0ms pulse → 0° (fully CCW)
-- 1.5ms pulse → 90° (center)
-- 2.0ms pulse → 180° (fully CW)
-
-**STM32 Firmware**:
-
-- Configure Timer TIM4 Channel 1 & 2 as PWM output
-- Frequency: 50 Hz (20ms period)
-- Pulse width register: 1000–2000 counts (at 1µs clock granularity) to map to 1–2ms
-
-**Wiring**:
-
-```bash
-5V Logic Rail ──→ Vcc (SG90)
-GND ────────────→ GND (SG90)
-STM32 PB6 (PWM) ──→ Signal (SG90)
-```
-
-### Raspberry Pi → STM32 SPI Communication
-
-**Bus Specification**: SPI1, 1 MHz clock, Mode 0 (CPOL=0, CPHA=0)
-
-**Raspberry Pi (Master)**:
-
-- GPIO23 (SCLK) → STM32 PA5 (SPI1_SCK)
-- GPIO24 (MOSI) → STM32 PA7 (SPI1_MOSI)
-- GPIO25 (MISO) → STM32 PA6 (SPI1_MISO)
-- GPIO8 (CE0) → STM32 PA4 (SPI1_NSS, active low)
-
-**Command Frame Format** (Pi → STM32):
-
-```bash
-[COMMAND_BYTE] [PARAMETER_BYTE] [CHECKSUM_BYTE]
-```
-
-**Response Frame Format** (STM32 → Pi):
-
-```bash
-[STATUS_BYTE] [DATA_BYTE] [CHECKSUM_BYTE]
-```
-
-**Checksum Algorithm**: CRC-8 (polynomial 0xD5, simplest variant sufficient for local SPI)
-
-**Command Set** (Phase 5 from BUILD.md Phase 4.4):
-
-- `0x01`: ROTATE_TO_SLOT(slot_index) → rotate carousel to slot, return status
-- `0x02`: EJECT_CARD() → pulse ejector servo, return status
-- `0x03`: LATCH_CARD() → close expired card slot latch, return status
-- `0x04`: UNLOCK_DOOR() → de-energize solenoid, return status
-- `0x05`: LOCK_DOOR() → energize solenoid, return status
-- `0x06`: GET_SENSOR_STATE() → read all 5 sensor states (packed byte), return status + sensor_byte
-- `0x07`: HOME_CAROUSEL() → rotate until hall-effect triggers, reset step counter, return status
-
-**Python SPI Driver** (Pi-side, from BUILD.md Phase 4.5):
-
-- Module: `modules/spi_master.py`
-- Function: `send_command(cmd_byte, param_byte)` → builds 3-byte frame, transfers, reads response, validates checksum
-- Wrapper functions: `rotate_to_slot(index)`, `eject_card()`, `unlock_door()`, etc.
-- Error handling: Timeout (>500ms response) = retry up to 3 times, then log failure
-
-**Sample Wiring Diagram**:
-
-```bash
-Raspberry Pi 5              SPI Bus              STM32 Nucleo-F401RE
-┌──────────────┐           (1 MHz)              ┌─────────────────┐
-│ GPIO23 ─────────────────────────→ PA5 (SCK)   │                 │
-│ GPIO24 ─────────────────────────→ PA7 (MOSI)  │                 │
-│ GPIO25 ←─────────────────────── PA6 (MISO)   │                 │
-│ GPIO8  ─────────────────────────→ PA4 (NSS)   │                 │
-│ GND    ─────────────────────────→ GND         │                 │
-└──────────────┘                                 └─────────────────┘
-```
-
-### Integration Checkpoint (Phase 5.1-5.7)
+## Integration Checkpoint
 
 Before moving to full system integration, validate in sequence:
-
-1. **Power Rails** (Phase 5 Task TBD): Verify 12V and 5V outputs under load; check for noise/ripple
-2. **Stepper Drivers** (Phase 5.2): Test rotation in both directions; measure current draw at configured frequency
-3. **Solenoid** (Phase 5.3 TBD): Confirm door lock/unlock with GPIO control; verify fail-secure on power loss
-4. **Hall-Effect Homing** (Phase 5.2): Rotate carousel until home sensor triggers; confirm repeatability
-5. **Servo Control** (Phase 5.3 TBD): Command servo through full range; measure response time
-6. **SPI Loopback** (Phase 5.1.4): Echo all commands from Pi and confirm byte-for-byte round-trips
-7. **Full Carousel Cycle**: Load a test card into Slot 0, rotate through all 10 positions, return to home — verify mechanical precision
-
-**Documentation Reference**: See `firmware/` directory for STM32 CubeIDE project with complete HAL configuration and interrupt handlers.
+1. **Power Rails**: Verify stable 12V and 5V outputs under load; check for noise/ripple.
+2. **Stepper driver**: Test rotation in both directions; verify that speed is set to 5 RPM to ensure torque.
+3. **Servo Gate**: Confirm card holder gate opens to 70° and returns to origin (0°).
+4. **SPI Loopback**: Send characters `"10"`, `"11"`, `"20"`, etc., from `spi_master.py` and confirm serial outputs on the Arduino Mega.

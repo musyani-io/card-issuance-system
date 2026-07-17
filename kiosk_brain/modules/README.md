@@ -21,7 +21,7 @@ IDLE Screen
     │                  ├─ [OCR pass] → Regex validation + confidence gating
     │                  ├─ HTTPS query university API → student data fetch
     │                  ├─ [API timeout] → queue card as pending_lookup, retry background
-    │                  ├─ SPI ROTATE_TO_SLOT (assign carousel position)
+    │                  ├─ SPI status frames ("1X" / "00")
     │                  ├─ Africa's Talking SMS dispatch (OTP for returning, OTP+PIN for first-year)
     │                  └─ Loop until conveyor empty → SUMMARY (batch complete)
     │
@@ -46,8 +46,8 @@ IDLE Screen
          │
          ├─→ CONFIRM Screen (show student name, programme, card info)
          │    ├─ [confirm button] → SUCCESS
-         │    │    ├─ SPI ROTATE_TO_SLOT(assigned_index)
-         │    │    ├─ SPI EJECT_CARD (servo push from front gate)
+         │    │    ├─ SPI status frame "2X"
+         │    │    ├─ Servo activation to open gate
          │    │    ├─ [eject success] → StudentCollection audit event
          │    │    └─ Timer 30s → auto-logout back to IDLE
          │    │
@@ -70,7 +70,7 @@ IDLE Screen
 | `ocr.py`             | Image preprocessing, Tesseract invocation, regex validation    | opencv-python, pytesseract |
 | `session_manager.py` | Per-session state lifecycle, explicit teardown                 | dataclasses                |
 | `sms_client.py`      | Africa's Talking SDK wrapper, retry queue                      | africastalking             |
-| `spi_master.py`      | SPI frame encoding, checksum, command dispatch                 | spidev                     |
+| `spi_master.py`      | SPI frame transmission to lower controller                     | spidev                     |
 | `ui/screens.py`      | Kivy Screen subclasses, event handlers                         | Kivy                       |
 | `ui/styles.kv`       | Widget layouts, event bindings                                 | Kivy (.kv DSL)             |
 
@@ -155,7 +155,7 @@ DATABASE_PATH = "/home/pi/card-issuance-system/kiosk-brain/data/kiosk.db"
 LOG_PATH = "/home/pi/card-issuance-system/kiosk-brain/data/logs"
 
 SPI_DEVICE = "/dev/spidev0.0"
-SPI_SPEED_HZ = 1_000_000  # 1 MHz clock
+SPI_SPEED_HZ = 100_000  # 100 kHz clock
 
 # Email for escalated audit events (admin review)
 ADMIN_CONTACT_EMAIL = "admin@university.edu"
@@ -176,7 +176,7 @@ cd db
 python init_db.py
 ```
 
-This creates `kiosk.db` with tables: `students`, `authentication`, `audit_log`, `batches`, `sessions`.
+This creates `kiosk.db` with tables: `students`, `cards`, `authentication`, `audit_log`, `batches`.
 
 ## Python Modules Reference
 
@@ -478,63 +478,19 @@ class SMSClient:
 
 ### `spi_master.py`
 
-**Purpose**: SPI protocol implementation for hardware command dispatch.
+**Purpose**: SPI helper for transmitting 2-byte ASCII status frames to the lower controller (Arduino Mega 2560).
 
 **Frame Format**:
+Every transmission frame consists of exactly 2 ASCII characters representing the processing transaction status. No checksum byte is appended.
 
-```
-Frame Down (Pi → STM32):
-  [COMMAND_BYTE (0-255)][PARAMETER_BYTE (0-255)][CHECKSUM_BYTE]
-
-Frame Up (STM32 → Pi):
-  [STATUS_BYTE (0=OK, 1=ERR, 2=BUSY)][DATA_BYTE (varies)][CHECKSUM_BYTE]
-
-Checksum: XOR of first two bytes
-```
-
-**Commands**:
-| Command | Param | Response | Notes |
-|---------|-------|----------|-------|
-| `0x01` ROTATE_TO_SLOT | Slot index (0–9) | `0x00` OK or `0x01` ERROR | Carousel 36° per slot |
-| `0x02` EJECT_CARD | — | `0x00` OK | Servo push at front gate |
-| `0x03` UNLOCK_DOOR | — | `0x00` OK | De-energize solenoid (staff) |
-| `0x04` LOCK_DOOR | — | `0x00` OK | Energize solenoid |
-| `0x05` LATCH_CARD | — | `0x00` OK | Servo clamp (expired slot) |
-| `0x06` RELEASE_CARD | — | `0x00` OK | Servo release |
-| `0x07` GET_SENSOR_STATE | — | `[status_byte]` | Packed byte: S1|S2|S3|S4|Hall|... |
-| `0x08` HOME_CAROUSEL | — | `0x00` OK or `0x01` ERROR | Hall sensor → slot 0 |
+- Ingestion (OCR) Success: `"1X"` where `X` is the slot index (`0`, `1`, `2`)
+- Ingestion (OCR) Failure: `"00"`
+- Collection (UI) Success: `"2X"` where `X` is the slot index (`0`, `1`, `2`)
+- Collection (UI) Failure: `"FF"`
 
 **Public Interface**:
-
-```python
-class SPIMaster:
-    def __init__(self, spi_device: str = "/dev/spidev0.0", speed_hz: int = 1_000_000):
-        pass
-
-    def rotate_to_slot(self, slot_index: int) -> tuple[bool, str]:
-        """Send ROTATE_TO_SLOT command. Returns (success, message)."""
-
-    def eject_card(self) -> tuple[bool, str]:
-        """Send EJECT_CARD command."""
-
-    def unlock_door(self) -> tuple[bool, str]:
-        """Send UNLOCK_DOOR command."""
-
-    def get_sensor_state(self) -> tuple[bool, int]:
-        """Send GET_SENSOR_STATE. Returns (success, packed_byte)."""
-
-    def home_carousel(self) -> tuple[bool, str]:
-        """Send HOME_CAROUSEL (reset step counter to slot 0)."""
-
-    def _send_receive(self, cmd_byte: int, param_byte: int) -> tuple[int, int]:
-        """Low-level SPI transaction with checksum."""
-```
-
-**Error Handling**:
-
-- STM32 not responding: Timeout exception (SPI stuck, hardware malfunction)
-- Checksum mismatch: Invalid response, retry once, escalate if repeated
-- Motor timeout (carousel stuck): Return error, lock out further transactions until administrator intervention
+- `send_spi_message(message: str) -> list[int]`: Lower-level SPI transmission using `spidev` at 100 kHz clock speed. Opens and closes the SPI port dynamically to prevent bus locking.
+- `send_status(success: bool, slot_index: int | None = None, is_ui: bool = False) -> str`: Higher-level wrapper to formulate the status frame and transmit it.
 
 ### `ui/screens.py`
 
@@ -625,7 +581,7 @@ pytest -v
 
 - Frame encoding/decoding
 - Checksum calculation (XOR)
-- Command dispatch to mock STM32 via loopback
+- Command dispatch to mock Arduino Mega via loopback
 
 ### Integration Tests
 
@@ -680,7 +636,7 @@ ORDER BY timestamp DESC;
 | **OCR**            | Tesseract processing (1–3 seconds per frame) | Pre-process image quality, ROI tuning                 |
 | **API call**       | Network latency (mDNS lookup + HTTPS)        | Connection pooling, keep-alive                        |
 | **SMS dispatch**   | Africa's Talking rate limit                  | Queue failures, background retry                      |
-| **SPI latency**    | Motor response time                          | Increase SPI clock (1 MHz → 2 MHz if STM32 tolerates) |
+| **SPI latency**    | Motor response time                          | Configure SPI clock speed (currently 100 kHz)        |
 | **Kivy rendering** | GPU fill rate on 7" display                  | Reduce animation frame count, optimize .kv layouts    |
 
 ## Troubleshooting
@@ -691,7 +647,7 @@ ORDER BY timestamp DESC;
 | --------------------------------------------- | ----------------------------- | ---------------------------------------------------------- |
 | **Pi cannot reach university-db.local**       | mDNS not resolved             | Check avahi-daemon running on mock API laptop              |
 | **OCR accuracy very low**                     | Poor card lighting            | Adjust conveyor LED brightness, check ROI crop bounds      |
-| **SPI timeout (motor stuck)**                 | STM32 firmware crash          | Check ST-Link debugger logs, reload firmware               |
+| **SPI timeout (motor stuck)**                 | Arduino Mega firmware crash   | Check serial monitor logs, reload firmware                 |
 | **Kivy display corruption**                   | GPU memory exhaustion         | Reduce concurrent animations, check DSI ribbon connection  |
 | **SMS not dispatched**                        | Invalid API key or rate limit | Check config.py, monitor audit log for `sms_failed` status |
 | **Database file corruption after power loss** | Incomplete checkpoint         | Verify UPS backup working (5V rail hold time)              |
@@ -704,7 +660,7 @@ ORDER BY timestamp DESC;
 - [ ] University database mDNS name resolvable
 - [ ] Staff PIN hashed in config.py (never plaintext)
 - [ ] Kivy runs on framebuffer (DSI display intact)
-- [ ] SPI communication verified (GPIO connected to STM32)
+- [ ] SPI communication verified (GPIO connected to Arduino Mega)
 - [ ] Systemd service enabled for autostart
 - [ ] Camera calibration (CSI focus, USB angle)
 - [ ] Test batch with sample cards

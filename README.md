@@ -85,7 +85,7 @@ The repository currently contains four main parts:
 | Camera image capture                    | Implemented                                            |
 | Card contour and perspective correction | Implemented                                            |
 | Tesseract OCR extraction                | Implemented                                            |
-| Card ingestion and four-slot assignment | Implemented                                            |
+| Card ingestion and three-slot assignment | Implemented                                            |
 | Raspberry Pi SPI sender                 | Basic two-byte status frames implemented               |
 | Arduino Mega SPI receiver               | Basic frame reception implemented                      |
 | Servo prototype                         | Implemented at firmware-test level                     |
@@ -94,7 +94,7 @@ The repository currently contains four main parts:
 | Complete carousel/conveyor control      | Not implemented in the checked-in firmware             |
 | Production deployment and enclosure     | Not complete                                           |
 
-The repository documentation contains earlier STM32 and 10-slot carousel plans. The current checked-in firmware instead targets an **Arduino Mega 2560**, and the current SQLite ingestion logic assigns a maximum of **four active slots**.
+The repository documentation has been updated to reflect the physical system. The firmware targets an **Arduino Mega 2560**, and the SQLite ingestion logic assigns a maximum of **three active slots** (0, 1, 2) matching the 3-compartment carousel design.
 
 ---
 
@@ -443,10 +443,10 @@ python3 db/init_db.py --reset
 | `audit_log`      | Authentication and card-processing events    |
 | `batches`        | Batch-loading statistics                     |
 
-The current ingestion code uses four local slots:
+The current ingestion code uses three local slots:
 
 ```text
-0, 1, 2, 3
+0, 1, 2
 ```
 
 A slot remains occupied while its card status is not `collected`.
@@ -806,8 +806,8 @@ The authentication module includes:
 4. **The firmware is an early prototype.**  
    It receives SPI frames and tests servo movement but does not yet execute complete carousel or conveyor commands.
 
-5. **The software and planning documents differ.**  
-   Several documents describe STM32 firmware, a three-byte protocol, 1 MHz SPI, and a 10-slot carousel. The checked-in code uses Arduino Mega 2560, two-byte ASCII frames, 100 kHz SPI, and four software slots.
+5. **Legacy planning references.**  
+   Earlier design drafts mentioned STM32 controllers, a 3-byte binary protocol, 1 MHz SPI, and a 10-slot carousel. The actual system implementation uses an Arduino Mega 2560, a 2-byte ASCII frame protocol over 100 kHz SPI, and three software slots corresponding to the 3-compartment carousel.
 
 6. **Staff batch-loading UI is not integrated.**  
    Card ingestion is available through the OCR module and database functions, not through the current Kivy `main.py` interface.

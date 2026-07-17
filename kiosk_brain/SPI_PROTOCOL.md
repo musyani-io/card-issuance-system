@@ -1,73 +1,53 @@
-# SPI Communication Protocol: Raspberry Pi 5 ↔ STM32 Nucleo-F401RE
+# SPI Communication Protocol: Raspberry Pi 5 ↔ Arduino Mega 2560
 
 ## Overview
 
-Defines byte-level protocol for Pi-to-STM32 communication over SPI bus at 1 MHz.
-Every message is 3 bytes: [command/status, parameter/data, checksum].
-Checksum is XOR of first two bytes to detect 1-bit corruption.
+Defines the ASCII-level protocol for Raspberry Pi 5 to Arduino Mega 2560 communication over the SPI bus at 100 kHz.
+Every transmission is exactly 2 characters (2 bytes) of ASCII data, terminated by a null character in the receiver buffer. No checksum bytes or complex frame overhead is used in this prototype.
+
+---
 
 ## Physical Interface
 
-- Bus: SPI1 (GPIO10=MOSI, GPIO9=MISO, GPIO11=SCLK, GPIO8=CS)
-- Speed: 1 MHz (stable over ~2m ribbon cable)
-- Frame: 3 bytes per command, 3 bytes per response
+- **Raspberry Pi 5 (Master)**:
+  - Bus: SPI0 (GPIO 11 = SCK, GPIO 10 = MOSI, GPIO 9 = MISO, GPIO 8 = CE0)
+  - Speed: 100 kHz (configured in `spi_master.py`)
+  - Mode: SPI Mode 0 (CPOL=0, CPHA=0)
+- **Arduino Mega 2560 (Slave)**:
+  - Pins: SS (53), MOSI (51), MISO (50), SCK (52)
+  - Common Ground: A shared common ground reference point must be established between both boards.
+  - Logic Level Shift: A logic level shifter must be used on the MISO line (5V to 3.3V) to protect the Pi.
 
-## Command Frame Format
+---
 
-```bash
-Byte 0 [CMD]:     Command code (0x10–0x41, see table)
-Byte 1 [PARAM]:   Parameter (slot index, etc.) or 0x00
-Byte 2 [CHECKSUM]: XOR(CMD ^ PARAM)
+## Transmission Frame Format
+
+Commands sent by the Raspberry Pi are 2-character ASCII strings. The Arduino Mega reads the 2 bytes, terminates them as a string, and processes the corresponding routing routine.
+
+```text
+Byte 0: Command Group / Transaction Prefix ('0', '1', '2', 'F')
+Byte 1: Target slot index ('0', '1', '2') or command identifier ('0', 'F')
 ```
 
-Example: Rotate to slot 5 → `[0x10, 0x05, 0x15]`
+---
 
-## Response Frame Format
+## Command Reference Table
 
-```bash
-Byte 0 [STATUS]:   Response code (0x00–0x04, see table)
-Byte 1 [DATA]:     Payload (sensor flags, error detail, etc.)
-Byte 2 [CHECKSUM]: XOR(STATUS ^ DATA)
-```
+The following status and command frames are sent by the Raspberry Pi `spi_master.py`:
 
-## Command Code Table
+| ASCII Frame | Transaction Type | Action / Target Meaning |
+| ----------- | ---------------- | ----------------------- |
+| `"10"`      | Ingestion (OCR)  | Route Compartment A to Entrance (0°) and trigger servo release |
+| `"11"`      | Ingestion (OCR)  | Route Compartment B to Entrance (120°) and trigger servo release |
+| `"12"`      | Ingestion (OCR)  | Route Compartment C to Entrance (240°) and trigger servo release |
+| `"00"`      | Ingestion (OCR)  | OCR Error/Failure: Route Compartment C to Entrance (240°) |
+| `"20"`      | Collection (UI)  | Route Compartment A to Exit (180°) and await pickup |
+| `"21"`      | Collection (UI)  | Route Compartment B to Exit (300°) and await pickup |
+| `"FF"`      | Collection (UI)  | UI Transaction Failure / Cancelled |
 
-| Hex  | Command          | Param Meaning    | Response       |
-| ---- | ---------------- | ---------------- | -------------- |
-| 0x10 | ROTATE_TO_SLOT   | Slot index (0–9) | ACK / BUSY     |
-| 0x11 | EJECT_CARD       | (unused, 0x00)   | ACK / ERROR    |
-| 0x12 | LATCH_CARD       | (unused, 0x00)   | ACK / ERROR    |
-| 0x13 | RELEASE_LATCH    | (unused, 0x00)   | ACK / ERROR    |
-| 0x20 | LOCK_DOOR        | (unused, 0x00)   | ACK / ERROR    |
-| 0x21 | UNLOCK_DOOR      | (unused, 0x00)   | ACK / ERROR    |
-| 0x30 | FEED_CARD        | (unused, 0x00)   | ACK / BUSY     |
-| 0x31 | DIVERT_REJECT    | (unused, 0x00)   | ACK / ERROR    |
-| 0x40 | GET_SENSOR_STATE | (unused, 0x00)   | SENSOR_PAYLOAD |
-| 0x41 | HOME_CAROUSEL    | (unused, 0x00)   | ACK / BUSY     |
+---
 
-## Response Code Table
+## Error and Status Handling
 
-| Hex  | Response             | Data Byte Meaning                        |
-| ---- | -------------------- | ---------------------------------------- |
-| 0x00 | ACK                  | Operation complete                       |
-| 0x01 | NACK                 | Command not recognized or invalid param  |
-| 0x02 | BUSY                 | Motor/servo still moving; retry in 100ms |
-| 0x03 | SENSOR_STATE_PAYLOAD | Packed sensor flags (see below)          |
-| 0x04 | ERROR                | Hardware failure (motor stall, etc.)     |
-
-## Sensor State Payload (Data byte for RESP_SENSOR_STATE_PAYLOAD)
-
-```bashs
-Bit 7 [Door Open]         : 1 = rear door unlocked/open
-Bit 6 [Card at Rear Gate] : 1 = card at carousel entry sensor
-Bit 5 [Card at Front Gate]: 1 = card at ejection slot
-Bit 4 [Card in Reject]    : 1 = card in reject bin
-Bits 3–0 [Reserved]       : Always 0
-```
-
-Example: `0b01010000` = Card at both rear and front gates
-
-## Error Handling
-
-**Checksum Failure:** STM32 rejects frame; Pi times out after 10ms and retries (max 3 times).
-**Hardware Error:** STM32 responds with `RESP_ERROR`; Pi logs to audit_log and shows ErrorScreen.
+- **Invalid Command**: The Arduino Mega logs "Unknown SPI Frame" via its serial monitor on baud 115200 if the received 2-byte frame does not match any known commands.
+- **SS Pin Synchronization**: The Mega's software buffer index resets whenever the Chip Select (SS) line goes HIGH (signaling that the Pi has released the SPI bus), which automatically maintains word synchronization.
